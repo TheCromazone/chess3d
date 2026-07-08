@@ -1,0 +1,15 @@
+id,role,type,description,size/ratio,style line ref,source
+piece_set,3d piece meshes for all 6 chess piece types,3d-procedural,classic Staunton profiles (pawn rook knight bishop queen king) built as Three.js lathe/extrude geometry,~1.0 board-square width per piece base,blocks 1-3,generate(procedural)
+wood_walnut,dark squares surface,texture,walnut wood photo texture (user-generated via codex from formula prompt; mirrored-repeat wrap for seamless tiling; procedural fallback in code),1024x1024 jpg,block 3,reference_media(codex)
+wood_maple,light squares surface,texture,maple wood photo texture (user-generated via codex; mirrored-repeat wrap; procedural fallback),1024x1024 jpg,block 3,reference_media(codex)
+wood_espresso,board frame surface,texture,espresso wood photo texture (user-generated via codex; mirrored-repeat wrap; procedural fallback),1024x1024 jpg,block 3,reference_media(codex)
+menu_bg,main menu backdrop,image,tournament hall interior (user-generated via codex from formula prompt) behind dark overlay,1600x900 jpg,blocks 3-4,reference_media(codex)
+felt_table,table surface under the board,material-procedural,deep green-charcoal felt tone with soft roughness,large plane,block 4,generate(procedural)
+sfx_move,piece placed on square,audio-sfx,wood-tap synthesized in WebAudio (generation blocked: workspace out of credits),<1s,block 4,generate(procedural-webaudio)
+sfx_capture,piece captures another,audio-sfx,sharper double wood knock synthesized in WebAudio,<1s,block 4,generate(procedural-webaudio)
+sfx_check,check alert,audio-sfx,single soft chime synthesized in WebAudio,<1s,block 4,generate(procedural-webaudio)
+sfx_end,game over,audio-sfx,two-note chime synthesized in WebAudio,<2s,block 4,generate(procedural-webaudio)
+sfx_tick,low-time clock tick,audio-sfx,soft click synthesized in WebAudio,<1s,block 4,generate(procedural-webaudio)
+music_calm,looping background track,audio-music,CUT — generation blocked (workspace out of credits); re-add via sonilo_music when credits available,40s loop,block 4,blocked
+img_thumbnail,deploy cover / OG image,image,illustrated cover with CHESS 3D title (user-generated via codex from formula prompt),1600x900 jpg,full formula,reference_media(codex)
+img_favicon,deploy favicon / catalog icon / site favicon,image,white Staunton knight on espresso wood (user-generated via codex),512x512 png,full formula,reference_media(codex)

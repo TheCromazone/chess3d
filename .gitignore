@@ -1,0 +1,5 @@
+node_modules
+dist
+.vercel
+chess3d-game.zip
+DEPLOY.md
