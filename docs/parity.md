@@ -6,9 +6,9 @@ Loop 1 built the platform (shell, engine, bots, review, analysis, puzzles, learn
 2D/3D boards). Loop 2 added Chess960 / KOTH / Three-check, the opening explorer, Bot Arena, Puzzle
 Battle, Insights, sharing (link, GIF, PNG), light mode, a PWA, and an independent bug hunt (22 fixes).
 Loop 3 added onboarding, move times, background-tab alerts, and daily (correspondence) chess on
-persistent rooms. What remains needs servers: chat and takebacks online are built but wait for the
-v2 rules to be deployed (see docs/online-server.md), and friends, clubs, messages and leaderboards
-need accounts.
+persistent rooms. Rules v2 (chat, takebacks, abort, custom time controls) is deployed to the room server. What remains
+needs an accounts backend: friend requests and presence, clubs, direct messages, and a global
+leaderboard (the user chose to stay account-free).
 Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don't have (alternative noted)
 
 ## Play
@@ -17,11 +17,11 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 |---|---|---|
 | Play online vs random opponent (matchmaking) | ✅ | quick pairing through rotating public pool rooms; ghost seats skipped; verified with two live clients |
 | Play a friend (invite link) | ✅ | time control chosen up front, share sheet on mobile |
-| Time controls: bullet/blitz/rapid presets + custom | ✅ | 9 presets + custom vs bots / pass and play; online limited to the server's 5 until rules v2 is deployed |
+| Time controls: bullet/blitz/rapid presets + custom | ✅ | 9 presets + custom for bots, friends and pass and play; quick pairing uses the 5 pool presets |
 | Bots with names, ratings, personalities | ✅ | 16 original personalities, 250 → 3200, chat lines, Stockfish 18 |
 | Pass and play | ✅ | names, clocks, auto-flip |
 | Draw offer / resign / abort | ✅ | abort before both sides move |
-| Takebacks (bots) | ✅ | online takeback requests ship with rules v2 |
+| Takebacks | ✅ | vs bots, and online takeback requests (rules v2) |
 | Hints vs bots | ✅ | |
 | Coach feedback while playing | ✅ | live move verdicts + eval bar in bot games |
 | Premoves | ✅ | |
@@ -36,7 +36,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Resume an unfinished bot game | ✅ | |
 | "Your move" alert in a background tab | ✅ | online games |
 | New-player onboarding (skill level seeds ratings) | ✅ | |
-| In-game chat (online) | 🟡 | built into rules v2 + client; lights up when the room server runs the new logic.js |
+| In-game chat (online) | ✅ | rules v2 live on the room server; quick phrases + free text |
 | Variants (Chess960, 3-check, KOTH) | ✅ | vs bots and pass and play; Chess960 castling verified against Stockfish perft |
 | Daily / correspondence chess | ✅ | untimed friend games on persistent rooms; your seats are remembered on this device, "your move" list (no per-move deadline until rules v2) |
 | Tournaments / arenas | ✅ | Bot Arena: timed arena vs the bots near your rating, live standings, streak bonuses (human arenas would need a server) |

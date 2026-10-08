@@ -194,8 +194,8 @@ export class FriendScreen {
     app.panel({
       title: "Play a friend", back: "#/",
       body: [
-        h("p.note", "Create a private game and send the link. You play White; the game starts when your friend opens it."),
-        tcPicker(friendTc, (k) => { friendTc = k; }, { allowCustom: false, groups: ONLINE_TIME_CONTROLS }),
+        h("p.note", "Create a private game and send the link. You play White; the game starts when your friend opens it. For a game without a clock, start a daily game instead."),
+        tcPicker(friendTc, (k) => { friendTc = k; }, { allowUnlimited: false }),
       ],
       foot: h("button.btn.primary.big.block", { onclick: () => app.launch(() => new OnlineGame(app, { kind: "friend", tcKey: friendTc }), "#/online") }, "Create invite link"),
     });

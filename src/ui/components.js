@@ -366,7 +366,8 @@ export function tcPicker(value, onChange, { allowUnlimited = true, allowCustom =
                 h("div.two-col", h("div.field", h("label", "Minutes"), mins), h("div.field", h("label", "Increment (sec)"), inc)),
                 h("button.btn.primary", {
                   onclick: () => {
-                    const mm = Math.max(0.5, Math.min(180, Number(mins.value) || 5));
+                    // half-minute steps: the room server accepts "7+2" or "0.5+0", not "7.25+2"
+                    const mm = Math.max(0.5, Math.min(180, Math.round((Number(mins.value) || 5) * 2) / 2));
                     const ii = Math.max(0, Math.min(60, Math.round(Number(inc.value) || 0)));
                     value = `${mm}+${ii}`; onChange(value); render(); m.close();
                   },
