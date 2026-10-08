@@ -405,3 +405,36 @@ export function moveEntry(getChess, onMove) {
   });
   return input;
 }
+
+// ---------- screen-reader announcements ----------
+const PIECE_WORD = { K: "king", Q: "queen", R: "rook", B: "bishop", N: "knight" };
+export function sanToWords(san) {
+  if (!san) return "";
+  let s = san, tail = "";
+  if (s.endsWith("#")) { tail = ", checkmate"; s = s.slice(0, -1); }
+  else if (s.endsWith("+")) { tail = ", check"; s = s.slice(0, -1); }
+  if (s.startsWith("O-O-O")) return "castles queenside" + tail;
+  if (s.startsWith("O-O")) return "castles kingside" + tail;
+  let promo = "";
+  const pm = /=([QRBN])$/.exec(s);
+  if (pm) { promo = ", promotes to " + PIECE_WORD[pm[1]]; s = s.slice(0, -2); }
+  const piece = PIECE_WORD[s[0]] ? PIECE_WORD[s[0]] : "pawn";
+  if (PIECE_WORD[s[0]]) s = s.slice(1);
+  const to = s.slice(-2);
+  const capture = s.includes("x");
+  const from = s.slice(0, -2).replace("x", "");
+  const subject = piece === "pawn" ? (from ? `${from} pawn` : "pawn") : (from ? `${piece} ${from}` : piece);
+  return `${subject} ${capture ? "takes" : "to"} ${to}${promo}${tail}`;
+}
+let announceTimer = null;
+export function announce(text) {
+  const el = document.getElementById("sr-live");
+  if (!el || !text) return;
+  el.textContent = "";
+  clearTimeout(announceTimer);
+  announceTimer = setTimeout(() => { el.textContent = text; }, 40);
+}
+export function announceMove(mv) {
+  if (!mv || !mv.san) return;
+  announce(`${mv.color === "w" ? "White" : "Black"}: ${sanToWords(mv.san)}`);
+}

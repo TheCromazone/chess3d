@@ -4,7 +4,7 @@ import { createChess, animateOn, chess960Fen } from "../core/chess960.js";
 import { MoveTree, START_FEN, kingSquare, capturedFromFen } from "../core/tree.js";
 import { MoveInput } from "../core/input.js";
 import { h, icon } from "../ui/dom.js";
-import { MoveList, openModal, updateClock, parseTc, tcLabel, toast, moveEntry } from "../ui/components.js";
+import { MoveList, openModal, updateClock, parseTc, tcLabel, toast, moveEntry, announceMove, announce } from "../ui/components.js";
 import { getSettings, saveGame, newGameId, updateProfile, unlock } from "../store.js";
 import { moveSound, SFX } from "../audio.js";
 import { openingForGame, loadOpenings } from "../openings.js";
@@ -153,6 +153,7 @@ export class BaseGame {
     if (wasLive) animateOn(this.app.board, mv, { instant });
     else this.app.board.syncFromBoard(this.chess.board());
     moveSound(mv, this.chess, { opponent });
+    announceMove(mv);
     // clocks: increment for the mover, start the opponent's clock once both sides have moved
     if (this.clock) {
       const now = performance.now();
@@ -328,6 +329,7 @@ export class BaseGame {
   finish(result) {
     if (this.result) return;
     this.result = result;
+    announce(`Game over. ${result.winner ? (result.winner === "w" ? "White" : "Black") + " won" : result.reason === "aborted" ? "Aborted" : "Draw"} ${REASON_TEXT[result.reason] || ""}.`);
     if (this.clock && this.clock.active) {
       const c = this.clock.active;
       this.clock[c] = Math.max(0, this.clock[c] - (performance.now() - this.clock.lastTs));

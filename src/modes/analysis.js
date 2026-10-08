@@ -5,7 +5,7 @@ import { MoveTree, START_FEN, kingSquare, capturedFromFen } from "../core/tree.j
 import { MoveInput } from "../core/input.js";
 import { h, icon, copyText, downloadText, downloadBlob, esc } from "../ui/dom.js";
 import { positionPng } from "../core/gif.js";
-import { TreeView, toast, switchRow, GLYPH, sanHtml, openModal } from "../ui/components.js";
+import { TreeView, toast, switchRow, GLYPH, sanHtml, openModal, announceMove } from "../ui/components.js";
 import { analysisEngine } from "../core/engines.js";
 import { formatScore, evalBarFraction } from "../engine.js";
 import { loadOpenings, openingForGame, bookMoves } from "../openings.js";
@@ -87,6 +87,7 @@ export class AnalysisScreen {
     this.input.clear();
     if (node.parent === prev && node.move) {
       animateOn(this.app.board, node.move, { instant });
+      announceMove(node.move);
       moveSound(node.move, createChess(node.fen));
     } else this.app.board.syncFromBoard(createChess(node.fen).board());
     this.refresh(false);

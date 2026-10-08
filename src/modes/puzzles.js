@@ -3,7 +3,7 @@ import { Chess } from "chess.js";
 import { MoveInput } from "../core/input.js";
 import { kingSquare, uciToMove } from "../core/tree.js";
 import { h, icon, todayStr } from "../ui/dom.js";
-import { openModal, toast, segmented } from "../ui/components.js";
+import { openModal, toast, segmented, announceMove, announce } from "../ui/components.js";
 import { loadPuzzles, nextPuzzle, dailyPuzzle, rushSequence, puzzleRatingUpdate, isCorrectMove, themesAvailable, THEME_INFO } from "../puzzles.js";
 import { getProfile, updateProfile, unlock } from "../store.js";
 import { moveSound, SFX } from "../audio.js";
@@ -42,6 +42,7 @@ export class PuzzleRunner {
       if (this.p !== p) return;
       const mv = this.chess.move(uciToMove(p.moves[0]));
       b.animateMove(mv);
+      announceMove(mv);
       moveSound(mv, this.chess, { opponent: true });
       this._decorate(mv);
       this.state = "solving";
@@ -63,6 +64,7 @@ export class PuzzleRunner {
     const uci = mv.from + mv.to + (mv.promotion || "");
     const b = this.app.board;
     b.animateMove(mv, { instant });
+    announceMove(mv);
     b.setArrows([]);
     if (isCorrectMove(this.p, this.chess, uci, this.idx)) {
       moveSound(mv, this.chess);
@@ -76,6 +78,7 @@ export class PuzzleRunner {
       this._t = setTimeout(() => {
         const r = this.chess.move(uciToMove(reply));
         b.animateMove(r);
+        announceMove(r);
         moveSound(r, this.chess, { opponent: true });
         b.setMarks([]);
         this._decorate(r);
@@ -125,6 +128,7 @@ export class PuzzleRunner {
     for (let i = this.idx; i < p.moves.length; i++) {
       const mv = this.chess.move(uciToMove(p.moves[i]));
       b.animateMove(mv);
+      announceMove(mv);
       moveSound(mv, this.chess, { opponent: i % 2 === 0 });
       b.setArrows([{ from: mv.from, to: mv.to, color: "rgba(82,179,106,.8)" }]);
       this._decorate(mv);

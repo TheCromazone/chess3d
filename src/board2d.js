@@ -169,6 +169,11 @@ export class Board2D {
     b.setAttribute("role", "grid");
     b.setAttribute("aria-label", "Chess board");
     b.setAttribute("aria-readonly", "true");
+    // keyboard play: focus the board, move the outline with the arrow keys, Enter/Space taps
+    b.tabIndex = 0;
+    b.setAttribute("aria-describedby", "b2d-kbd-help");
+    b.addEventListener("keydown", (e) => this._onKey(e));
+    b.addEventListener("blur", () => { this._kbd = null; this.setCursor(null); });
 
     // surface: squares, tints, coordinates, hints (clipped to the rounded board)
     const surface = div("b2d-surface", b);
@@ -354,7 +359,7 @@ export class Board2D {
   }
 
   _relabel() {
-    for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) this._cells[r * 8 + c].dataset.sq = this._sqRC(r, c);
+    for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) { const cell = this._cells[r * 8 + c]; cell.dataset.sq = this._sqRC(r, c); cell.id = "b2d-sq-" + cell.dataset.sq; }
     for (let i = 0; i < 8; i++) {
       this._rankLabels[i].textContent = this._orient === "w" ? String(8 - i) : String(i + 1);
       this._fileLabels[i].textContent = this._orient === "w" ? FILES[i] : FILES[7 - i];
@@ -539,6 +544,39 @@ export class Board2D {
   setCheck(sq) { this._show(this._el.check, sq); }
   setSelected(sq) { this._show(this._el.sel, sq); }
   setPremove(from, to) { this._show(this._el.preFrom, from); this._show(this._el.preTo, to); }
+  _onKey(e) {
+    const D = { ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+    if (e.key in D) {
+      e.preventDefault();
+      e.stopPropagation();
+      const inv = this._orient === "b" ? -1 : 1;
+      let sq = this._kbd || (this._orient === "b" ? "e7" : "e2");
+      if (this._kbd) {
+        const f = Math.max(0, Math.min(7, "abcdefgh".indexOf(sq[0]) + D[e.key][0] * inv));
+        const r = Math.max(0, Math.min(7, Number(sq[1]) - 1 + D[e.key][1] * inv));
+        sq = "abcdefgh"[f] + (r + 1);
+      }
+      this._kbd = sq;
+      this.setCursor(sq);
+      const cell = this._board.querySelector(`[data-sq="${sq}"]`);
+      if (cell) this._board.setAttribute("aria-activedescendant", cell.id || "");
+      this._announceSq(sq);
+    } else if ((e.key === "Enter" || e.key === " ") && this._kbd) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (this.onSquareTap) this.onSquareTap(this._kbd);
+    } else if (e.key === "Escape" && this._kbd) {
+      this._kbd = null;
+      this.setCursor(null);
+    }
+  }
+
+  _announceSq(sq) {
+    const live = document.getElementById("sr-live");
+    const cell = this._board.querySelector(`[data-sq="${sq}"]`);
+    if (live) live.textContent = (cell && cell.getAttribute("aria-label")) || sq;
+  }
+
   /** Extra (not in the contract): keyboard-navigation cursor outline, mirrors Board3D.setCursor. */
   setCursor(sq) { this._show(this._el.cursor, sq); }
 

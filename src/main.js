@@ -70,8 +70,9 @@ if (new URLSearchParams(location.search).get("room") && !location.hash) {
 
 const app = new App(routes);
 addEventListener("pointerdown", () => unlockAudio(), { once: true });
-loadOpenings();
 app.start();
+// the opening book (~460 KB) isn't needed for first paint; screens that use it load it on demand
+(window.requestIdleCallback || ((f) => setTimeout(f, 1500)))(() => loadOpenings());
 
 // first visit: a short welcome that seeds ratings (skipped for invite links and automated checks)
 {
