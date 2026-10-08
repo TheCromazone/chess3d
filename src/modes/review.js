@@ -207,9 +207,11 @@ export class ReviewScreen {
     if (p) {
       const col = CLS_HEX[p.classification] || "#999";
       b.setMarks([{ sq: p.uci.slice(0, 2), color: hexA(col, 0.38) }, { sq: p.uci.slice(2, 4), color: hexA(col, 0.6) }]);
+      const c = CLS[p.classification];
+      if (b.setBadge && c) b.setBadge(p.uci.slice(2, 4), { text: c.sym === "👍" ? "+" : c.sym === "📖" ? "B" : c.sym, color: col });
       const showBest = p.bestUci && p.bestUci !== p.uci && !["best", "book", "forced", "brilliant", "great"].includes(p.classification);
       b.setArrows(showBest ? [{ from: p.bestUci.slice(0, 2), to: p.bestUci.slice(2, 4), color: "rgba(82,179,106,.85)" }] : []);
-    } else { b.setMarks([]); b.setArrows([]); }
+    } else { b.setMarks([]); b.setArrows([]); if (b.setBadge) b.setBadge(null); }
     this.app.evalBar.show(true);
     this._evalBar();
   }
@@ -249,6 +251,7 @@ export class ReviewScreen {
   }
 
   startRetry(p) {
+    if (this.app.board.setBadge) this.app.board.setBadge(null);
     this.retry = { fen: p.fenBefore, ply: p };
     this.boardDirty = true;
     this.lineTok = (this.lineTok || 0) + 1;
@@ -283,6 +286,7 @@ export class ReviewScreen {
   }
 
   showBestLine(p) {
+    if (this.app.board.setBadge) this.app.board.setBadge(null);
     this.retry = null;
     this.boardDirty = true;
     const tok = this.lineTok = (this.lineTok || 0) + 1;

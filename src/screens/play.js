@@ -2,7 +2,7 @@
 import { Chess } from "chess.js";
 import { h, icon, todayStr } from "../ui/dom.js";
 import { tcPicker, tcLabel, segmented, switchRow, openModal, ONLINE_TIME_CONTROLS } from "../ui/components.js";
-import { getProfile, getResume, setResume, getGames, getDailyGames } from "../store.js";
+import { getProfile, getResume, setResume, getGames, getDailyGames, getSettings } from "../store.js";
 import { BOTS } from "../bots.js";
 import { BotGame, LocalGame, findBot } from "../modes/bot-game.js";
 import { OnlineGame } from "../modes/online-game.js";
@@ -58,7 +58,7 @@ export class HomeScreen {
     app.panel({
       title: "",
       body: [
-        h("div", h("div.hero-title", "Play chess"), h("p.hero-sub", "On a real 3D board, with Stockfish at your side.")),
+        h("div", h("div.hero-title", "Play chess"), h("p.hero-sub", getSettings().view === "2d" ? "Against friends, bots and the world, with Stockfish at your side." : "On a real 3D board, with Stockfish at your side.")),
         tcBtn,
         h("button.btn.primary.big.block", { onclick: () => app.launch(() => new OnlineGame(app, { kind: "pool", tcKey: lastOnlineTc }), "#/online") }, "Play online"),
         rows,
@@ -119,6 +119,7 @@ export class BotsScreen {
   constructor(app) { this.app = app; }
   mount() {
     const app = this.app;
+    app.setLobby(true);
     idleBoard(app);
     if (app.board.setIdle) app.board.setIdle(false);
     const p = getProfile();
@@ -188,9 +189,11 @@ export class FriendScreen {
   constructor(app) { this.app = app; }
   mount() {
     const app = this.app;
+    app.setLobby(true);
     idleBoard(app);
     if (app.board.setIdle) app.board.setIdle(false);
-    app.strips(null, meStrip());
+    const pr = getProfile();
+    app.strips(null, { name: pr.name, rating: pr.ratings.rapid.r, avatar: pr.avatar });
     app.panel({
       title: "Play a friend", back: "#/",
       body: [
@@ -210,6 +213,7 @@ export class LocalScreen {
   constructor(app) { this.app = app; }
   mount() {
     const app = this.app;
+    app.setLobby(true);
     idleBoard(app);
     if (app.board.setIdle) app.board.setIdle(false);
     app.strips(null, null);

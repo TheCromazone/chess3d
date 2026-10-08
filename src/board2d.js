@@ -93,6 +93,8 @@ const CSS = `
 .b2d-ring{border-radius:50%;border:calc(var(--b2d-sq)*.085) solid var(--b2d-hint)}
 .b2d-hover{box-shadow:inset 0 0 0 max(2px,calc(var(--b2d-sq)*.05)) rgba(255,255,255,.65)}
 .b2d-cursor{box-shadow:inset 0 0 0 max(2px,calc(var(--b2d-sq)*.05)) rgba(52,210,123,.95)}
+.b2d-badgesq{pointer-events:none;overflow:visible}
+.b2d-badge{position:absolute;right:-9%;top:-9%;width:40%;height:40%;border-radius:50%;display:grid;place-items:center;color:#fff;font:900 calc(var(--b2d-sq)*.19)/1 system-ui,sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.45),inset 0 0 0 max(1px,calc(var(--b2d-sq)*.02)) rgba(255,255,255,.55);letter-spacing:-.5px}
 .b2d-coord{position:absolute;left:0;top:0;width:12.5%;height:12.5%;box-sizing:border-box;display:flex;
   padding:calc(var(--b2d-sq)*.035) calc(var(--b2d-sq)*.055);
   font:600 max(8px,calc(var(--b2d-sq)*.17))/1 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
@@ -228,6 +230,12 @@ export class Board2D {
 
     this._pieceLayer = div("b2d-layer b2d-pieces", b);
     this._pieceLayer.setAttribute("aria-hidden", "true");
+
+    // move-classification badge (Game Review), drawn over the pieces at a square's corner
+    const badgeLayer = div("b2d-layer", b);
+    badgeLayer.setAttribute("aria-hidden", "true");
+    this._el.badge = mk("b2d-badgesq", badgeLayer);
+    this._badgeDot = div("b2d-badge", this._el.badge);
 
     const svg = this._svg = document.createElementNS(SVGNS, "svg");
     svg.setAttribute("class", "b2d-arrows");
@@ -542,6 +550,13 @@ export class Board2D {
 
   setLastMove(from, to) { this._show(this._el.lastFrom, from); this._show(this._el.lastTo, to); }
   setCheck(sq) { this._show(this._el.check, sq); }
+  /** Extra: Game Review classification badge on a square (null clears). badge = { text, color } */
+  setBadge(sq, badge) {
+    if (!sq || !badge) { this._show(this._el.badge, null); return; }
+    this._badgeDot.textContent = badge.text;
+    this._badgeDot.style.background = badge.color;
+    this._show(this._el.badge, sq);
+  }
   setSelected(sq) { this._show(this._el.sel, sq); }
   setPremove(from, to) { this._show(this._el.preFrom, from); this._show(this._el.preTo, to); }
   _onKey(e) {

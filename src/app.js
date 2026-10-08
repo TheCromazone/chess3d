@@ -61,7 +61,8 @@ export class App {
       const mk = () => h("a.nav-item", { href: n.hash, dataset: { nav: n.id } }, icon(n.icon, 24), h("span", n.label));
       if (n.id === "settings") rail.appendChild(h("div.rail-spacer"));
       rail.appendChild(mk());
-      if (n.id !== "analysis") tabbar.appendChild(mk());
+      // phones: Analysis gets a tab; Settings is reached from Profile
+      if (n.id !== "settings") tabbar.appendChild(mk());
     }
   }
   _setNav(id) {
@@ -151,9 +152,14 @@ export class App {
     renderStrip(this.stripBottom, bottom);
   }
 
+  // phones: setup screens hide the board so their options and Start button fit on screen
+  setLobby(on) { $("#app").classList.toggle("lobby", !!on); }
+
   resetStage() {
     this.arenaMode();
     this.setInGame(false);
+    this.setLobby(false);
+    $("#main").scrollTop = 0;
     this.evalBar.show(false);
     $("#stage-overlay").innerHTML = "";
     this.strips(null, null);
@@ -162,6 +168,7 @@ export class App {
     if (b) {
       b.clearHints(); b.setLastMove(null, null); b.setCheck(null); b.setPremove(null, null);
       b.setMarks([]); b.setArrows([]); b.clearUserDrawings();
+      if (b.setBadge) b.setBadge(null);
       if (b.setIdle) b.setIdle(false);
     }
   }

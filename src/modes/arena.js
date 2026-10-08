@@ -92,6 +92,7 @@ export class ArenaScreen {
   constructor(app) { this.app = app; }
 
   mount() {
+    this.app.setLobby(true);
     this.app.board.syncFromBoard(new Chess().board());
     if (this.app.board.setIdle) this.app.board.setIdle(true);
     if (arena) arena.onUpdate = () => this.render();

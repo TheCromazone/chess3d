@@ -266,7 +266,7 @@ export class BaseGame {
     this.controlsEl.innerHTML = "";
     for (const c of this.controls()) {
       const b = h("button", { "aria-label": c.label, title: c.label, onclick: c.onClick, disabled: c.disabled || undefined, class: c.on ? "on" : "" },
-        c.text ? h("span.txt", c.text) : icon(c.icon));
+        c.text ? h("span.txt", c.text) : icon(c.icon), h("span.lbl", c.short || c.label));
       this.controlsEl.appendChild(b);
     }
     this.postEl.innerHTML = "";
@@ -419,7 +419,7 @@ export class BaseGame {
       body.push(h("button.btn.primary.big.block", { onclick: () => { m.close(); this.app.go(`#/review/${this.id}`); } }, icon("star"), "Game review"));
     }
     body.push(h("div.btn-row", ...this.postGameButtons(() => m.close())));
-    const m = openModal({ title, sub: r.reason === "aborted" ? "" : REASON_TEXT[r.reason], body });
+    const m = openModal({ title, sub: r.reason === "aborted" ? "" : REASON_TEXT[r.reason], body, light: true });
   }
 
   // Offer the user to leave; returns true if navigation may proceed.

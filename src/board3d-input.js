@@ -14,6 +14,14 @@
 import { BRUSHES } from "./board3d-themes.js";
 
 const DRAG_PX = { mouse: 3, pen: 6, touch: 9 };
+
+function scrollParent(el) {
+  for (let n = el.parentElement; n; n = n.parentElement) {
+    const oy = getComputedStyle(n).overflowY;
+    if ((oy === "auto" || oy === "scroll") && n.scrollHeight > n.clientHeight) return n;
+  }
+  return null;
+}
 const TAP_PX = { mouse: 6, pen: 9, touch: 14 };
 
 function brushFor(e) {
@@ -142,6 +150,16 @@ export class BoardInput {
       }
       b._dragMove(e.clientX, e.clientY);
     } else if (g.kind === "tap") {
+      if (g.type === "touch" && this.down.size === 1) {
+        // a one-finger swipe off the pieces scrolls the page (the canvas blocks native scrolling)
+        if (dist > (TAP_PX.touch || 8)) g.moved = true;
+        if (g.moved) {
+          if (g.scroller === undefined) g.scroller = scrollParent(this.c);
+          if (g.scroller) g.scroller.scrollTop -= e.clientY - (g.lastY ?? e.clientY);
+        }
+        g.lastY = e.clientY;
+        return;
+      }
       if (dist > (TAP_PX[g.type] || 8)) { g.moved = true; b._userOrbited = true; }
     } else if (g.kind === "draw") {
       const sq = b._pickSquare(e.clientX, e.clientY, g.type || "mouse");

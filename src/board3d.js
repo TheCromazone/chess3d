@@ -196,6 +196,8 @@ export class Board3D {
     controls.minPolarAngle = 0.1;
     controls.maxPolarAngle = 1.32;
     controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: -1 };
+    // touch: one finger scrolls the page (BoardInput does that), two fingers orbit and zoom
+    controls.touches = { ONE: null, TWO: THREE.TOUCH.DOLLY_ROTATE };
     controls.target.set(0, 0, 0);
     // OrbitControls hooks `keydown` on canvas.getRootNode(); the canvas is still detached here, so
     // that root is the canvas itself and no document-level listener is installed (contract).
@@ -438,6 +440,41 @@ export class Board3D {
   }
 
   clearHints() { this._hl.quiet = []; this._hl.caps = []; this._hl.selected = null; this._overlayChanged(); }
+
+  /** Extra: Game Review classification badge floating at a square's corner (null clears). */
+  setBadge(sq, badge) {
+    if (!this._badge) {
+      const cv = document.createElement("canvas");
+      cv.width = cv.height = 128;
+      const tex = new THREE.CanvasTexture(cv);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true }));
+      sprite.renderOrder = 999;
+      sprite.scale.set(0.42, 0.42, 1);
+      sprite.visible = false;
+      this.scene.add(sprite);
+      this._badge = { cv, tex, sprite, key: "" };
+    }
+    const bd = this._badge;
+    if (!isSq(sq) || !badge) { bd.sprite.visible = false; this.invalidate(); return; }
+    const key = badge.text + "|" + badge.color;
+    if (bd.key !== key) {
+      bd.key = key;
+      const g = bd.cv.getContext("2d");
+      g.clearRect(0, 0, 128, 128);
+      g.beginPath(); g.arc(64, 64, 58, 0, Math.PI * 2);
+      g.fillStyle = badge.color; g.fill();
+      g.lineWidth = 6; g.strokeStyle = "rgba(255,255,255,.75)"; g.stroke();
+      g.fillStyle = "#fff"; g.font = `900 ${badge.text.length > 1 ? 56 : 66}px system-ui, sans-serif`;
+      g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText(badge.text, 64, 68);
+      bd.tex.needsUpdate = true;
+    }
+    const { x, z } = sqToXZ(sq);
+    bd.sprite.position.set(x + 0.32, BOARD_TOP + 0.95, z - 0.32);
+    bd.sprite.visible = true;
+    this.invalidate();
+  }
 
   setMarks(list) {
     this._marks = (Array.isArray(list) ? list : []).filter((m) => m && isSq(m.sq)).map((m) => ({ sq: m.sq, rgba: parseColor(m.color || "rgba(52,210,123,.5)") }));

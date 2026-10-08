@@ -210,13 +210,13 @@ export class AnalysisScreen {
           h("button", { "aria-label": "Forward", onclick: () => this.node.children[0] && this.goto(this.node.children[0]) }, icon("next")),
           h("button", { "aria-label": "End", onclick: () => { let n = this.node; while (n.children[0]) n = n.children[0]; this.goto(n); } }, icon("last"))),
         h("div.iconbar",
-          h("button", { "aria-label": "Copy FEN", title: "Copy FEN", onclick: async () => { if (await copyText(this.node.fen)) toast("FEN copied"); } }, h("span.txt", "FEN")),
-          h("button", { "aria-label": "Copy PGN", title: "Copy PGN", onclick: async () => { if (await copyText(this.tree.toPgn(this.headers))) toast("PGN copied"); } }, h("span.txt", "PGN")),
-          h("button", { "aria-label": "Download PGN", title: "Download PGN", onclick: () => downloadText("chess3d-analysis.pgn", this.tree.toPgn(this.headers)) }, icon("download")),
-          h("button", { "aria-label": "Download image", title: "Download an image of this position", onclick: async () => downloadBlob("chess3d-position.png", await positionPng(this.node.fen, { flip: this.app.board.orientation === "b", last: this.node.move })) }, icon("eye")),
-          h("button", { "aria-label": "Copy share link", title: "Copy a link to this analysis", onclick: async () => { if (await copyText(shareLink(this.tree, this.headers))) toast("Link copied. Anyone with it sees this analysis."); } }, icon("share")),
-          h("button", { "aria-label": "Delete from here", title: "Delete this move and what follows", onclick: () => this.deleteHere() }, icon("trash")),
-          h("button", { "aria-label": "Play vs bot from here", title: "Play a bot from this position", onclick: () => this.playFromHere() }, icon("robot"))),
+          h("button", { "aria-label": "Copy FEN", title: "Copy FEN", onclick: async () => { if (await copyText(this.node.fen)) toast("FEN copied"); } }, h("span.txt", "FEN"), h("span.lbl", "FEN")),
+          h("button", { "aria-label": "Copy PGN", title: "Copy PGN", onclick: async () => { if (await copyText(this.tree.toPgn(this.headers))) toast("PGN copied"); } }, h("span.txt", "PGN"), h("span.lbl", "PGN")),
+          h("button", { "aria-label": "Download PGN", title: "Download PGN", onclick: () => downloadText("chess3d-analysis.pgn", this.tree.toPgn(this.headers)) }, icon("download"), h("span.lbl", "Save")),
+          h("button", { "aria-label": "Download image", title: "Download an image of this position", onclick: async () => downloadBlob("chess3d-position.png", await positionPng(this.node.fen, { flip: this.app.board.orientation === "b", last: this.node.move })) }, icon("image"), h("span.lbl", "Image")),
+          h("button", { "aria-label": "Copy share link", title: "Copy a link to this analysis", onclick: async () => { if (await copyText(shareLink(this.tree, this.headers))) toast("Link copied. Anyone with it sees this analysis."); } }, icon("share"), h("span.lbl", "Share")),
+          h("button", { "aria-label": "Delete from here", title: "Delete this move and what follows", onclick: () => this.deleteHere() }, icon("trash"), h("span.lbl", "Delete")),
+          h("button", { "aria-label": "Play vs bot from here", title: "Play a bot from this position", onclick: () => this.playFromHere() }, icon("robot"), h("span.lbl", "Play"))),
       ],
     });
     this.renderSide();
@@ -297,10 +297,12 @@ export class AnalysisScreen {
         this.tree = r.tree; this.headers = r.headers;
       }
     } catch (e) {
-      toast("That doesn't look like a valid PGN or FEN.");
+      // chess.js names the offending move ("Invalid move in PGN: Nf9"); pass that on
+      const why = e && e.message ? e.message.replace(/^Error:\s*/, "") : "";
+      toast(why && /move|PGN|FEN/i.test(why) ? `Couldn't load it: ${why}` : "That doesn't look like a valid PGN or FEN.", { ms: 5000 });
       return;
     }
-    this.node = this.tree.root;
+    this.node = this.tree.lastMain ? this.tree.lastMain() : this.tree.root;
     this.tab = "analysis";
     this.renderPanel();
     this.refresh(true);
@@ -348,21 +350,32 @@ export class AnalysisScreen {
     }
   }
 
-  editorPanel() {
-    const wrap = h("div", { style: { display: "flex", flexDirection: "column", gap: "12px" } });
-    const pal = h("div.palette");
+  renderPalette() {
+    const NAMES = { k: "king", q: "queen", r: "rook", b: "bishop", n: "knight", p: "pawn" };
+    const pal = h("div.palette.palette-strip");
     for (const color of ["w", "b"]) for (const t of ["k", "q", "r", "b", "n", "p"]) {
       const id = color + t;
-      pal.appendChild(h(`button${this.ed.piece === id ? ".on" : ""}`, { "aria-label": `${color === "w" ? "White" : "Black"} ${t}`, onclick: () => { this.ed.piece = id; this.renderSide(); } }, GLYPH[color][t] + "︎"));
+      pal.appendChild(h(`button${this.ed.piece === id ? ".on" : ""}`, { "aria-label": `${color === "w" ? "White" : "Black"} ${NAMES[t]}`, "aria-pressed": String(this.ed.piece === id), onclick: () => { this.ed.piece = id; this.renderSide(); } }, GLYPH[color][t] + "\uFE0E"));
     }
+    pal.appendChild(h(`button${this.ed.piece === "x" ? ".on" : ""}`, { "aria-label": "Erase", "aria-pressed": String(this.ed.piece === "x"), onclick: () => { this.ed.piece = "x"; this.renderSide(); } }, icon("trash", 20)));
+    const strip = this.app.stripBottom;
+    strip.innerHTML = "";
+    strip._clock = null;
+    strip.appendChild(pal);
+  }
+
+  editorPanel() {
+    const wrap = h("div", { style: { display: "flex", flexDirection: "column", gap: "12px" } });
+    // the palette sits right under the board (the bottom player strip), where it's reachable on phones
+    this.renderPalette();
     const eraser = h(`button.btn.small${this.ed.piece === "x" ? ".primary" : ""}`, { onclick: () => { this.ed.piece = "x"; this.renderSide(); } }, icon("trash", 16), "Erase");
     const castle = h("div.seg", ...[["K", "White O-O"], ["Q", "White O-O-O"], ["k", "Black O-O"], ["q", "Black O-O-O"]].map(([f, label]) => {
       const on = this.ed.castling.includes(f);
       return h(`button${on ? ".on" : ""}`, { onclick: () => { this.ed.castling = on ? this.ed.castling.replace(f, "") : (this.ed.castling.replace("-", "") + f); if (!this.ed.castling) this.ed.castling = "-"; this.renderSide(); } }, label);
     }));
     wrap.append(
-      h("p.note", "Pick a piece, then tap squares to place it. Tap a square holding the same piece to remove it."),
-      pal, h("div.btn-row", eraser,
+      h("p.note", "Pick a piece under the board, then tap squares to place it. Tap a square holding the same piece to remove it."),
+      h("div.btn-row", eraser,
         h("button.btn.small", { onclick: () => { this.ed.board = createChess().board(); this.ed.castling = "KQkq"; this.ed.turn = "w"; this.syncEditor(); } }, "Start position"),
         h("button.btn.small", { onclick: () => { this.ed.board = Array.from({ length: 8 }, () => Array(8).fill(null)); this.ed.castling = "-"; this.syncEditor(); } }, "Clear")),
       h("div.field", h("div.lbl", "Side to move"), h("div.seg",

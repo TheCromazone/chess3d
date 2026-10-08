@@ -22,6 +22,7 @@ export class DailyScreen {
   destroy() { this.dead = true; }
 
   mount() {
+    this.app.setLobby(true);
     this.app.board.syncFromBoard(new Chess().board());
     this.app.board.viewSide("w", false);
     if (this.app.board.setIdle) this.app.board.setIdle(true);

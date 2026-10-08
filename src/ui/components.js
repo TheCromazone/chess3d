@@ -228,9 +228,9 @@ export function sparkline(hist, color = "var(--accent)") {
 
 // ---------- modal ----------
 let modalStack = [];
-export function openModal({ title, sub, body, closable = true, onClose }) {
+export function openModal({ title, sub, body, closable = true, onClose, light = false }) {
   const root = $("#modal-root");
-  const back = h("div.modal-back");
+  const back = h(`div.modal-back${light ? ".light" : ""}`);
   const close = () => {
     back.remove();
     modalStack = modalStack.filter(m => m !== api);

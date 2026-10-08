@@ -105,7 +105,7 @@ export class BotGame extends BaseGame {
     const list = [];
     if (this.cfg.assisted?.takebacks !== false) list.push({ label: "Takeback", icon: "undo", onClick: () => this.takeback(), disabled: !live || !this.tree.mainline().some(n => n.move.color === this.myColor) });
     if (this.cfg.assisted?.hints !== false) list.push({ label: "Hint", icon: "hint", onClick: () => this.hint(), disabled: !live });
-    list.push({ label: "Offer draw", text: "½", onClick: () => this.offerDraw(), disabled: !live || this.plyCount() < 2 });
+    list.push({ label: "Offer draw", short: "Draw", text: "½", onClick: () => this.offerDraw(), disabled: !live || this.plyCount() < 2 });
     list.push(this.plyCount() < 2 && live
       ? { label: "Abort", icon: "close", onClick: () => this.finish({ winner: null, reason: "aborted" }), disabled: !live }
       : { label: "Resign", icon: "flag", onClick: () => this.resign(), disabled: !live || !started });

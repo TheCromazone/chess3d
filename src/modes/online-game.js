@@ -338,10 +338,10 @@ export class OnlineGame extends BaseGame {
     const live = this.phase === "playing" && !this.result && this.myColor;
     const early = this.plyCount() < 2;
     const list = [];
-    if (this.v2) list.push({ label: "Request takeback", icon: "undo", onClick: () => { this.client.action({ t: "takeback-offer" }); toast("Takeback requested"); }, disabled: !live || !this.plies().some(n => n.move.color === this.myColor) });
+    if (this.v2) list.push({ label: "Request takeback", short: "Takeback", icon: "undo", onClick: () => { this.client.action({ t: "takeback-offer" }); toast("Takeback requested"); }, disabled: !live || !this.plies().some(n => n.move.color === this.myColor) });
     return [
       ...list,
-      { label: "Offer draw", text: "½", onClick: () => { this.client.action({ t: "draw-offer" }); toast("Draw offer sent"); }, disabled: !live || early },
+      { label: "Offer draw", short: "Draw", text: "½", onClick: () => { this.client.action({ t: "draw-offer" }); toast("Draw offer sent"); }, disabled: !live || early },
       early
         ? { label: "Abort", icon: "close", onClick: () => this.client.action({ t: this.v2 ? "abort" : "resign" }), disabled: !live }
         : { label: "Resign", icon: "flag", onClick: async () => { if (!getSettings().confirmResign || await confirmModal({ title: "Resign this game?", yes: "Resign", danger: true })) this.client.action({ t: "resign" }); }, disabled: !live },

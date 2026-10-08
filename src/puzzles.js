@@ -1,8 +1,17 @@
-// Rated puzzles, Puzzle Rush and the daily puzzle, backed by public/data/puzzles.json
+// Rated puzzles, Puzzle Rush and the daily puzzle, backed by public/data/puzzles/
 // (built by tools/build-puzzles.mjs from the lichess puzzle database, CC0).
 //
-// Data: {"v":1,"themes":[id...],"p":[[id, fen, "uci uci ...", rating, [themeIdx...]], ...]}
-// sorted by rating. Browser module: no Node APIs.
+// Data: data/puzzles/index.json lists the theme ids and the shards, one per rating band:
+//   {"v":2,"count":N,"themes":[id...],"themeCounts":[n...],
+//    "shards":[{"file":"r0400-0799.<hash>.json","from":400,"to":799,"count":n,"lo":r,"hi":r}, ...]}
+// and each shard is {"v":2,"from":400,"to":799,"p":[[id, fen, "uci uci ...", rating, [themeIdx...]], ...]}
+// (theme indices refer to the index's `themes`). Browser module: no Node APIs.
+//
+// Loading: loadPuzzles() fetches the index, then every shard in parallel (~2MB raw, ~0.8MB
+// gzipped in total), and resolves once all of them are in memory. Everything else in this module
+// stays synchronous: nextPuzzle() / rushSequence() / dailyPuzzle() / getPuzzle() can be called
+// right after `await loadPuzzles()`. Shards that loaded are kept if another one fails, so a retry
+// only fetches what is missing.
 //
 // Puzzle convention (lichess): `fen` is the position BEFORE the opponent's last move;
 // moves[0] is that setup move (play it automatically), then the player answers with
@@ -12,17 +21,29 @@
 //   { id, fen, moves: ["e2e4", ...], rating, themes: ["fork", ...], playerColor: "w" | "b" }
 // playerColor is the side that moves SECOND (i.e. NOT the side to move in `fen`).
 
-const DATA_URL = "./data/puzzles.json";
+const DATA_DIR = "./data/puzzles/";
+const INDEX_URL = DATA_DIR + "index.json";
 
-let rows = null;     // raw rows, sorted by rating
+let rows = null;     // raw rows from every shard, sorted by rating
 let themeIds = null; // index -> theme id
 let byId = null;     // id -> row index
 let loading = null;
+let index = null;              // parsed index.json (kept across a failed load)
+const shardRows = new Map();   // shard file -> rows (kept across a failed load)
+
+async function fetchJson(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("HTTP " + res.status + " for " + url);
+  return res.json();
+}
+
+const isRow = (r) => Array.isArray(r) && r.length === 5 && typeof r[0] === "string" && typeof r[1] === "string" &&
+  typeof r[2] === "string" && Number.isFinite(r[3]) && Array.isArray(r[4]);
 
 /**
- * Fetch the puzzle set once and cache it. Safe to call repeatedly. Always resolves:
- * true when loaded, false if the fetch failed (lookups then return null / []).
- * A failed load is retried on the next call.
+ * Fetch the puzzle index and every rating-band shard (in parallel) once and cache them.
+ * Safe to call repeatedly. Always resolves: true when loaded, false if a fetch failed
+ * (lookups then return null / []). A failed load is retried on the next call.
  * @returns {Promise<boolean>}
  */
 export function loadPuzzles() {
@@ -30,17 +51,26 @@ export function loadPuzzles() {
   if (!loading) {
     loading = (async () => {
       try {
-        const res = await fetch(DATA_URL);
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const data = await res.json();
-        if (!data || !Array.isArray(data.p) || !Array.isArray(data.themes)) throw new Error("bad puzzle data");
-        const p = data.p.slice().sort((a, b) => a[3] - b[3]);
-        themeIds = data.themes;
+        if (!index) {
+          const data = await fetchJson(INDEX_URL);
+          if (!data || !Array.isArray(data.themes) || !Array.isArray(data.shards) || !data.shards.length) throw new Error("bad puzzle index");
+          index = data;
+        }
+        await Promise.all(index.shards.map(async (s) => {
+          if (shardRows.has(s.file)) return;
+          const data = await fetchJson(DATA_DIR + s.file);
+          if (!data || !Array.isArray(data.p) || !data.p.every(isRow)) throw new Error("bad puzzle shard " + s.file);
+          shardRows.set(s.file, data.p);
+        }));
+        const p = [];
+        for (const s of index.shards) for (const r of shardRows.get(s.file)) p.push(r);
+        p.sort((a, b) => a[3] - b[3]);
+        themeIds = index.themes;
         byId = new Map(p.map((r, i) => [r[0], i]));
         rows = p;
         return true;
       } catch (err) {
-        console.warn("[puzzles] could not load " + DATA_URL + ":", err);
+        console.warn("[puzzles] could not load the puzzle set (" + DATA_DIR + "):", err);
         loading = null;
         return false;
       }

@@ -21,23 +21,32 @@ export class LearnPage {
     const lessonCats = [...new Set(LESSONS.map(l => l.category))];
     const page = h("div.page",
       h("div.page-head", h("h1", "Learn"), h("p", "Short interactive lessons, endgame drills against Stockfish, and an opening trainer. Progress saves on this device.")));
+    const chips = h("div.seg.learn-chips");
+    page.append(chips);
+    const addChip = (label, id) => chips.appendChild(h("button", { onclick: () => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }) }, label));
     for (const cat of lessonCats) {
-      page.append(h("section", h("h2", cat === "Basics" ? "Lessons: the basics" : `Lessons: ${cat.toLowerCase()}`),
+      const secId = "learn-" + cat.toLowerCase();
+      const done = LESSONS.filter(l => l.category === cat && p.lessons[l.id]).length, total = LESSONS.filter(l => l.category === cat).length;
+      addChip(`${cat} ${done}/${total}`, secId);
+      page.append(h("section", { id: secId }, h("h2", cat === "Basics" ? "Lessons: the basics" : `Lessons: ${cat.toLowerCase()}`),
         h("div.grid-cards", ...LESSONS.filter(l => l.category === cat).map(l => h("button.tile", { onclick: () => this.app.go(`#/lesson/${l.id}`) },
           h("b", l.title), h("small", `${l.steps.length} steps`), p.lessons[l.id] ? h("span.done", "✓ Completed") : null)))));
     }
-    page.append(h("section", h("h2", "Endgame drills"),
+    addChip("Endgame drills", "learn-drills");
+    page.append(h("section", { id: "learn-drills" }, h("h2", "Endgame drills"),
       h("p.note", { style: { marginBottom: "10px" } }, "Convert or hold these positions against Stockfish."),
       h("div.grid-cards", ...ENDGAME_DRILLS.map(d => h("button.tile", { onclick: () => this.app.go(`#/drill/${d.id}`) },
         h("b", d.title), h("small", d.blurb), h("small", `${d.goal === "win" ? "Win" : "Draw"} as ${d.side === "w" ? "White" : "Black"} · ${"★".repeat(d.difficulty)}`),
         p.drills[d.id] ? h("span.done", "✓ Completed") : null)))));
-    page.append(h("section", h("h2", "Opening trainer"),
+    addChip("Openings", "learn-openings");
+    page.append(h("section", { id: "learn-openings" }, h("h2", "Opening trainer"),
       h("p.note", { style: { marginBottom: "10px" } }, "Learn the main line of popular openings move by move."),
       h("div.grid-cards", ...POPULAR_OPENINGS.map(o => h("button.tile", { onclick: () => this.app.go(`#/opening/${o.id}`) },
         h("b", o.name), h("small", o.blurb), h("small", `${o.eco} · as ${o.side === "w" ? "White" : "Black"}`),
         p.openings[o.id] ? h("span.done", `✓ Practiced ${p.openings[o.id]}×`) : null)))));
     const themes = h("div.grid-cards");
-    page.append(h("section", h("h2", "Tactics by theme"), themes));
+    addChip("Tactics by theme", "learn-themes");
+    page.append(h("section", { id: "learn-themes" }, h("h2", "Tactics by theme"), themes));
     loadPuzzles().then(() => {
       for (const t of themesAvailable().slice(0, 24)) {
         themes.appendChild(h("button.tile", { onclick: () => this.app.go(`#/puzzles/theme/${t.id}`) }, h("b", t.name), h("small", t.desc), h("small", `${t.count} puzzles`)));
@@ -250,7 +259,37 @@ export class OpeningTrainer {
     if (!this.op) { this.app.go("#/learn"); return; }
     this.line = this.op.moves.split(/\s+/).filter(Boolean);
     this.input.bind();
-    this.restart();
+    this.demo();
+  }
+
+  // play the whole line once with arrows, then hand over for practice
+  demo() {
+    clearTimeout(this._t);
+    this.input.clear();
+    this.chess = new Chess();
+    this.i = 0;
+    this.state = "demo";
+    this.msg = { ok: true, text: "Watch the main line first. Your turn comes next." };
+    const b = this.app.board;
+    b.viewSide(this.op.side, false);
+    b.syncFromBoard(this.chess.board());
+    b.setMarks([]); b.setArrows([]); b.setLastMove(null, null);
+    this.render();
+    const step = () => {
+      if (this.dead || this.state !== "demo") return;
+      if (this.i >= this.line.length) {
+        this._t = setTimeout(() => { if (!this.dead && this.state === "demo") { this.restart(); this.msg = { ok: true, text: "Now you play it. Your opponent answers with the main line." }; this.render(); } }, 1200);
+        return;
+      }
+      const mv = this.chess.move(this.line[this.i++]);
+      b.animateMove(mv);
+      b.setLastMove(mv.from, mv.to);
+      b.setArrows([{ from: mv.from, to: mv.to, color: "rgba(91,143,214,.8)" }]);
+      moveSound(mv, this.chess, { opponent: mv.color !== this.op.side });
+      this.render();
+      this._t = setTimeout(step, 1100);
+    };
+    this._t = setTimeout(step, 700);
   }
   destroy() { this.dead = true; clearTimeout(this._t); this.input.clear(); }
   onBoardSwap() { this.input.bind(); this.app.board.syncFromBoard(this.chess.board()); }
@@ -334,6 +373,7 @@ export class OpeningTrainer {
         h("div.card", h("div.note", "Moves"), h("p", { style: { fontWeight: "600" } }, txt || "–"))],
       foot: h("div.btn-row",
         h("button.btn", { onclick: () => this.restart() }, icon("undo", 18), "Restart"),
+        h("button.btn", { onclick: () => this.demo() }, icon("eye", 18), "Show me"),
         h("button.btn", { onclick: () => { const u = this.line[this.i]; if (!u || this.state !== "play") return; const mv = new Chess(this.chess.fen()).move(u); this.app.board.setArrows([{ from: mv.from, to: mv.to, color: "rgba(91,143,214,.85)" }]); } }, icon("hint", 18), "Hint")),
     });
   }

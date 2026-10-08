@@ -2,7 +2,7 @@
 // The bot's pace and accuracy come from its rating against each puzzle's rating.
 import { Chess } from "chess.js";
 import { h, icon } from "../ui/dom.js";
-import { openModal, toast } from "../ui/components.js";
+import { openModal, toast, confirmModal } from "../ui/components.js";
 import { PuzzleRunner } from "./puzzles.js";
 import { loadPuzzles, rushSequence } from "../puzzles.js";
 import { BOTS } from "../bots.js";
@@ -40,6 +40,9 @@ export class BattleScreen {
 
   menu() {
     this.state = "menu";
+    this.app.setLobby(true);
+    this.app.setInGame(false);
+    this.app.leaveGuard = null;
     this.opp = this.opp || pickOpponent();
     const p = getProfile();
     this.app.board.syncFromBoard(new Chess().board());
@@ -66,6 +69,9 @@ export class BattleScreen {
     await loadPuzzles();
     if (this.dead) return;
     this.state = "playing";
+    this.app.setLobby(false);
+    this.app.setInGame(true);
+    this.app.leaveGuard = async () => this.state !== "playing" || confirmModal({ title: "Leave the battle?", sub: "Leaving now counts as a loss.", yes: "Leave", danger: true }).then(ok => { if (ok) this.end(); return ok; });
     this.seq = rushSequence(Math.floor(Math.random() * 1e6), 80);
     this.me = { score: 0, strikes: 0, i: 0, out: false, log: [] };
     this.bot = { score: 0, strikes: 0, i: 0, out: false, log: [] };

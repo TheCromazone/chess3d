@@ -96,7 +96,17 @@ export class MoveTree {
     return head + "\n\n" + wrap(out.join(" ").replace(/\( /g, "(").replace(/ \)/g, ")"), 80) + "\n";
   }
 
+  // Real-world PGNs: tags with no blank line before the moves, castling written with zeros,
+  // Windows line endings. chess.js is strict about all three.
+  static normalizePgn(pgn) {
+    let t = String(pgn || "").replace(/\r\n?/g, "\n").trim();
+    t = t.replace(/^((?:\s*\[[^\]\n]*\]\s*\n)+)(?!\s*\n)/, (m) => m.replace(/\n*$/, "") + "\n\n");
+    t = t.replace(/\b0-0-0\b/g, "O-O-O").replace(/\b0-0\b(?![-\d])/g, "O-O");
+    return t;
+  }
+
   static fromPgn(pgn) {
+    pgn = MoveTree.normalizePgn(pgn);
     // chess.js rejects Shredder castling rights, so Chess960 movetext is replayed here
     const fenTag = /\[FEN\s+"([^"]+)"\]/.exec(pgn);
     if (fenTag && is960Fen(fenTag[1])) {

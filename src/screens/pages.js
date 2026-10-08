@@ -6,6 +6,7 @@ import { BOTS } from "../bots.js";
 import { BOARD_THEMES as B3, PIECE_THEMES as P3 } from "../board3d.js";
 import { BOARD_THEMES as B2, PIECE_THEMES as P2 } from "../board2d.js";
 import { MoveTree } from "../core/tree.js";
+import { createChess } from "../core/chess960.js";
 
 const EMOJIS = ["♞", "♛", "♜", "♝", "♚", "♟", "🦁", "🦊", "🐺", "🦉", "🐉", "🐙", "🦅", "🐢", "🎩", "👑", "⚡", "🔥", "🌙", "🍀"];
 const BGS = ["#2f6b4f", "#6b4a2f", "#3b4f7a", "#7a3b4f", "#5a4f2a", "#2a5a5a", "#5a2a6b", "#6b2a2a"];
@@ -24,6 +25,7 @@ export class ProfilePage {
         h("div", h("h1", p.name), h("p", `Joined ${new Date(p.created).toLocaleDateString()}. ${plural(p.stats.games, "game")} played.`)),
         h("div", { style: { marginLeft: "auto", display: "flex", gap: "8px" } },
           h("button.btn.small", { onclick: () => this.app.go("#/insights") }, icon("analysis", 16), "Insights"),
+          h("button.btn.small", { onclick: () => this.app.go("#/settings"), "aria-label": "Settings" }, icon("settings", 16), "Settings"),
           h("button.btn.small", { onclick: () => this.editProfile() }, icon("edit", 16), "Edit profile"))));
     const stat = (ic, label, slot, extra) => h("div.stat", h("div.lbl", icon(ic, 16), label), h("div.val", String(slot.r)), extra || h("div.note", plural(slot.n, label === "Puzzles" ? "puzzle" : "game")), sparkline(slot.hist));
     page.append(h("section", h("h2", "Ratings"), h("div.stat-grid",
@@ -58,10 +60,10 @@ export class ProfilePage {
         h("span", { style: { width: `${(e.w / e.n) * 100}%`, background: "var(--accent-2)" } }),
         h("span", { style: { width: `${(e.d / e.n) * 100}%`, background: "#6b6259" } }),
         h("span", { style: { width: `${(e.l / e.n) * 100}%`, background: "#a3291f" } }));
-      page.append(h("section", h("h2", "Openings you play"), h("table.table",
+      page.append(h("section", h("h2", "Openings you play"), h("div.table-wrap", h("table.table",
         h("thead", h("tr", h("th", "Opening"), h("th", "As"), h("th", "Games"), h("th", "Won / drawn / lost"), h("th", ""))),
         h("tbody", ...top.map(e => h("tr", h("td", h("b", e.fam)), h("td", e.color === "w" ? "White" : "Black"), h("td", String(e.n)),
-          h("td", `${e.w} / ${e.d} / ${e.l}`), h("td", bar(e))))))));
+          h("td", `${e.w} / ${e.d} / ${e.l}`), h("td", bar(e)))))))));
     }
 
     // archive
@@ -170,7 +172,21 @@ export function gamePgn(g) {
 // ---------- settings ----------
 export class SettingsPage {
   constructor(app) { this.app = app; }
-  mount() { this.render(); }
+  mount() {
+    // settings sit beside a sample position so theme changes preview live on the real board
+    const c = createChess();
+    let last = null;
+    for (const m of ["e4", "e5", "Nf3", "Nc6", "Bc4", "Nf6"]) last = c.move(m);
+    this.sample = c;
+    this.app.board.syncFromBoard(c.board());
+    this.app.board.viewSide("w", false);
+    this.app.board.setLastMove(last.from, last.to);
+    this.app.board.setSelected("f3");
+    this.app.board.showMoves(["g5", "h4", "d4", "g1"], ["e5"]);
+    this.app.board.setArrows([{ from: "f3", to: "g5", color: "rgba(91,143,214,.8)" }]);
+    this.render();
+  }
+  onBoardSwap() { this.mount(); }
   destroy() {}
   render() {
     const s = getSettings();
@@ -180,7 +196,7 @@ export class SettingsPage {
     const curBoard = is3d ? s.boardTheme3d : s.boardTheme2d, curPiece = is3d ? s.pieceTheme3d : s.pieceTheme2d;
     const chips = (items, cur, key) => h("div.theme-grid", ...items.map(t => h(`button.theme-chip${t.id === cur ? ".on" : ""}`, { onclick: () => set({ [key]: t.id }) },
       h("span.sw", { style: { background: t.swatch, backgroundSize: "cover", backgroundPosition: "center" } }), t.name)));
-    const page = h("div.page", h("div.page-head", h("h1", "Settings"), h("p", "Saved on this device.")),
+    const page = h("div", { style: { display: "flex", flexDirection: "column", gap: "12px" } },
       h("section.settings-sec", h("h2", "Appearance"),
         segmented([{ value: "dark", label: "Dark" }, { value: "light", label: "Light" }, { value: "system", label: "Match device" }], s.appearance || "dark", (v) => setSettings({ appearance: v }))),
       h("section.settings-sec", h("h2", "Board"),
@@ -210,7 +226,11 @@ export class SettingsPage {
           h("button.btn.danger", { onclick: async () => { if (await confirmModal({ title: "Erase all data?", sub: "Your profile, ratings and game archive will be deleted from this device.", yes: "Erase", danger: true })) { resetAll(); toast("All data erased"); this.render(); } } }, icon("trash", 18), "Erase"))),
       h("section.settings-sec", h("h2", "About"),
         h("p.note", { html: "Chess 3D. Engine: <a href=\"https://github.com/nmrugg/stockfish.js\" target=\"_blank\" rel=\"noopener\">Stockfish.js 18</a> (GPLv3, <a href=\"./stockfish/COPYING.txt\" target=\"_blank\">license</a>). Puzzles and opening names: <a href=\"https://database.lichess.org/\" target=\"_blank\" rel=\"noopener\">lichess.org open database</a> (CC0). 2D piece sets: see <a href=\"./assets/pieces/LICENSES.md\" target=\"_blank\">credits</a>." })));
-    this.app.pageMode(page);
+    const scroll = this.app.side.querySelector(".side-body");
+    const y = scroll ? scroll.scrollTop : 0;
+    this.app.panel({ title: "Settings", body: [h("p.note", "Saved on this device. The board shows your choices as you make them."), page] });
+    const nb = this.app.side.querySelector(".side-body");
+    if (nb) nb.scrollTop = y;
   }
 
   importFile() {

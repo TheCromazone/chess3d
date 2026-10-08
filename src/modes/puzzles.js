@@ -3,7 +3,7 @@ import { Chess } from "chess.js";
 import { MoveInput } from "../core/input.js";
 import { kingSquare, uciToMove } from "../core/tree.js";
 import { h, icon, todayStr } from "../ui/dom.js";
-import { openModal, toast, segmented, announceMove, announce } from "../ui/components.js";
+import { openModal, toast, segmented, announceMove, announce, confirmModal } from "../ui/components.js";
 import { loadPuzzles, nextPuzzle, dailyPuzzle, rushSequence, puzzleRatingUpdate, isCorrectMove, themesAvailable, THEME_INFO } from "../puzzles.js";
 import { getProfile, updateProfile, unlock } from "../store.js";
 import { moveSound, SFX } from "../audio.js";
@@ -250,10 +250,10 @@ export class PuzzleScreen {
       h("div", h("div.note", "Puzzle rating"), h("div.big-num.brass", String(p.ratings.puzzle.r))),
       this.delta !== null ? h(`span.delta.${this.delta >= 0 ? "up" : "down"}`, (this.delta >= 0 ? "+" : "") + this.delta) : null,
       h("div", { style: { marginLeft: "auto", textAlign: "right" } }, h("div.note", "Streak"), h("b", { style: { fontSize: "20px" } }, "🔥 " + p.puzzles.streak))) : h("div.card",
-      h("div.note", todayStr()), h("b", `Daily streak: ${p.daily.streak} day${p.daily.streak === 1 ? "" : "s"}`));
+      h("div.note", new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })), h("b", `Daily streak: ${p.daily.streak} day${p.daily.streak === 1 ? "" : "s"}`));
     const themeSel = this.mode === "rated" ? h("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } }, this.themeSelect(), this.difficultySelect()) : null;
-    const info = done || this.result === "wrong" ? h("div.card",
-      h("div.kv", h("span", "Puzzle rating"), h("span", String(pz.rating))),
+    const info = done ? h("div.card",
+      h("div.kv", h("span", "Puzzle difficulty"), h("span", String(pz.rating))),
       h("div.kv", h("span", "Themes"), h("span", { style: { textAlign: "right" } }, pz.themes.filter(t => THEME_INFO[t]).slice(0, 4).map(t => THEME_INFO[t].name).join(", ")))) : null;
     const foot = [];
     if (done) {
@@ -317,6 +317,9 @@ export class RushScreen {
 
   menu() {
     this.state = "menu";
+    this.app.setLobby(true);
+    this.app.setInGame(false);
+    this.app.leaveGuard = null;
     const p = getProfile();
     this.app.board.viewSide("w", false);
     this.app.board.syncFromBoard(new Chess().board());
@@ -338,6 +341,10 @@ export class RushScreen {
     if (this.dead) return;
     this.run = (this.run || 0) + 1;
     this.state = "playing";
+    this.app.setLobby(false);
+    this.app.setInGame(true);
+    // a stray tap on another tab shouldn't silently end the run
+    this.app.leaveGuard = async () => this.state !== "playing" || confirmModal({ title: "End this run?", sub: "Leaving ends your Puzzle Rush.", yes: "End run", danger: true });
     this.score = 0;
     this.strikes = 0;
     this.log = [];
