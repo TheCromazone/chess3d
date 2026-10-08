@@ -80,10 +80,11 @@ ok((await call("GET", "/friends", { secret: a.secret })).data.friends[0].online 
 await call("POST", "/messages", { secret: a.secret, body: { to: b.id, text: "  good game!  " } });
 await call("POST", "/messages", { secret: a.secret, body: { to: b.id, kind: "challenge", room: "abc123", tc: "5+0", mode: "live" } });
 ok((await call("POST", "/messages", { secret: a.secret, body: { to: b.id, kind: "challenge", room: "../x", tc: "5+0" } })).status === 400, "malformed challenge is refused");
+ok((await call("POST", "/messages", { secret: a.secret, body: { to: b.id, kind: "challenge", room: "daily-abc", tc: "3d", mode: "daily" } })).status === 200, "daily challenge with days per move is accepted");
 let hbB = (await call("POST", "/heartbeat", { secret: b.secret, body: {} })).data;
-ok(hbB.unread === 2 && hbB.latest.length === 2 && hbB.latest[0].kind === "challenge", "heartbeat reports unread messages and the latest ones");
+ok(hbB.unread === 3 && hbB.latest.length === 3 && hbB.latest[0].kind === "challenge", "heartbeat reports unread messages and the latest ones");
 const thread = (await call("GET", "/messages", { secret: b.secret, query: "?with=" + a.id })).data.messages;
-ok(thread.length === 2 && thread[0].body === "good game!" && JSON.parse(thread[1].body).room === "abc123", "thread returns messages in order, trimmed");
+ok(thread.length === 3 && thread[0].body === "good game!" && JSON.parse(thread[1].body).room === "abc123" && JSON.parse(thread[2].body).tc === "3d", "thread returns messages in order, trimmed");
 hbB = (await call("POST", "/heartbeat", { secret: b.secret, body: {} })).data;
 ok(hbB.unread === 0, "reading a thread marks it seen");
 const convs = (await call("GET", "/conversations", { secret: a.secret })).data.conversations;

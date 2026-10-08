@@ -115,7 +115,7 @@ export function applyRating(cat, opp, score) {
 }
 
 export function timeClass(tcKey) {
-  if (!tcKey || tcKey === "inf") return null;
+  if (!tcKey || tcKey === "inf" || /d$/.test(tcKey)) return null;   // unlimited and daily games
   const [m, inc] = tcKey.split("+").map(Number);
   const est = m * 60 + inc * 40;   // chess.com: estimated duration over 40 moves
   if (est < 180) return "bullet";

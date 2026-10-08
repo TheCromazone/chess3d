@@ -93,7 +93,7 @@ ok(!L.validateAction(s2, "p-nosy", { t: "move", from: "e7", to: "e5" }).ok, "spe
 
 // v2 additions: chat, custom time control, abort, takebacks
 let s6 = L.setup([P1, P2]);
-ok(s6.v === 2 && Array.isArray(s6.chat), "state advertises v2");
+ok(s6.v >= 2 && Array.isArray(s6.chat), "state advertises v2 or later");
 ok(L.validateAction(s6, P1, { t: "config", tc: "7+3" }).ok, "custom time control accepted");
 ok(!L.validateAction(s6, P1, { t: "config", tc: "999+0" }).ok, "absurd time control rejected");
 s6 = L.applyAction(s6, P1, { t: "config", tc: "7+3" });
@@ -115,6 +115,28 @@ ok(s6.moves.length === 2 && s6.san.join(" ") === "e4 e5" && !s6.takebackOffer, "
 let s7 = L.applyAction(L.applyAction(L.setup([P1, P2]), P1, { t: "config", tc: "inf" }), P1, { t: "abort" });
 r = L.isGameOver(s7);
 ok(r.over && r.draw && r.reason === "aborted", "aborted game reported");
+
+// v3: daily games with a deadline per move
+let s8 = L.setup([P1, P2]);
+ok(s8.v >= 3, "state advertises v3");
+ok(L.validateAction(s8, P1, { t: "config", tc: "3d" }).ok, "3 days per move accepted");
+ok(!L.validateAction(s8, P1, { t: "config", tc: "4d" }).ok, "unsupported daily length rejected");
+s8 = L.applyAction(s8, P1, { t: "config", tc: "3d" });
+const D3 = 3 * 86400000;
+ok(s8.tc.perMove && s8.clock.w === D3 && s8.clock.b === D3, "both sides start with 3 days");
+s8 = { ...s8, clock: { ...s8.clock, lastAt: Date.now() - 2 * 86400000 } };   // White thinks for 2 days
+s8 = L.applyAction(s8, P1, { t: "move", from: "e2", to: "e4" });
+ok(s8.moves.length === 1 && s8.clock.w === D3, "after moving, White's allowance resets to 3 days");
+ok(!L.validateAction(s8, P1, { t: "flag" }).ok, "no flag while Black is inside the deadline");
+s8 = { ...s8, clock: { ...s8.clock, lastAt: Date.now() - D3 - 1000 } };       // Black misses the deadline
+ok(L.validateAction(s8, P1, { t: "flag" }).ok, "flag accepted once Black's deadline has passed");
+s8 = L.applyAction(s8, P1, { t: "flag" });
+r = L.isGameOver(s8);
+ok(r.over && r.winner === P1 && r.reason === "timeout", "missing the daily deadline loses on time");
+let s9 = L.applyAction(L.setup([P1, P2]), P1, { t: "config", tc: "1d" });
+s9 = { ...s9, clock: { ...s9.clock, lastAt: Date.now() - 86400000 - 1000 } };
+s9 = L.applyAction(s9, P1, { t: "move", from: "e2", to: "e4" });
+ok(s9.flagged === "w" && s9.moves.length === 0, "a move after your deadline is a loss, not a move");
 
 console.log(failures === 0 ? "\nALL TESTS PASSED" : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

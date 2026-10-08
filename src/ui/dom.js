@@ -100,6 +100,8 @@ export function fmtClock(ms) {
   if (ms === null || ms === undefined) return "–";
   ms = Math.max(0, ms);
   const s = ms / 1000;
+  // daily games: a deadline days away reads as "2d 7h"
+  if (s >= 86400) return `${Math.floor(s / 86400)}d ${Math.floor((s % 86400) / 3600)}h`;
   if (s < 20) return `0:${s < 10 ? "0" : ""}${s.toFixed(1)}`;
   const m = Math.floor(s / 60), sec = Math.floor(s % 60);
   if (m >= 60) return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;

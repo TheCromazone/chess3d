@@ -5,6 +5,7 @@ import { openModal, toast, confirmModal, segmented, tcPicker, tcLabel, switchRow
 import { userAvatar, presenceText, notice } from "../ui/people.js";
 import { getProfile } from "../store.js";
 import { OnlineGame } from "../modes/online-game.js";
+import { DAILY_PACES } from "../modes/daily.js";
 import { SFX } from "../audio.js";
 import * as S from "../net/social.js";
 
@@ -16,18 +17,21 @@ const TABS = [
 ];
 const CAT_LABEL = { blitz: "Blitz", bullet: "Bullet", rapid: "Rapid", puzzle: "Puzzles", bots: "Vs bots" };
 let lastTc = "10+0";
+let lastPace = "3d";
+const isDailyKey = (k) => k === "inf" || /^\d+d$/.test(k || "");
 let lbCat = "blitz";
 
 // ---------- challenges ----------
+// mode "live" takes a clock like "5+0"; mode "daily" takes days per move ("3d") or "inf"
 export async function sendChallenge(app, user, mode, tc) {
   const room = S.challengeRoom(mode);
-  const tcKey = mode === "daily" ? "inf" : tc;
+  const tcKey = mode === "daily" ? (isDailyKey(tc) ? tc : "inf") : tc;
   await S.api("POST", "/messages", { to: user.id, kind: "challenge", room, tc: tcKey, mode });
   app.launch(() => new OnlineGame(app, { kind: mode === "daily" ? "daily" : "friend", room, tcKey, invitee: user.name }), "#/online");
 }
 
 export function acceptChallenge(app, c) {
-  app.launch(() => new OnlineGame(app, { kind: c.mode === "daily" ? "daily" : "friend", room: c.room, tcKey: c.mode === "daily" ? "inf" : c.tc }), "#/online");
+  app.launch(() => new OnlineGame(app, { kind: c.mode === "daily" ? "daily" : "friend", room: c.room, tcKey: c.mode === "daily" ? (isDailyKey(c.tc) ? c.tc : "inf") : c.tc }), "#/online");
 }
 
 // reading a thread marks it seen on the server; refresh the badge afterwards
@@ -35,15 +39,23 @@ function markRead(userId, lastId) {
   S.api("GET", `/messages?with=${encodeURIComponent(userId)}&after=${lastId}`).then(() => S.beat()).catch(() => {});
 }
 
-function challengeLabel(c) { return c.mode === "daily" ? "a daily game" : `a ${tcLabel(c.tc)} game`; }
+function challengeLabel(c) {
+  if (c.mode !== "daily") return `a ${tcLabel(c.tc)} game`;
+  return /d$/.test(c.tc || "") ? `a daily game (${tcLabel(c.tc)} per move)` : "a daily game";
+}
 
 function challengeModal(app, user) {
-  let mode = "live", tc = lastTc;
+  let mode = "live", tc = lastTc, days = lastPace;
   const picker = h("div", tcPicker(tc, (v) => { tc = v; }));
+  const pacePicker = h("div.field", { hidden: true }, h("div.lbl", "Time per move"), segmented(DAILY_PACES, days, (v) => { days = v; }));
   const send = h("button.btn.primary.block", {
     onclick: async () => {
       send.disabled = true;
-      try { if (mode === "live") lastTc = tc; m.close(); await sendChallenge(app, user, mode, tc); }
+      try {
+        if (mode === "live") lastTc = tc; else lastPace = days;
+        m.close();
+        await sendChallenge(app, user, mode, mode === "live" ? tc : days);
+      }
       catch (e) { toast(e.message); send.disabled = false; }
     },
   }, icon("bolt", 18), "Send challenge");
@@ -51,8 +63,8 @@ function challengeModal(app, user) {
     title: `Challenge ${user.name}`,
     sub: user.online ? presenceText(user) : `${user.name} is offline. They'll see the challenge next time they open Chess 3D.`,
     body: [
-      segmented([{ value: "live", label: "Live game" }, { value: "daily", label: "Daily (no clock)" }], mode, (v) => { mode = v; picker.hidden = v === "daily"; }),
-      picker, send,
+      segmented([{ value: "live", label: "Live game" }, { value: "daily", label: "Daily game" }], mode, (v) => { mode = v; picker.hidden = v === "daily"; pacePicker.hidden = v !== "daily"; }),
+      picker, pacePicker, send,
     ],
   });
 }

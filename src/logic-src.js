@@ -5,11 +5,15 @@ import { Chess } from "chess.js";
 export const meta = { game: "Chess 3D", minPlayers: 2, maxPlayers: 2 };
 
 const TIME_CONTROLS = { "1+0": [60, 0], "3+2": [180, 2], "5+0": [300, 0], "10+0": [600, 0], "15+10": [900, 10], "inf": null };
-const VERSION = 2;           // clients light up chat / takebacks / abort when view.v >= 2
+const VERSION = 3;           // v2: chat / takebacks / abort / custom clocks; v3: daily deadlines
+const DAILY_DAYS = [1, 2, 3, 5, 7, 14];
 
-// "7+2", "0.5+0" ... -> [seconds, increment] (custom controls), or a preset key
+// "7+2", "0.5+0" ... -> [seconds, increment] (custom controls), or a preset key.
+// "3d" is a daily game: 3 days for each move, and the deadline resets after every move.
 function parseTc(key) {
   if (key in TIME_CONTROLS) return { ok: true, tc: TIME_CONTROLS[key] };
+  const d = /^(\d{1,2})d$/.exec(String(key));
+  if (d) return DAILY_DAYS.includes(Number(d[1])) ? { ok: true, tc: [Number(d[1]) * 86400, 0], perMove: true } : { ok: false };
   const m = /^(\d{1,3}(?:\.5)?)\+(\d{1,2})$/.exec(String(key));
   if (!m) return { ok: false };
   const mins = Number(m[1]), inc = Number(m[2]);
@@ -126,12 +130,12 @@ export function applyAction(state, playerId, action) {
   }
 
   if (action.t === "config") {
-    const tc = parseTc(action.tc).tc;
+    const { tc, perMove } = parseTc(action.tc);
     return {
       ...state,
       phase: "playing",
       tcKey: action.tc,
-      tc: tc ? { initial: tc[0], inc: tc[1] } : null,
+      tc: tc ? { initial: tc[0], inc: tc[1], perMove: !!perMove } : null,
       clock: tc ? { w: tc[0] * 1000, b: tc[0] * 1000, lastAt: now } : { w: 0, b: 0, lastAt: null },
     };
   }
@@ -147,7 +151,8 @@ export function applyAction(state, playerId, action) {
         clock = { ...clock, [color]: 0, lastAt: null };
         return { ...state, clock, flagged };
       }
-      clock = { ...clock, [color]: remaining + state.tc.inc * 1000, lastAt: now };
+      // daily games: the mover gets their full allowance back for their next turn
+      clock = { ...clock, [color]: state.tc.perMove ? state.tc.initial * 1000 : remaining + state.tc.inc * 1000, lastAt: now };
     }
     const game = rebuild(state);
     const mv = game.move({ from: action.from, to: action.to, promotion: action.promotion || undefined });

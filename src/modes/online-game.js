@@ -165,7 +165,8 @@ export class OnlineGame extends BaseGame {
       this.phase = "config";
       if (this.myColor === "w" && !this.sentConfig) {
         this.sentConfig = true;
-        const tc = this.tcKey || new URLSearchParams(location.search).get("tc") || "10+0";
+        let tc = this.tcKey || new URLSearchParams(location.search).get("tc") || "10+0";
+        if (/d$/.test(tc) && (v.v || 1) < 3) tc = "inf";   // a server without daily deadlines
         this.client.action({ t: "config", tc: this.v2 || SERVER_TCS.includes(tc) ? tc : nearestTc(tc) });
       }
       this._setNote(this.myColor === "w" ? "Starting…" : "Waiting for White to start the clock…");
@@ -195,7 +196,7 @@ export class OnlineGame extends BaseGame {
     } else this.clock = null;
 
     // opponent presence
-    if (s.status === "playing" && this.myColor) {
+    if (s.status === "playing" && this.myColor && this.kind !== "daily") {
       if (s.connected < 2) { if (!this._oppGoneAt) this._oppGoneAt = Date.now(); this._setNote("Your opponent disconnected. If they don't return, you can claim the win when their clock runs out."); }
       else { this._oppGoneAt = null; this._setNote(null); }
     }
@@ -435,7 +436,7 @@ export class OnlineGame extends BaseGame {
           onclick: async () => {
             btn.disabled = true;
             try {
-              await Social.api("POST", "/messages", { to: u.id, kind: "challenge", room: this.room, tc: daily ? "inf" : this.tcKey, mode: daily ? "daily" : "live" });
+              await Social.api("POST", "/messages", { to: u.id, kind: "challenge", room: this.room, tc: daily ? (/d$/.test(this.tcKey) ? this.tcKey : "inf") : this.tcKey, mode: daily ? "daily" : "live" });
               btn.textContent = "Sent";
               toast(`Challenge sent to ${u.name}`);
             } catch (e) { toast(e.message); btn.disabled = false; }
@@ -464,10 +465,10 @@ export class OnlineGame extends BaseGame {
       body.push(h("div.card",
         h("h3", invitee ? `Challenge sent to ${invitee}` : this.kind === "daily" ? "Invite a friend to a daily game" : "Invite a friend"),
         h("p.note", invitee
-          ? (this.kind === "daily" ? `The game starts when ${invitee} accepts. There's no clock, so you can both play at your own pace. You play White.`
+          ? (this.kind === "daily" ? `The game starts when ${invitee} accepts. ${dailyPace(this.tcKey)} You play White.`
             : `The game (${tcLabel(this.tcKey)}) starts as soon as ${invitee} accepts. You play White. You can also send them this link.`)
           : this.kind === "daily"
-            ? "Send this link. There's no clock: moves are saved, so you can both come back and play at your own pace. You play White."
+            ? `Send this link. ${dailyPace(this.tcKey)} You play White.`
             : `Send this link. The game starts (${tcLabel(this.tcKey)}) as soon as they open it. You play White.`),
         h("div.field", input),
         h("div.btn-row",
@@ -500,6 +501,11 @@ export class OnlineGame extends BaseGame {
 }
 
 export const SERVER_TCS = ["1+0", "3+2", "5+0", "10+0", "15+10", "inf"];
+
+function dailyPace(tcKey) {
+  return /d$/.test(tcKey || "") ? `Each of you has ${tcLabel(tcKey)} for every move; run out and you lose on time.`
+    : "There's no clock: moves are saved, so you can both come back and play at your own pace.";
+}
 function nearestTc(tc) {
   const [m] = tc.split("+").map(Number);
   if (m <= 1) return "1+0";

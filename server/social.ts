@@ -55,7 +55,7 @@ const ONLINE_MS = 90_000;
 const CODE_ABC = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 const NAME_RE = /^[A-Za-z0-9_]{2,16}$/;
 const ROOM_RE = /^[A-Za-z0-9_-]{1,64}$/;
-const TC_RE = /^(\d{1,3}(?:\.5)?\+\d{1,2}|inf)$/;
+const TC_RE = /^(\d{1,3}(?:\.5)?\+\d{1,2}|\d{1,2}d|inf)$/;
 const EMOJI_MAX = 8;
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 

@@ -329,6 +329,8 @@ export const ONLINE_TIME_CONTROLS = [
 ];
 export function tcLabel(key) {
   if (!key || key === "inf") return "Unlimited";
+  const days = /^(\d+)d$/.exec(key);
+  if (days) return `${days[1]} day${days[1] === "1" ? "" : "s"}`;
   const [m, inc] = key.split("+").map(Number);
   const mins = m >= 1 ? `${m} min` : `${Math.round(m * 60)} sec`;
   return inc ? `${m} | ${inc}` : mins;
