@@ -5,12 +5,15 @@
   "type": "module",
   "scripts": {
     "build": "node tools/build.mjs",
-    "test": "node tools/test-logic.mjs",
-    "serve": "node tools/serve.mjs"
+    "test": "node tools/test-logic.mjs && node tools/test-core.mjs && node tools/test-960.mjs",
+    "serve": "node tools/serve.mjs",
+    "test:engine": "node tools/test-engine.mjs && node tools/test-960-bots.mjs",
+    "test:data": "node tools/test-data.mjs && node tools/test-explorer.mjs"
   },
   "dependencies": {
     "chess.js": "1.0.0-beta.8",
     "esbuild": "0.21.5",
+    "stockfish": "^18.0.8",
     "three": "0.165.0"
   }
 }

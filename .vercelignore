@@ -2,3 +2,8 @@ node_modules
 chess3d-game.zip
 marketing
 .vercel
+dist
+tools/sandbox2d
+tools/sandbox3d
+.impeccable
+.playwright-mcp

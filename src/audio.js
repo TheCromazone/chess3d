@@ -81,3 +81,18 @@ export const SFX = {
   tick()    { play(t => { click(t, 2100, 0.03, 0.28); }); },
   illegal() { play(t => { thump(t, 110, 0.09, 0.3); }); },
 };
+
+// Picks the right sound for a verbose chess.js move given the position after it.
+export function moveSound(mv, chessAfter, { opponent = false } = {}) {
+  if (chessAfter.isCheckmate()) { SFX.end(); return; }
+  if (chessAfter.inCheck()) { SFX.check(); return; }
+  if (mv.promotion) SFX.promote();
+  else if (mv.flags.includes("k") || mv.flags.includes("q")) SFX.castle();
+  else if (mv.captured) SFX.capture();
+  else if (opponent) SFX.moveOpp();
+  else SFX.move();
+}
+SFX.moveOpp = function () { play(t => { click(t, 1250, 0.05, 0.45); thump(t, 135, 0.1, 0.55); }); };
+SFX.correct = function () { play(t => { chime(t, 659, 0.14, 0.18); chime(t + 0.08, 988, 0.22, 0.18); }); };
+SFX.wrong = function () { play(t => { thump(t, 140, 0.12, 0.45); thump(t + 0.1, 104, 0.16, 0.4); }); };
+SFX.notify = function () { play(t => { chime(t, 784, 0.12, 0.16); chime(t + 0.1, 1046, 0.2, 0.16); }); };

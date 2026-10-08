@@ -1,12 +1,14 @@
-// Bundles the client, the AI worker, and the server rules module into dist/
-// (dist/ mirrors the deploy zip layout: index.html + logic.js + game.js + ai-worker.js + design/).
+// Bundles the client and the server rules module into dist/
+// (dist/ mirrors the deploy layout: public/ + game.js + logic.js + stockfish/ + design/).
+// OUTDIR=<dir> builds somewhere else (parallel sandboxes); default is dist/.
 import { build } from "esbuild";
-import { rmSync, mkdirSync, copyFileSync, cpSync, readFileSync, writeFileSync } from "node:fs";
+import { rmSync, mkdirSync, copyFileSync, cpSync, readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const dist = join(root, "dist");
+const dist = process.env.OUTDIR ? resolve(process.env.OUTDIR) : join(root, "dist");
 
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist, { recursive: true });
@@ -16,14 +18,6 @@ await build({
   bundle: true, format: "iife", minify: true,
   target: ["es2020", "safari15"],
   outfile: join(dist, "game.js"),
-  logLevel: "info",
-});
-
-await build({
-  entryPoints: [join(root, "src/ai-worker.js")],
-  bundle: true, format: "iife", minify: true,
-  target: ["es2020", "safari15"],
-  outfile: join(dist, "ai-worker.js"),
   logLevel: "info",
 });
 
@@ -45,7 +39,34 @@ await build({
   console.log("logic.js assembled (inline exports)");
 }
 
-copyFileSync(join(root, "public/index.html"), join(dist, "index.html"));
-cpSync(join(root, "public/assets"), join(dist, "assets"), { recursive: true });
+// Stockfish 18 lite (single-threaded WASM, GPLv3): the worker script finds its .wasm
+// by swapping the extension of its own URL, so both files ship side by side.
+{
+  const sfDir = join(root, "node_modules/stockfish/bin");
+  mkdirSync(join(dist, "stockfish"), { recursive: true });
+  for (const f of ["stockfish-18-lite-single.js", "stockfish-18-lite-single.wasm"]) {
+    copyFileSync(join(sfDir, f), join(dist, "stockfish", f));
+  }
+  copyFileSync(join(root, "node_modules/stockfish/Copying.txt"), join(dist, "stockfish", "COPYING.txt"));
+}
+
+cpSync(join(root, "public"), dist, { recursive: true });
 cpSync(join(root, "design"), join(dist, "design"), { recursive: true });
-console.log("build complete -> dist/");
+
+// stamp the service worker with a content hash so each deploy gets a fresh cache
+{
+  const hash = createHash("sha256");
+  const walk = (dir) => {
+    for (const name of readdirSync(dir).sort()) {
+      const p = join(dir, name);
+      if (statSync(p).isDirectory()) walk(p);
+      else if (name !== "sw.js") hash.update(name).update(readFileSync(p));
+    }
+  };
+  walk(dist);
+  const v = hash.digest("hex").slice(0, 12);
+  const swPath = join(dist, "sw.js");
+  writeFileSync(swPath, readFileSync(swPath, "utf8").replace("__BUILD_HASH__", v));
+  console.log("service worker version " + v);
+}
+console.log("build complete -> " + dist);

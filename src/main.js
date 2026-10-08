@@ -1,152 +1,97 @@
-// Entry point: boots the 3D scene + UI, routes menu choices to game modes,
-// wires the toolbar and keyboard (physical key codes only).
-import { STR } from "./strings.js";
-import { Board3D } from "./board3d.js";
-import { UI } from "./ui.js";
-import { LocalGame } from "./game.js";
-import { OnlineGame } from "./online.js";
+// Entry point: routes → screens. The App owns the board, panel and navigation.
+import { App } from "./app.js";
+import { HomeScreen, BotsScreen, FriendScreen, LocalScreen } from "./screens/play.js";
+import { ProfilePage, SettingsPage } from "./screens/pages.js";
+import { BotGame } from "./modes/bot-game.js";
+import { OnlineGame } from "./modes/online-game.js";
+import { AnalysisScreen } from "./modes/analysis.js";
+import { ReviewScreen } from "./modes/review.js";
+import { PuzzleScreen, RushScreen } from "./modes/puzzles.js";
+import { LearnPage, LessonScreen, DrillScreen, OpeningTrainer } from "./modes/learn.js";
+import { WatchPage, ReplayScreen, BotTV } from "./modes/watch.js";
+import { ArenaScreen } from "./modes/arena.js";
+import { DailyScreen } from "./modes/daily.js";
+import { InsightsPage } from "./screens/insights.js";
+import { maybeWelcome } from "./screens/welcome.js";
+import { BattleScreen } from "./modes/battle.js";
+import { getResume, setSettings } from "./store.js";
+import { unlockAudio } from "./audio.js";
+import { loadOpenings } from "./openings.js";
 
-const ui = new UI();
-const b3d = new Board3D(document.getElementById("scene"));
-let game = null;
-let lastStart = null;
+const dec = (s) => { try { return decodeURIComponent(s); } catch { return s; } };
 
-// static text
-document.title = STR.title;
-document.getElementById("menu-title").textContent = STR.title;
-document.getElementById("menu-sub").textContent = STR.menu.subtitle;
-document.getElementById("mode-ai").textContent = STR.menu.vsComputer;
-document.getElementById("mode-local").textContent = STR.menu.passPlay;
-document.getElementById("mode-online").textContent = STR.menu.online;
-document.getElementById("online-hint").textContent = STR.menu.onlineHint;
-document.getElementById("opt-side-label").textContent = STR.menu.side;
-document.getElementById("opt-level-label").textContent = STR.menu.difficulty;
-document.getElementById("opt-time-label").textContent = STR.menu.time;
-document.getElementById("opt-back").textContent = STR.menu.back;
-document.getElementById("opt-start").textContent = STR.menu.start;
-document.getElementById("lbl-moves").textContent = STR.hud.moves;
-for (const [i, name] of STR.menu.levels.entries()) {
-  const el = document.querySelector(`#seg-level [data-v="${i + 1}"]`);
-  if (el) el.textContent = name;
-}
-for (const [k, name] of Object.entries(STR.menu.times)) {
-  const el = document.querySelector(`#seg-time [data-v="${k}"]`);
-  if (el) el.textContent = name;
-}
-document.querySelector('#seg-side [data-v="w"]').textContent = STR.menu.white;
-document.querySelector('#seg-side [data-v="b"]').textContent = STR.menu.black;
-document.querySelector('#seg-side [data-v="random"]').textContent = STR.menu.random;
+const routes = [
+  { pattern: /^#\/?$/, nav: "play", make: (app) => new HomeScreen(app) },
+  { pattern: /^#\/bots$/, nav: "play", make: (app) => new BotsScreen(app) },
+  { pattern: /^#\/friend$/, nav: "play", make: (app) => new FriendScreen(app) },
+  { pattern: /^#\/local$/, nav: "play", make: (app) => new LocalScreen(app) },
+  {
+    pattern: /^#\/game$/, nav: "play", make: (app) => {
+      const r = getResume();
+      if (r && r.kind === "bot") return new BotGame(app, { botId: r.botId, myColor: r.myColor, tcKey: r.tcKey, assisted: r.assisted, resume: r, id: r.id, startFen: r.startFen, variant: r.variant });
+      return new HomeScreen(app);
+    },
+  },
+  {
+    pattern: /^#\/online$/, nav: "play", make: (app) => {
+      const q = new URLSearchParams(location.search);
+      if (q.get("room")) return new OnlineGame(app, { kind: "friend", room: q.get("room"), tcKey: q.get("tc") || "10+0" });
+      return new HomeScreen(app);
+    },
+  },
+  { pattern: /^#\/puzzles$/, nav: "puzzles", make: (app) => new PuzzleScreen(app, { mode: "rated" }) },
+  { pattern: /^#\/puzzles\/daily$/, nav: "puzzles", make: (app) => new PuzzleScreen(app, { mode: "daily" }) },
+  { pattern: /^#\/puzzles\/rush$/, nav: "puzzles", make: (app) => new RushScreen(app) },
+  { pattern: /^#\/puzzles\/battle$/, nav: "puzzles", make: (app) => new BattleScreen(app) },
+  { pattern: /^#\/arena$/, nav: "play", make: (app) => new ArenaScreen(app) },
+  { pattern: /^#\/daily$/, nav: "play", make: (app) => new DailyScreen(app) },
+  { pattern: /^#\/puzzles\/theme\/([\w-]+)$/, nav: "puzzles", make: (app, m) => new PuzzleScreen(app, { mode: "rated", theme: m[1] }) },
+  { pattern: /^#\/learn$/, nav: "learn", make: (app) => new LearnPage(app) },
+  { pattern: /^#\/lesson\/([\w-]+)$/, nav: "learn", make: (app, m) => new LessonScreen(app, m[1]) },
+  { pattern: /^#\/drill\/([\w-]+)$/, nav: "learn", make: (app, m) => new DrillScreen(app, m[1]) },
+  { pattern: /^#\/opening\/([\w-]+)$/, nav: "learn", make: (app, m) => new OpeningTrainer(app, m[1]) },
+  { pattern: /^#\/watch$/, nav: "watch", make: (app) => new WatchPage(app) },
+  { pattern: /^#\/watch\/([\w-]+)$/, nav: "watch", make: (app, m) => new ReplayScreen(app, m[1]) },
+  { pattern: /^#\/tv$/, nav: "watch", make: (app) => new BotTV(app) },
+  { pattern: /^#\/analysis$/, nav: "analysis", make: (app) => new AnalysisScreen(app) },
+  { pattern: /^#\/analysis\/fen\/(.+)$/, nav: "analysis", make: (app, m) => new AnalysisScreen(app, { fen: dec(m[1]) }) },
+  { pattern: /^#\/analysis\/pgn\/(.+)$/, nav: "analysis", make: (app, m) => new AnalysisScreen(app, { pgn: dec(m[1]) }) },
+  { pattern: /^#\/analysis\/([\w]+)$/, nav: "analysis", make: (app, m) => new AnalysisScreen(app, { gameId: m[1] }) },
+  { pattern: /^#\/review\/([\w]+)$/, nav: "analysis", make: (app, m) => new ReviewScreen(app, m[1]) },
+  { pattern: /^#\/profile$/, nav: "profile", make: (app) => new ProfilePage(app) },
+  { pattern: /^#\/insights$/, nav: "profile", make: (app) => new InsightsPage(app) },
+  { pattern: /^#\/settings$/, nav: "settings", make: (app) => new SettingsPage(app) },
+];
 
-// segmented controls
-for (const seg of document.querySelectorAll(".seg")) {
-  seg.addEventListener("click", (e) => {
-    const btn = e.target.closest("button");
-    if (!btn) return;
-    seg.querySelectorAll("button").forEach(b => b.classList.remove("on"));
-    btn.classList.add("on");
-  });
-}
-
-function destroyGame() {
-  if (game) { game.destroy(); game = null; }
-}
-
-function exitToMenu() {
-  destroyGame();
-  showMenu();
-}
-
-function start(opts) {
-  destroyGame();
-  lastStart = opts;
-  if (opts.mode === "online") {
-    game = new OnlineGame(b3d, ui, { onExit: exitToMenu });
-  } else {
-    const mode = opts.mode === "ai"
-      ? { kind: "ai", level: opts.level, playerColor: opts.side }
-      : { kind: "local" };
-    game = new LocalGame(b3d, ui, mode, opts.tcKey, {
-      onExit: exitToMenu,
-      onRematch: () => start(lastStart),
-    });
-  }
-  document.getElementById("btn-undo").style.display = opts.mode === "ai" ? "" : "none";
+// invite links from older builds carry only ?room=
+if (new URLSearchParams(location.search).get("room") && !location.hash) {
+  history.replaceState(null, "", location.pathname + location.search + "#/online");
 }
 
-function showMenu() {
-  ui.showMenu((opts) => start(opts));
+const app = new App(routes);
+addEventListener("pointerdown", () => unlockAudio(), { once: true });
+loadOpenings();
+app.start();
+
+// first visit: a short welcome that seeds ratings (skipped for invite links and automated checks)
+{
+  const q = new URLSearchParams(location.search);
+  if (!q.get("room") && !q.has("dev")) setTimeout(() => maybeWelcome(app), 600);
 }
 
-// toolbar
-document.getElementById("btn-new").addEventListener("click", exitToMenu);
-document.getElementById("btn-flip").addEventListener("click", () => game && game.flip());
-document.getElementById("btn-undo").addEventListener("click", () => game && game.undo());
-document.getElementById("btn-resign").addEventListener("click", () => {
-  if (game) ui.askConfirmResign(() => game.resign());
-});
-document.getElementById("btn-draw").addEventListener("click", () => game && game.offerDraw());
-
-// keyboard: physical key codes; arrows drive a board cursor, Enter/Space selects
-let cursor = null;
-const FILES2 = "abcdefgh";
-function blackView() {
-  return Math.abs(Math.atan2(b3d.camera.position.x, b3d.camera.position.z)) > Math.PI / 2;
+// installable + offline (bots, puzzles, analysis and review all run locally)
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost") && !new URLSearchParams(location.search).has("nosw")) {
+  addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
 }
-addEventListener("keydown", (e) => {
-  if (document.getElementById("modal").style.display === "flex") return;
-  if (document.getElementById("menu").style.display !== "none") return;
-  const DIRS = { ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
-  if (e.code in DIRS) {
-    e.preventDefault();
-    const inv = blackView() ? -1 : 1;
-    if (!cursor) cursor = blackView() ? "e7" : "e2";
-    else {
-      let f = FILES2.indexOf(cursor[0]) + DIRS[e.code][0] * inv;
-      let r = Number(cursor[1]) - 1 + DIRS[e.code][1] * inv;
-      f = Math.max(0, Math.min(7, f)); r = Math.max(0, Math.min(7, r));
-      cursor = FILES2[f] + (r + 1);
-    }
-    b3d.setCursor(cursor);
-  } else if ((e.code === "Enter" || e.code === "Space") && cursor) {
-    e.preventDefault();
-    if (b3d.onSquareTap) b3d.onSquareTap(cursor);
-  } else if (e.code === "KeyF") {
-    if (game) game.flip();
-  } else if (e.code === "Escape") {
-    b3d.setCursor(null); cursor = null;
-  }
-});
-addEventListener("pointerdown", () => { b3d.setCursor(null); cursor = null; });
 
-// dev-only E2E hook (?dev=1): lets automated checks tap squares and read state
+// dev-only hook (?dev=1) for automated checks
 if (new URLSearchParams(location.search).has("dev")) {
   window.__test = {
-    tap: (sq) => b3d.onSquareTap && b3d.onSquareTap(sq),
-    game: () => game,
-    fen: () => game && (game.chess || game.mirror) && (game.chess || game.mirror).fen(),
-    b3d,
-    calls: () => b3d.renderer.info.render.calls,
-    tris: () => b3d.renderer.info.render.triangles,
-    shot: () => {
-      b3d.renderer.render(b3d.scene, b3d.camera);
-      return b3d.renderer.domElement.toDataURL("image/png");
-    },
-    cam: (r, phi, theta) => {
-      b3d.camera.position.setFromSphericalCoords(r, phi, theta);
-      b3d.camera.lookAt(0, 0, 0);
-      b3d.controls.target.set(0, 0, 0);
-    },
-    lookAt: (x, y, z, r, phi, theta) => {
-      b3d.controls.target.set(x, y, z);
-      b3d.camera.position.set(x, y, z).add(new (b3d.camera.position.constructor)().setFromSphericalCoords(r, phi, theta));
-      b3d.camera.lookAt(x, y, z);
-    },
+    app,
+    board: () => app.board,
+    ctrl: () => app.controller,
+    tap: (sq) => app.board.onSquareTap && app.board.onSquareTap(sq),
+    settings: (patch) => setSettings(patch),
+    fen: () => { const c = app.controller; return c && (c.chess ? c.chess.fen() : c.node ? c.node.fen : null); },
   };
-}
-
-// arriving via an invite link jumps straight into the online game
-if (new URLSearchParams(location.search).get("room")) {
-  start({ mode: "online" });
-} else {
-  showMenu();
 }

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Board3D sandbox</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #101010; color: #ddd; font: 13px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { display: flex; gap: 12px; padding: 12px; align-items: flex-start; min-height: 100vh; }
+  #wrap { flex: none; }
+  #board { width: 70vw; height: 80vh; background: #000; border: 1px solid #333; border-radius: 6px; overflow: hidden; position: relative; }
+  #board.resizable { resize: both; min-width: 200px; min-height: 160px; }
+  #board.phone { width: 375px; height: 520px; }
+  #board.wide { width: 1000px; height: 480px; }
+  #board.square { width: 560px; height: 560px; }
+  #hud { margin-top: 6px; font: 12px/1.4 ui-monospace, Menlo, monospace; color: #9fd6ae; white-space: pre; }
+  #panel { flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 24px); overflow-y: auto; }
+  fieldset { border: 1px solid #333; border-radius: 6px; padding: 8px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  legend { padding: 0 4px; color: #999; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+  button { background: #262626; color: #eee; border: 1px solid #444; border-radius: 5px; padding: 5px 8px; cursor: pointer; font: inherit; }
+  button:hover { background: #333; }
+  button.on { border-color: #34d27b; color: #9fd6ae; }
+  .chip { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; border: 1px solid rgba(255,255,255,.25); }
+  label { display: inline-flex; gap: 4px; align-items: center; }
+  input[type=text] { background: #1b1b1b; color: #eee; border: 1px solid #444; border-radius: 4px; padding: 4px 6px; width: 100%; font: 12px ui-monospace, Menlo, monospace; }
+  #log { font: 11px/1.4 ui-monospace, Menlo, monospace; color: #aaa; white-space: pre-wrap; max-height: 120px; overflow-y: auto; }
+  @media (max-width: 760px) {
+    body { flex-direction: column; padding: 0; gap: 6px; }
+    #board, #board.phone, #board.wide, #board.square { width: 100vw; height: 62vh; border-radius: 0; border: none; }
+    #panel { max-height: none; padding: 0 8px 20px; width: 100%; }
+    #hud { padding: 0 8px; }
+  }
+</style>
+</head>
+<body>
+  <div id="wrap">
+    <div id="board"></div>
+    <div id="hud">loading…</div>
+  </div>
+  <div id="panel">
+    <fieldset><legend>Game</legend>
+      <button id="new">New game</button>
+      <button id="undo">Undo</button>
+      <button id="flip">Flip</button>
+      <button id="random">Random move</button>
+      <button id="auto">Auto-play</button>
+      <label>promote <select id="promo"><option>q</option><option>r</option><option>b</option><option>n</option></select></label>
+    </fieldset>
+    <fieldset><legend>Board theme</legend><div id="bthemes" style="display:flex;flex-wrap:wrap;gap:6px"></div></fieldset>
+    <fieldset><legend>Piece theme</legend><div id="pthemes" style="display:flex;flex-wrap:wrap;gap:6px"></div></fieldset>
+    <fieldset><legend>View</legend>
+      <label><input type="checkbox" id="coords" checked> coords</label>
+      <label><input type="checkbox" id="top"> top-down</label>
+      <label><input type="checkbox" id="idle"> idle orbit</label>
+      <label><input type="checkbox" id="active" checked> active</label>
+      <label><input type="checkbox" id="continuous"> render every frame</label>
+      <label>animMs <input type="range" id="anim" min="0" max="1000" step="10" value="220"> <span id="animv">220</span></label>
+    </fieldset>
+    <fieldset><legend>Container</legend>
+      <button data-size="">70vw × 80vh</button>
+      <button data-size="resizable">resizable</button>
+      <button data-size="phone">375 × 520</button>
+      <button data-size="wide">1000 × 480</button>
+      <button data-size="square">560²</button>
+      <button id="recreate">destroy + recreate</button>
+    </fieldset>
+    <fieldset><legend>Programmatic</legend>
+      <button id="arrows">setArrows demo</button>
+      <button id="marks">setMarks demo</button>
+      <button id="premove">setPremove demo</button>
+      <button id="userdraw">user drawings demo</button>
+      <button id="clearall">clear all</button>
+    </fieldset>
+    <fieldset><legend>Test positions</legend>
+      <button id="t-castle">castling</button>
+      <button id="t-ep">en passant</button>
+      <button id="t-promo">promotion</button>
+      <button id="t-check">check</button>
+      <button id="t-many">many queens</button>
+      <input type="text" id="fen" placeholder="FEN, Enter to load">
+    </fieldset>
+    <div id="log"></div>
+  </div>
+<script src="./main.js"></script>
+</body>
+</html>

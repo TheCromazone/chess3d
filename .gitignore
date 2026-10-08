@@ -3,3 +3,5 @@ dist
 .vercel
 chess3d-game.zip
 DEPLOY.md
+.playwright-mcp
+.impeccable

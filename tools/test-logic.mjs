@@ -91,5 +91,30 @@ ok(JSON.stringify(JSON.parse(JSON.stringify(s))) === JSON.stringify(s), "state J
 // spectator rejected
 ok(!L.validateAction(s2, "p-nosy", { t: "move", from: "e7", to: "e5" }).ok, "spectator cannot act");
 
+// v2 additions: chat, custom time control, abort, takebacks
+let s6 = L.setup([P1, P2]);
+ok(s6.v === 2 && Array.isArray(s6.chat), "state advertises v2");
+ok(L.validateAction(s6, P1, { t: "config", tc: "7+3" }).ok, "custom time control accepted");
+ok(!L.validateAction(s6, P1, { t: "config", tc: "999+0" }).ok, "absurd time control rejected");
+s6 = L.applyAction(s6, P1, { t: "config", tc: "7+3" });
+ok(s6.tc.initial === 420 && s6.tc.inc === 3, "custom clock 7+3");
+ok(L.validateAction(s6, P2, { t: "chat", text: "good luck!" }).ok, "chat allowed");
+ok(!L.validateAction(s6, "p-nosy", { t: "chat", text: "hi" }).ok, "spectators can't chat");
+s6 = L.applyAction(s6, P2, { t: "chat", text: "  good luck!  " });
+ok(s6.chat.length === 1 && s6.chat[0].c === "b" && s6.chat[0].text === "good luck!", "chat stored trimmed with color");
+ok(L.validateAction(s6, P1, { t: "abort" }).ok, "abort allowed before moves");
+s6 = L.applyAction(s6, P1, { t: "move", from: "e2", to: "e4" });
+s6 = L.applyAction(s6, P2, { t: "move", from: "e7", to: "e5" });
+ok(!L.validateAction(s6, P1, { t: "abort" }).ok, "abort refused after both moved");
+s6 = L.applyAction(s6, P1, { t: "move", from: "g1", to: "f3" });
+ok(L.validateAction(s6, P1, { t: "takeback-offer" }).ok, "takeback request allowed");
+s6 = L.applyAction(s6, P1, { t: "takeback-offer" });
+ok(!L.validateAction(s6, P1, { t: "takeback-accept" }).ok, "can't accept own takeback");
+s6 = L.applyAction(s6, P2, { t: "takeback-accept" });
+ok(s6.moves.length === 2 && s6.san.join(" ") === "e4 e5" && !s6.takebackOffer, "takeback undid Nf3 (opponent to move → 1 ply)");
+let s7 = L.applyAction(L.applyAction(L.setup([P1, P2]), P1, { t: "config", tc: "inf" }), P1, { t: "abort" });
+r = L.isGameOver(s7);
+ok(r.over && r.draw && r.reason === "aborted", "aborted game reported");
+
 console.log(failures === 0 ? "\nALL TESTS PASSED" : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);
