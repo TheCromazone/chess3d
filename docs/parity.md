@@ -6,7 +6,12 @@ Loop 1 built the platform (shell, engine, bots, review, analysis, puzzles, learn
 2D/3D boards). Loop 2 added Chess960 / KOTH / Three-check, the opening explorer, Bot Arena, Puzzle
 Battle, Insights, sharing (link, GIF, PNG), light mode, a PWA, and an independent bug hunt (22 fixes).
 Loop 3 added onboarding, move times, background-tab alerts, and daily (correspondence) chess on
-persistent rooms. Rules v2 (chat, takebacks, abort, custom time controls) is deployed to the room server. What remains
+persistent rooms. Loop 4 went deep rather than wide: 17k puzzles, 40 classic games and 23 lessons; keyboard play and
+spoken moves for screen-reader users; and a flow-by-flow UX review at phone and desktop sizes whose
+findings were all fixed (sticky actions on phones, review badges on the board, tolerant PGN import,
+live settings preview, contrast, tap targets).
+
+Rules v2 (chat, takebacks, abort, custom time controls) is deployed to the room server. What remains
 needs an accounts backend: friend requests and presence, clubs, direct messages, and a global
 leaderboard (the user chose to stay account-free).
 Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don't have (alternative noted)
@@ -62,7 +67,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 
 | chess.com feature | Status | Notes |
 |---|---|---|
-| Rated puzzles | ✅ | 4,847 puzzles (lichess, CC0), puzzle rating + streak |
+| Rated puzzles | ✅ | 17,452 puzzles (lichess, CC0), puzzle rating + streak |
 | Puzzle Rush (3 min / 5 min / survival) | ✅ | |
 | Daily puzzle | ✅ | with day streak |
 | Puzzles by theme | ✅ | 73 themes |
@@ -74,7 +79,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 
 | chess.com feature | Status | Notes |
 |---|---|---|
-| Lessons (rules, tactics, strategy) | ✅ | 12 interactive lessons |
+| Lessons (rules, tactics, strategy) | ✅ | 23 interactive lessons |
 | Endgame practice vs engine | ✅ | 15 drills |
 | Opening trainer | ✅ | 32 openings |
 
@@ -82,7 +87,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 
 | chess.com feature | Status | Notes |
 |---|---|---|
-| Watch games | ✅ | 16 classic games replayed + Bot TV (live bot vs bot) |
+| Watch games | ✅ | 40 classic games replayed + Bot TV (live bot vs bot) |
 | Spectate a live game | ✅ | open a friend's game link |
 
 ## Profile & social
@@ -111,4 +116,4 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Light / dark site theme | ✅ | dark, light, or match device |
 | Keyboard shortcuts sheet | ✅ | press ? |
 | Mobile app | ✅ | installable PWA, works offline for bots / puzzles / analysis |
-| Accessible labels | ✅ | labelled controls, focus rings, reduced motion |
+| Accessibility | ✅ | labelled controls, focus rings, reduced motion, keyboard play on the 2D board, spoken moves for screen readers |
