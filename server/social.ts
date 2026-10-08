@@ -46,6 +46,7 @@ const SCHEMA = [
      club TEXT NOT NULL, member TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'member', joined INTEGER NOT NULL,
      PRIMARY KEY (club, member))`,
   `CREATE INDEX IF NOT EXISTS social_club_members_member ON social_club_members (member)`,
+  `CREATE TABLE IF NOT EXISTS social_club_bans (club TEXT NOT NULL, member TEXT NOT NULL, PRIMARY KEY (club, member))`,
   `CREATE TABLE IF NOT EXISTS social_reg_log (ip TEXT NOT NULL, at INTEGER NOT NULL)`,
 ];
 
@@ -373,6 +374,9 @@ export class Social {
         ? await this.q("SELECT * FROM social_clubs WHERE code = ?", code).first<{ id: string; public: number }>()
         : await this.q("SELECT * FROM social_clubs WHERE id = ? AND public = 1", id).first<{ id: string; public: number }>();
       if (!club) throw new HttpError(404, "no such club");
+      if (await this.q("SELECT 1 AS x FROM social_club_bans WHERE club = ? AND member = ?", club.id, me.id).first()) {
+        throw new HttpError(403, "the club's owner removed you from this club");
+      }
       await this.q("INSERT OR IGNORE INTO social_club_members (club, member, role, joined) VALUES (?, ?, 'member', ?)", club.id, me.id, now).run();
       return { id: club.id };
     }
@@ -420,6 +424,18 @@ export class Social {
         await this.q("INSERT INTO social_messages (sender, club, kind, body, created) VALUES (?, ?, 'text', ?, ?)", me.id, id, text, now).run();
         return { ok: true };
       }
+      // POST /clubs/:id/remove {member}: the owner removes someone, who can't rejoin this club
+      if (seg2 === "remove" && method === "POST") {
+        const b = await body(request);
+        const member = str(b["member"], 32);
+        const [owner] = await this.many(this.q("SELECT 1 AS x FROM social_clubs WHERE id = ? AND owner = ?", id, me.id));
+        if (!owner?.length) throw new HttpError(403, "only the club's owner can remove members");
+        if (member === me.id) throw new HttpError(400, "owners leave instead of removing themselves");
+        await this.many(
+          this.q("DELETE FROM social_club_members WHERE club = ? AND member = ?", id, member),
+          this.q("INSERT OR IGNORE INTO social_club_bans (club, member) VALUES (?, ?)", id, member));
+        return { ok: true };
+      }
       throw new HttpError(404, "not found");
     }
 
@@ -455,6 +471,7 @@ export class Social {
         this.q("DELETE FROM social_friends WHERE a = ? OR b = ?", me.id, me.id),
         this.q("DELETE FROM social_messages WHERE sender = ? OR recipient = ?", me.id, me.id),
         this.q("DELETE FROM social_club_members WHERE member = ?", me.id),
+        this.q("DELETE FROM social_club_bans WHERE member = ?", me.id),
         this.q("DELETE FROM social_users WHERE id = ?", me.id));
       for (const c of clubs ?? []) {
         const club = String(c["club"]);
@@ -468,7 +485,8 @@ export class Social {
   }
 
   private async dropClub(id: string) {
-    await this.many(this.q("DELETE FROM social_messages WHERE club = ?", id), this.q("DELETE FROM social_clubs WHERE id = ?", id));
+    await this.many(this.q("DELETE FROM social_messages WHERE club = ?", id), this.q("DELETE FROM social_club_bans WHERE club = ?", id),
+      this.q("DELETE FROM social_clubs WHERE id = ?", id));
   }
 
   private async accept(requester: string, accepter: string, now: number) {

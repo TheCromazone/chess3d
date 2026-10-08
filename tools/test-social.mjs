@@ -103,7 +103,10 @@ const club = (await call("GET", "/clubs/" + c.id, { secret: a.secret })).data;
 ok(club.members.length === 2 && club.messages.length === 1 && club.messages[0].sender_name === "Bob", "club shows members and chat");
 const clubs = (await call("GET", "/clubs", { secret: b.secret })).data;
 ok(clubs.mine.length === 1 && clubs.public[0].members === 2, "club lists show membership counts");
-await call("POST", "/clubs/leave", { secret: b.secret, body: { id: c.id } });
+ok((await call("POST", "/clubs/" + c.id + "/remove", { secret: b.secret, body: { member: a.id } })).status === 403, "members can't remove others");
+ok((await call("POST", "/clubs/" + c.id + "/remove", { secret: a.secret, body: { member: b.id } })).data.ok === true, "the owner can remove a member");
+ok((await call("GET", "/clubs/" + c.id, { secret: b.secret })).status === 403, "a removed member loses access");
+ok((await call("POST", "/clubs/join", { secret: b.secret, body: { code: c.code } })).status === 403, "a removed member can't rejoin");
 await call("POST", "/clubs/leave", { secret: a.secret, body: { id: c.id } });
 ok((await call("GET", "/clubs", { secret: a.secret })).data.public.length === 0, "an empty club is removed");
 

@@ -44,7 +44,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | New-player onboarding (skill level seeds ratings) | ✅ | |
 | In-game chat (online) | ✅ | rules v2 live on the room server; quick phrases + free text |
 | Variants (Chess960, 3-check, KOTH) | ✅ | vs bots and pass and play; Chess960 castling verified against Stockfish perft |
-| Daily / correspondence chess | ✅ | untimed friend games on persistent rooms; your seats are remembered on this device, "your move" list (no per-move deadline until rules v2) |
+| Daily / correspondence chess | ✅ | 1, 3 or 7 days per move (or no limit), lose on time when a deadline passes (rules v3); persistent rooms, "your move" list with time left, daily challenges to friends |
 | Tournaments / arenas | ✅ | Bot Arena: timed arena vs the bots near your rating, live standings, streak bonuses (human arenas would need a server) |
 
 ## Analysis

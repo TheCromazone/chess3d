@@ -31,7 +31,7 @@ export class OnlineGame extends BaseGame {
     this.myRating = myRatingFor(tcKey);
     // daily games keep their seat in localStorage so they survive closing the browser
     const daily = this.kind === "daily" && cfg.room ? getDaily(cfg.room) : null;
-    this.playerId = cfg.playerId || (daily && daily.playerId) || sessionStorage.getItem("mp-pid-" + (cfg.room || "")) || makePlayerId(me.name, this.myRating);
+    this.playerId = cfg.playerId || (daily && daily.playerId) || sessionStorage.getItem("mp-pid-" + (cfg.room || "")) || makePlayerId(me.name, this.myRating, Social.myCode());
     this.room = cfg.room || null;
     this.client = cfg.client || null;
     this.flagSentAt = 0;
@@ -146,6 +146,7 @@ export class OnlineGame extends BaseGame {
       if (color) {
         this.players = { [color]: mine, [color === "w" ? "b" : "w"]: theirs };
         this.oppRating = opp.rating || 1200;
+        this.oppCode = opp.code;
       } else {
         this.players = { w: parsePlayerIdAsPlayer(v.white), b: parsePlayerIdAsPlayer(v.black) };
       }
@@ -355,6 +356,19 @@ export class OnlineGame extends BaseGame {
     const btns = [];
     if (this.myColor) btns.push(h("button.btn", { onclick: () => { close(); this._rematch(); } }, icon("flip", 18), "Rematch"));
     btns.push(h("button.btn", { onclick: () => { close(); this.app.setController(() => new OnlineGame(this.app, { kind: "pool", tcKey: this.tcKey })); } }, icon("users", 18), "New opponent"));
+    // both players have social on: offer to add the opponent (chess.com does this after a game)
+    if (this.oppCode && Social.registered() && this.oppCode !== Social.myCode()) {
+      const add = h("button.btn", {
+        onclick: async () => {
+          add.disabled = true;
+          try {
+            const r = await Social.api("POST", "/friends/request", { code: this.oppCode });
+            toast(r.status === "friends" ? "You're already friends" : `Friend request sent to ${r.user.name}`);
+          } catch (e) { toast(e.message); add.disabled = false; }
+        },
+      }, icon("plus", 18), "Add friend");
+      btns.push(add);
+    }
     return btns;
   }
 

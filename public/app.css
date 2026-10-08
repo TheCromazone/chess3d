@@ -413,6 +413,8 @@ textarea.input { min-height: 110px; resize: vertical; font-family: ui-monospace,
 .friend-lists, .club-lists { display: flex; flex-direction: column; gap: 22px; }
 .code-card .btn { white-space: nowrap; }
 .lb-box { display: flex; flex-direction: column; gap: 12px; }
+.lb-controls { display: flex; flex-direction: column; gap: 8px; }
+.lb-controls > .seg:first-child { max-width: 320px; }
 textarea.input.prose { font-family: var(--font); font-size: 14.5px; min-height: 80px; }
 .msg.pending { opacity: .6; }
 .section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }

@@ -12,14 +12,16 @@ export function roomUrl(room) {
   return "wss://" + PLATFORM_HOST + "/ws/" + room;
 }
 
-// "p-k3j2x9.MagnusFan.1450"
-export function makePlayerId(name, rating) {
+// "p-k3j2x9.MagnusFan.1450", plus ".K7M2QX9P" (a friend code) when social is on, so the
+// opponent can add you as a friend after the game
+export function makePlayerId(name, rating, code) {
   const clean = String(name || "Guest").replace(/[^A-Za-z0-9_]/g, "").slice(0, 16) || "Guest";
-  return `p-${Math.random().toString(36).slice(2, 8)}.${clean}.${Math.round(rating || 1200)}`;
+  const tag = /^[0-9A-Z]{8}$/.test(code || "") ? "." + code : "";
+  return `p-${Math.random().toString(36).slice(2, 8)}.${clean}.${Math.round(rating || 1200)}${tag}`;
 }
 export function parsePlayerId(id) {
-  const m = /^p-[a-z0-9]+\.([A-Za-z0-9_]{1,16})\.(\d{2,4})$/.exec(id || "");
-  return m ? { name: m[1], rating: Number(m[2]) } : { name: "Opponent", rating: null };
+  const m = /^p-[a-z0-9]+\.([A-Za-z0-9_]{1,16})\.(\d{2,4})(?:\.([0-9A-Z]{8}))?$/.exec(id || "");
+  return m ? { name: m[1], rating: Number(m[2]), code: m[3] || null } : { name: "Opponent", rating: null, code: null };
 }
 
 export class RoomClient {

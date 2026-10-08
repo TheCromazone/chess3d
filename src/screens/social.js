@@ -20,6 +20,7 @@ let lastTc = "10+0";
 let lastPace = "3d";
 const isDailyKey = (k) => k === "inf" || /^\d+d$/.test(k || "");
 let lbCat = "blitz";
+let lbScope = "all";
 
 // ---------- challenges ----------
 // mode "live" takes a clock like "5+0"; mode "daily" takes days per move ("3d") or "inf"
@@ -272,7 +273,8 @@ export class SocialScreen {
     } catch (e) { toast(e.message); }
   }
 
-  _profile(u, isFriend) {
+  // extra: { onRemove } when a club owner looks at a member
+  _profile(u, isFriend, extra = {}) {
     const R = u.ratings || {};
     const grid = h("div.mini-ratings", ...S.CATS.map(c => h("div", h("small", CAT_LABEL[c]), h("b", String(R[c] ? R[c].r : "–")), h("small", R[c] ? `${R[c].n} ${c === "puzzle" ? "puzzles" : "games"}` : ""))));
     const mine = u.id === S.myId();
@@ -287,10 +289,17 @@ export class SocialScreen {
         try { await S.api("POST", "/friends/remove", { id: u.id }); m.close(); toast(`Removed ${u.name}`); this.render(); } catch (e) { toast(e.message); }
       },
     }, "Remove friend") : null;
+    const kick = extra.onRemove ? h("button.btn.danger.block", {
+      onclick: async () => {
+        if (!(await confirmModal({ title: `Remove ${u.name} from the club?`, sub: "They leave the club and can't rejoin it.", yes: "Remove", danger: true }))) return;
+        m.close();
+        extra.onRemove();
+      },
+    }, "Remove from club") : null;
     const m = openModal({
       title: u.name,
-      sub: `${presenceText(u)}${u.games ? ` · ${u.games} games played` : ""}`,
-      body: [h("div.profile-pop", userAvatar(u, ".lg"), grid), actions, remove],
+      sub: `${presenceText(u)}${u.games ? `, ${u.games} games played` : ""}`,
+      body: [h("div.profile-pop", userAvatar(u, ".lg"), grid), actions, remove, kick],
     });
   }
 
@@ -501,7 +510,13 @@ export class SocialScreen {
       h("div.club-grid",
         h("section.card.thread-card", h("h3", "Club chat"), list, h("div.composer", input, h("button.btn.primary", { onclick: send }, "Send"))),
         h("section.card.members-card", h("h3", `Members (${members.length}, ${online} online)`),
-          h("div.member-list", ...members.map(u => h("button.member", { onclick: () => this._profile(u, false) },
+          h("div.member-list", ...members.map(u => h("button.member", {
+            onclick: () => this._profile(u, false, c.owner === S.myId() && u.id !== S.myId() ? {
+              onRemove: async () => {
+                try { await S.api("POST", `/clubs/${id}/remove`, { member: u.id }); toast(`Removed ${u.name}`); this.render(); } catch (e) { toast(e.message); }
+              },
+            } : {}),
+          },
             userAvatar(u, ".sm"), h("span.rt", h("b", u.name), h("small", u.role === "owner" ? "Owner" : presenceText(u))), h("span.muted", String(u.ratings.blitz.r))))),
           h("button.btn.ghost.block", {
             onclick: async () => {
@@ -517,8 +532,9 @@ export class SocialScreen {
   // ---------- leaderboard ----------
   async _leaderboard(tok) {
     const seg = segmented(S.CATS.map(c => ({ value: c, label: CAT_LABEL[c] })), lbCat, (v) => { lbCat = v; this._leaderboard(++this.tok); });
+    const scope = segmented([{ value: "all", label: "Everyone" }, { value: "friends", label: "Friends" }], lbScope, (v) => { lbScope = v; this._leaderboard(++this.tok); });
     const box = h("div.lb-box", h("p.note", "Loading the leaderboard…"));
-    this.body.replaceChildren(seg, box);
+    this.body.replaceChildren(h("div.lb-controls", scope, seg), box);
     const path = `/leaderboard?cat=${lbCat}`;
     if (S.cached(path)) this._drawBoard(box, S.cached(path), S.cached("/friends"));
     let d, friends;
@@ -532,10 +548,21 @@ export class SocialScreen {
     const friendIds = new Set(friends.friends.map(u => u.id));
     const pendingIds = new Set(friends.outgoing.map(u => u.id));
     const unit = lbCat === "puzzle" ? "puzzles" : "games";
-    const meLine = d.me.rank
-      ? h("div.status-line.good", icon("trophy", 18), h("span", `You're #${d.me.rank} of ${d.total} with ${d.me.rating}.`))
-      : h("div.status-line", icon("trophy", 18), h("span", `Play ${d.minGames} rated ${CAT_LABEL[lbCat].toLowerCase()} ${unit} to get ranked (you have ${d.me.games}).`));
-    const rows = d.top.map((u, i) => {
+    let list = d.top, meLine;
+    if (lbScope === "friends") {
+      // you and your friends, whatever the number of games
+      const me = S.socialState().me;
+      list = [...friends.friends, ...(me ? [me] : [])].sort((a, b) => b.ratings[lbCat].r - a.ratings[lbCat].r);
+      const rank = list.findIndex(u => u.id === S.myId()) + 1;
+      meLine = friends.friends.length
+        ? h("div.status-line.good", icon("trophy", 18), h("span", `You're #${rank} of ${list.length} among your friends.`))
+        : h("div.status-line", icon("users", 18), h("span", "Add friends to compare your ratings with theirs."));
+    } else {
+      meLine = d.me.rank
+        ? h("div.status-line.good", icon("trophy", 18), h("span", `You're #${d.me.rank} of ${d.total} with ${d.me.rating}.`))
+        : h("div.status-line", icon("trophy", 18), h("span", `Play ${d.minGames} rated ${CAT_LABEL[lbCat].toLowerCase()} ${unit} to get ranked (you have ${d.me.games}).`));
+    }
+    const rows = list.map((u, i) => {
       const me = u.id === S.myId();
       const action = me ? h("span.muted", "You") : friendIds.has(u.id) ? h("span.muted", "Friend")
         : pendingIds.has(u.id) ? h("span.muted", "Requested")
@@ -548,11 +575,12 @@ export class SocialScreen {
         h("td", action));
     });
     box.replaceChildren(meLine,
-      d.top.length ? h("div.table-wrap", h("table.table.lb-table",
+      list.length ? h("div.table-wrap", h("table.table.lb-table",
         h("thead", h("tr", h("th", "#"), h("th", "Player"), h("th", "Rating"), h("th.wide-only", unit[0].toUpperCase() + unit.slice(1)), h("th", ""))),
         h("tbody", ...rows)))
         : h("p.note", "Nobody is ranked here yet. Be the first."),
-      h("p.note", `Ratings come from each player's own device and aren't verified by the server. Players need ${d.minGames}+ rated ${unit} and a visit in the last 30 days to be listed.`));
+      h("p.note", lbScope === "friends" ? "Ratings come from each player's own device and aren't verified by the server."
+        : `Ratings come from each player's own device and aren't verified by the server. Players need ${d.minGames}+ rated ${unit} and a visit in the last 30 days to be listed.`));
   }
 }
 

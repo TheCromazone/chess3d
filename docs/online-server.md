@@ -32,6 +32,12 @@ Everything from v1 still behaves the same, so the current client works against e
 The client turns chat, takebacks, abort and custom time controls on automatically when it sees
 `view.v >= 2`. `npm test` covers the new actions (`tools/test-logic.mjs`).
 
+Rules v3 (`view.v = 3`) adds daily time controls: `"1d"`, `"2d"`, `"3d"`, `"5d"`, `"7d"` or
+`"14d"` give each side that long for every move. The clock uses the same fields as a live game
+(`tc.perMove` is set), but a move resets the mover's allowance instead of adding an increment, and
+`flag` claims the win once the opponent's deadline has passed. Clients send `"inf"` to servers
+older than v3.
+
 To update the rules: copy `dist/logic.js` to the project's `app/src/logic.js`, run
 `bun run build` and `bun run test` in `app/`, then deploy. Because the project was migrated,
 its logic check reports `Date.now()` (used by the clocks) as a warning rather than an error.
