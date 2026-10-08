@@ -50,7 +50,7 @@ export class HomeScreen {
       }, h("span.badge", "Saved")) : null,
       row("robot", "Play bots", "16 personalities from 250 to 3200", () => app.go("#/bots")),
       row("link", "Play a friend", "Send an invite link", () => app.go("#/friend")),
-      row("trophy", "Arena", "A timed tournament against the bots", () => app.go("#/arena")),
+      row("trophy", "Arenas", "Live tournaments every 30 minutes, or against the bots", () => app.go("#/arenas")),
       row("calendar", "Daily chess", dailyLine(), () => app.go("#/daily")),
       row("users", "Pass and play", "Two players, one screen", () => app.go("#/local")),
       row("puzzle", daily ? "Daily puzzle solved" : "Daily puzzle", daily ? "Come back tomorrow for a new one" : "A fresh puzzle every day", () => app.go("#/puzzles/daily"), daily ? h("span.badge", "✓") : null),

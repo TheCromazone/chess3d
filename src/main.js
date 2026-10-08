@@ -15,6 +15,7 @@ import { InsightsPage } from "./screens/insights.js";
 import { maybeWelcome } from "./screens/welcome.js";
 import { BattleScreen } from "./modes/battle.js";
 import { SocialScreen, startSocial } from "./screens/social.js";
+import { ArenasScreen, ArenaLobby } from "./screens/arenas.js";
 import { getResume, setSettings } from "./store.js";
 import { unlockAudio } from "./audio.js";
 import { loadOpenings } from "./openings.js";
@@ -45,6 +46,8 @@ const routes = [
   { pattern: /^#\/puzzles\/rush$/, nav: "puzzles", make: (app) => new RushScreen(app) },
   { pattern: /^#\/puzzles\/battle$/, nav: "puzzles", make: (app) => new BattleScreen(app) },
   { pattern: /^#\/arena$/, nav: "play", make: (app) => new ArenaScreen(app) },
+  { pattern: /^#\/arenas$/, nav: "play", make: (app) => new ArenasScreen(app) },
+  { pattern: /^#\/arenas\/(ar-\d+)$/, nav: "play", make: (app, m) => new ArenaLobby(app, m[1]) },
   { pattern: /^#\/daily$/, nav: "play", make: (app) => new DailyScreen(app) },
   { pattern: /^#\/puzzles\/theme\/([\w-]+)$/, nav: "puzzles", make: (app, m) => new PuzzleScreen(app, { mode: "rated", theme: m[1] }) },
   { pattern: /^#\/learn$/, nav: "learn", make: (app) => new LearnPage(app) },

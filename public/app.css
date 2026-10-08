@@ -414,6 +414,21 @@ textarea.input { min-height: 110px; resize: vertical; font-family: ui-monospace,
 .code-card .btn { white-space: nowrap; }
 .lb-box { display: flex; flex-direction: column; gap: 12px; }
 .lb-controls { display: flex; flex-direction: column; gap: 8px; }
+.row .ri.live { color: var(--accent); background: rgba(52, 210, 123, .12); }
+.arena-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.arena-table tr.me td { background: rgba(52, 210, 123, .08); }
+.arena-table tr:nth-child(-n+3) td.rank { color: var(--brass); font-weight: 800; }
+.arena-table td.rank { width: 36px; color: var(--ink-3); }
+.arena-table td.num { font-variant-numeric: tabular-nums; }
+.arena-player { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.arena-player b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.form { display: inline-flex; gap: 3px; }
+.form span { min-width: 18px; height: 18px; border-radius: 4px; display: inline-grid; place-items: center; font-size: 11px; font-weight: 800; background: var(--panel-3); color: var(--ink-3); }
+.form .form-w, .form .form-w2 { background: rgba(52, 210, 123, .18); color: var(--accent-text); }
+.form .form-w2 { box-shadow: inset 0 0 0 1px var(--brass); }
+.form .form-l { background: rgba(226, 88, 74, .16); color: var(--danger-ink); }
+.spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .lb-controls > .seg:first-child { max-width: 320px; }
 textarea.input.prose { font-family: var(--font); font-size: 14.5px; min-height: 80px; }
 .msg.pending { opacity: .6; }

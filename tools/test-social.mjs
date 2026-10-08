@@ -34,7 +34,9 @@ let failures = 0;
 const ok = (cond, name) => { console.log((cond ? "PASS" : "FAIL") + "  " + name); if (!cond) failures++; };
 
 let clock = 1_800_000_000_000;
-const api = new Social(d1(new DatabaseSync(":memory:")), () => clock);
+// the room server, as the arena code sees it: room -> {status, seats, result}
+const rooms = new Map();
+const api = new Social(d1(new DatabaseSync(":memory:")), () => clock, { roomState: async (room) => rooms.get(room) ?? null });
 async function call(method, path, { body, secret, query = "", ip = "1.1.1.1" } = {}) {
   const req = new Request("https://x/api/social" + path + query, {
     method, headers: { "Content-Type": "application/json", "CF-Connecting-IP": ip, ...(secret ? { Authorization: "Bearer " + secret } : {}) },
@@ -135,6 +137,56 @@ ok((await call("GET", "/me", { secret: b.secret })).status === 401, "a deleted p
 const afterDel = (await call("GET", "/friends", { secret: a.secret })).data;
 ok(afterDel.friends.length === 0 && (await call("GET", "/conversations", { secret: a.secret })).data.conversations.length === 0, "friendships and messages go with them");
 ok(!(await call("GET", "/clubs", { secret: a.secret })).data.public.some((x) => x.id === c2.id), "a club left empty is removed");
+
+// live arenas
+const ann = (await call("POST", "/register", { body: { name: "Ann" }, ip: "2.2.2.2" })).data;
+const cid = (await call("POST", "/register", { body: { name: "Cid" }, ip: "2.2.2.2" })).data;
+const dee = (await call("POST", "/register", { body: { name: "Dee" }, ip: "2.2.2.2" })).data;
+const arenas = (await call("GET", "/arenas", { secret: ann.secret })).data.arenas;
+const live = arenas.find((x) => x.starts <= clock && clock < x.ends);
+ok(arenas.length >= 2 && live && live.tc === "3+0", "the schedule always has a running arena and the next one");
+const later = arenas.find((x) => x.starts > clock);
+const pidA = "p-aaaa.Ann.1500.ABCDEFGH", pidC = "p-cccc.Cid.1500", pidD = "p-dddd.Dee.1500";
+for (const u of [ann, cid, dee]) await call("POST", `/arenas/${live.id}/join`, { secret: u.secret });
+let pa = (await call("POST", `/arenas/${live.id}/pair`, { secret: ann.secret, body: { pid: pidA } })).data;
+ok(pa.state === "waiting" && !pa.room, "the first player waits for an opponent");
+let pc = (await call("POST", `/arenas/${live.id}/pair`, { secret: cid.secret, body: { pid: pidC } })).data;
+ok(pc.state === "paired" && pc.room && pc.opponent.name === "Ann", "the next player is paired with them");
+pa = (await call("POST", `/arenas/${live.id}/pair`, { secret: ann.secret, body: { pid: pidA } })).data;
+ok(pa.state === "paired" && pa.room === pc.room && pa.opponent.name === "Cid", "both sides see the same game");
+ok((await call("POST", `/arenas/${live.id}/pair`, { secret: ann.secret, body: { pid: "../../x" } })).status === 400, "bad player ids are refused");
+rooms.set(pc.room, { status: "playing", seats: [pidC, pidA], result: null });
+ok((await call("POST", `/arenas/${live.id}/result`, { secret: ann.secret, body: { room: pc.room } })).status === 409, "a game in progress can't be scored");
+rooms.set(pc.room, { status: "over", seats: [pidC, pidA], result: { winner: pidA, reason: "checkmate" } });
+const res = (await call("POST", `/arenas/${live.id}/result`, { secret: cid.secret, body: { room: pc.room } })).data;
+await call("POST", `/arenas/${live.id}/result`, { secret: ann.secret, body: { room: pc.room } });
+let st = (await call("GET", `/arenas/${live.id}`, { secret: ann.secret })).data;
+const row = (n) => st.standings.find((x) => x.name === n);
+ok(res.outcome && row("Ann").score === 2 && row("Cid").score === 0 && row("Ann").games === 1, "the server reads the winner from the room and scores once");
+// two more wins for Ann: the third win in a row counts double
+for (let i = 0; i < 2; i++) {
+  await call("POST", `/arenas/${live.id}/pair`, { secret: ann.secret, body: { pid: pidA } });
+  const p2 = (await call("POST", `/arenas/${live.id}/pair`, { secret: dee.secret, body: { pid: pidD } })).data;
+  rooms.set(p2.room, { status: "over", seats: [pidA, pidD], result: { winner: pidA, reason: "resignation" } });
+  await call("POST", `/arenas/${live.id}/result`, { secret: dee.secret, body: { room: p2.room } });
+}
+st = (await call("GET", `/arenas/${live.id}`, { secret: ann.secret })).data;
+ok(row("Ann").score === 8 && row("Ann").streak === 3 && st.standings[0].name === "Ann", "win streaks score double after two wins");
+// a player who stopped asking isn't paired
+await call("POST", `/arenas/${live.id}/pair`, { secret: cid.secret, body: { pid: pidC } });
+clock += 20_000;
+const pd = (await call("POST", `/arenas/${live.id}/pair`, { secret: dee.secret, body: { pid: pidD } })).data;
+ok(pd.state === "waiting", "players who stopped polling aren't paired");
+const pc2 = (await call("POST", `/arenas/${live.id}/pair`, { secret: cid.secret, body: { pid: pidC } })).data;
+ok(pc2.state === "paired" && pc2.opponent.name === "Dee", "but are as soon as they ask again");
+// the opponent never shows up: no score after 45 seconds
+rooms.set(pc2.room, { status: "waiting", seats: [pidC], result: null });
+clock += 50_000;
+const v = (await call("POST", `/arenas/${live.id}/result`, { secret: cid.secret, body: { room: pc2.room } })).data;
+st = (await call("GET", `/arenas/${live.id}`, { secret: ann.secret })).data;
+ok(v.outcome === "void" && row("Cid").games === 1 && row("Dee").state === "idle", "a no-show voids the game and frees both players");
+const notYet = (await call("POST", `/arenas/${later.id}/pair`, { secret: ann.secret, body: { pid: pidA } }));
+ok(notYet.status === 403 || notYet.data.running === false, "an arena that hasn't started doesn't pair");
 
 console.log(failures === 0 ? "\nALL SOCIAL TESTS PASSED" : `\n${failures} FAILURES`);
 process.exit(failures ? 1 : 0);

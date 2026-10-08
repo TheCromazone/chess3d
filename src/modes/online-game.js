@@ -40,7 +40,10 @@ export class OnlineGame extends BaseGame {
     this.sentConfig = false;
   }
 
-  title() { return this.kind === "pool" ? `Online ${tcLabel(this.tcKey)}` : this.kind === "daily" ? "Daily game" : "Play a friend"; }
+  title() {
+    if (this.cfg.arena) return this.cfg.arena.name;
+    return this.kind === "pool" ? `Online ${tcLabel(this.tcKey)}` : this.kind === "daily" ? "Daily game" : "Play a friend";
+  }
   bottomColor() { return this.myColor || "w"; }
   canMove(c) { return this.phase === "playing" && c === this.myColor; }
   premoveColor() { return this.phase === "playing" ? this.myColor : null; }
@@ -62,6 +65,7 @@ export class OnlineGame extends BaseGame {
     super.destroy();
     this.dead = true;
     if (this._onVis) document.removeEventListener("visibilitychange", this._onVis);
+    clearTimeout(this._noShowT); clearTimeout(this._arenaNextT);
     document.title = "Chess 3D";
     clearInterval(this._lobbyTimer);
     if (this.search) this.search.cancel();
@@ -122,6 +126,14 @@ export class OnlineGame extends BaseGame {
   _state(s) {
     this.lastState = s;
     if (s.status === "waiting") {
+      if (this.cfg.arena && !this._noShowT) {
+        this._noShowT = setTimeout(async () => {
+          if (this._destroyed || !this.lastState || this.lastState.status !== "waiting") return;
+          toast("Your opponent didn't show up. Finding you another game.");
+          try { await Social.api("POST", `/arenas/${this.cfg.arena.id}/result`, { room: this.room }); } catch { /* the server voids it later */ }
+          if (!this._destroyed) this.cfg.arena.next();
+        }, 50000);
+      }
       this.phase = this.kind === "pool" ? "searching" : "waiting";
       this._renderLobby();
       return;
@@ -326,7 +338,8 @@ export class OnlineGame extends BaseGame {
   // finish is driven by the server; rating + bookkeeping happen here
   onFinish(r) {
     if (r.reason === "aborted" || !this.myColor) return {};
-    const rated = this.kind === "pool";
+    const rated = this.kind === "pool" || !!this.cfg.arena;
+    if (this.cfg.arena) this._reportArena();
     const cls = timeClass(this.tcKey);
     let delta = null;
     if (rated && cls) {
@@ -354,9 +367,20 @@ export class OnlineGame extends BaseGame {
 
   postGameButtons(close = () => {}) {
     const btns = [];
+    if (this.cfg.arena) {
+      const a = this.cfg.arena;
+      btns.push(h("button.btn.primary", { onclick: () => { close(); clearTimeout(this._arenaNextT); a.next(); } }, icon("bolt", 18), "Next game"));
+      btns.push(h("button.btn", { onclick: () => { close(); clearTimeout(this._arenaNextT); a.leave(); } }, "Standings"));
+      return btns.concat(this._addFriendButton());
+    }
     if (this.myColor) btns.push(h("button.btn", { onclick: () => { close(); this._rematch(); } }, icon("flip", 18), "Rematch"));
     btns.push(h("button.btn", { onclick: () => { close(); this.app.setController(() => new OnlineGame(this.app, { kind: "pool", tcKey: this.tcKey })); } }, icon("users", 18), "New opponent"));
-    // both players have social on: offer to add the opponent (chess.com does this after a game)
+    return btns.concat(this._addFriendButton());
+  }
+
+  // both players have social on: offer to add the opponent (chess.com does this after a game)
+  _addFriendButton() {
+    const btns = [];
     if (this.oppCode && Social.registered() && this.oppCode !== Social.myCode()) {
       const add = h("button.btn", {
         onclick: async () => {
@@ -370,6 +394,23 @@ export class OnlineGame extends BaseGame {
       btns.push(add);
     }
     return btns;
+  }
+
+  // arena games: the server reads the result from this room and scores both players
+  async _reportArena(tries = 0) {
+    const a = this.cfg.arena;
+    try {
+      const r = await Social.api("POST", `/arenas/${a.id}/result`, { room: this.room });
+      if (this._destroyed) return;
+      const won = r.outcome === r.you, drew = r.outcome === "draw";
+      toast(r.outcome === "void" ? "This game doesn't count." : won ? "Win recorded in the arena" : drew ? "Draw recorded in the arena" : "Result recorded in the arena");
+      // like chess.com: back into the pairing pool after a short pause unless you choose otherwise
+      this._arenaNextT = setTimeout(() => { if (!this._destroyed && this.app.controller === this) { closeAllModals(); a.next(); } }, 7000);
+    } catch (e) {
+      // the room may still be settling, or the server busy: try again shortly
+      if (tries < 4 && (e.status === 409 || e.status === 503 || e.status === 0)) setTimeout(() => this._reportArena(tries + 1), 1500 * (tries + 1));
+      else toast(e.message);
+    }
   }
 
   _rematch() {
