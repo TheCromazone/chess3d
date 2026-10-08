@@ -8,7 +8,8 @@
     "test": "node tools/test-logic.mjs && node tools/test-core.mjs && node tools/test-960.mjs",
     "serve": "node tools/serve.mjs",
     "test:engine": "node tools/test-engine.mjs && node tools/test-960-bots.mjs",
-    "test:data": "node tools/test-data.mjs && node tools/test-explorer.mjs"
+    "test:data": "node tools/test-data.mjs && node tools/test-explorer.mjs",
+    "test:social": "node tools/test-social.mjs"
   },
   "dependencies": {
     "chess.js": "1.0.0-beta.8",

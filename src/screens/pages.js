@@ -7,6 +7,7 @@ import { BOARD_THEMES as B3, PIECE_THEMES as P3 } from "../board3d.js";
 import { BOARD_THEMES as B2, PIECE_THEMES as P2 } from "../board2d.js";
 import { MoveTree } from "../core/tree.js";
 import { createChess } from "../core/chess960.js";
+import { registered as socialOn, myCode, fmtCode, leave as leaveSocial } from "../net/social.js";
 
 const EMOJIS = ["♞", "♛", "♜", "♝", "♚", "♟", "🦁", "🦊", "🐺", "🦉", "🐉", "🐙", "🦅", "🐢", "🎩", "👑", "⚡", "🔥", "🌙", "🍀"];
 const BGS = ["#2f6b4f", "#6b4a2f", "#3b4f7a", "#7a3b4f", "#5a4f2a", "#2a5a5a", "#5a2a6b", "#6b2a2a"];
@@ -112,7 +113,8 @@ export class ProfilePage {
       friends.set(e.opponent, { name: e.opponent, rating: null, w: 0, d: 0, l: 0, last: e.updated || e.created, daily: true });
     }
     const fl = [...friends.values()].sort((a, b) => b.last - a.last);
-    page.append(h("section", h("h2", "Friends"),
+    page.append(h("section", h("div.section-head", h("h2", "People you've played"),
+      h("button.btn.small", { onclick: () => this.app.go("#/social") }, icon("users", 16), socialOn() ? "Friends and messages" : "Find friends")),
       fl.length ? h("div.rows", ...fl.slice(0, 20).map(f => h("div.row", { style: { cursor: "default" } },
         h("span.ri", icon("users", 20)),
         h("span.rt", h("b", f.name, f.rating ? h("span.muted", ` ${f.rating}`) : null),
@@ -120,7 +122,7 @@ export class ProfilePage {
         h("div", { style: { display: "flex", gap: "6px" } },
           h("button.btn.small", { onclick: () => this.app.go("#/friend"), title: "Create a live game link to send them" }, icon("bolt", 16), "Live"),
           h("button.btn.small", { onclick: () => this.app.go("#/daily"), title: "Start a daily game and send them the link" }, icon("calendar", 16), "Daily")))))
-        : h("p.note", "People you play online or in daily games show up here, with your record against them.")));
+        : h("p.note", "People you play online or in daily games show up here, with your record against them. To add friends, message them and see when they're online, open Social.")));
 
     // leaderboard: where you stand among the bots
     const ladder = [...BOTS.filter(b => b.category !== "Engine").map(b => ({ name: b.name, rating: b.elo, avatar: b.avatar })), { name: p.name, rating: R.bots.r, avatar: p.avatar, me: true }]
@@ -218,12 +220,29 @@ export class SettingsPage {
         h("div.field", h("div.lbl", "Move notation"), segmented([{ value: "figurine", label: "Figurine ♘f3" }, { value: "san", label: "Letters Nf3" }], s.notation, (v) => setSettings({ notation: v })))),
       h("section.settings-sec", h("h2", "Sound"),
         switchRow("Sound effects", null, s.sound, (v) => setSettings({ sound: v }))),
+      h("section.settings-sec", h("h2", "Social"),
+        socialOn()
+          ? [h("p.note", `Social is on. Your friend code is ${fmtCode(myCode())}. Your name, avatar, ratings and online status are visible to other players.`),
+            h("button.btn.danger", {
+              onclick: async () => {
+                if (!(await confirmModal({ title: "Delete your social profile?", sub: "Your friends, messages and club memberships are deleted from the server, and you leave the leaderboard. Games and ratings on this device stay.", yes: "Delete", danger: true }))) return;
+                try { await leaveSocial(); toast("Social profile deleted"); this.render(); } catch (e) { toast(e.message); }
+              },
+            }, icon("trash", 18), "Delete social profile")]
+          : [h("p.note", "Friends, messages, clubs and the global leaderboard are off. Nothing about you is shared until you turn them on."),
+            h("button.btn", { onclick: () => this.app.go("#/social") }, icon("users", 18), "Open Social")]),
       h("section.settings-sec", h("h2", "Your data"),
-        h("p.note", "Everything (profile, ratings, games) lives in this browser. Export a backup to move it to another device."),
+        h("p.note", "Your profile, ratings and games live in this browser. Export a backup to move them (and your social key) to another device."),
         h("div.btn-row",
           h("button.btn", { onclick: () => downloadText("chess3d-backup.json", exportAll(), "application/json") }, icon("download", 18), "Export"),
           h("button.btn", { onclick: () => this.importFile() }, icon("upload", 18), "Import"),
-          h("button.btn.danger", { onclick: async () => { if (await confirmModal({ title: "Erase all data?", sub: "Your profile, ratings and game archive will be deleted from this device.", yes: "Erase", danger: true })) { resetAll(); toast("All data erased"); this.render(); } } }, icon("trash", 18), "Erase"))),
+          h("button.btn.danger", {
+            onclick: async () => {
+              if (!(await confirmModal({ title: "Erase all data?", sub: socialOn() ? "Your profile, ratings and game archive are deleted from this device, and your social profile from the server." : "Your profile, ratings and game archive will be deleted from this device.", yes: "Erase", danger: true }))) return;
+              if (socialOn()) await leaveSocial().catch(() => {});
+              resetAll(); toast("All data erased"); this.render();
+            },
+          }, icon("trash", 18), "Erase"))),
       h("section.settings-sec", h("h2", "About"),
         h("p.note", { html: "Chess 3D. Engine: <a href=\"https://github.com/nmrugg/stockfish.js\" target=\"_blank\" rel=\"noopener\">Stockfish.js 18</a> (GPLv3, <a href=\"./stockfish/COPYING.txt\" target=\"_blank\">license</a>). Puzzles and opening names: <a href=\"https://database.lichess.org/\" target=\"_blank\" rel=\"noopener\">lichess.org open database</a> (CC0). 2D piece sets: see <a href=\"./assets/pieces/LICENSES.md\" target=\"_blank\">credits</a>." })));
     const scroll = this.app.side.querySelector(".side-body");

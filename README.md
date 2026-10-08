@@ -1,8 +1,8 @@
 # Chess 3D
 
 A complete chess platform in the browser, played on a rendered 3D board (or a classic 2D board,
-if you prefer). Everything chess.com does that doesn't need an account server: online play,
-bots, puzzles, lessons, Stockfish game review, and analysis.
+if you prefer), covering what chess.com does: online play, friends and clubs, bots, puzzles,
+lessons, Stockfish game review, and analysis. There's no sign-up: your device holds your key.
 
 **▶ Play it live:** https://chess3d-five.vercel.app/
 
@@ -25,6 +25,13 @@ bots, puzzles, lessons, Stockfish game review, and analysis.
 - **Learn:** interactive lessons, endgame drills against Stockfish, and an opening trainer.
 - **Watch:** 40 famous games replayed move by move, plus Bot TV.
 
+**Social**
+- **Friends:** share your friend code or an invite link, accept requests, and see who's online or playing.
+- **Challenges and messages:** challenge a friend to a live or daily game and they get a pop-up with Accept / Decline; message friends one to one.
+- **Clubs:** public or invite-only clubs with their own chat and member list.
+- **Leaderboards:** global top 50 for blitz, bullet, rapid, puzzles and bots (ratings are reported by each player's device).
+- Social is off until you turn it on; you can delete your social profile from Settings at any time.
+
 **You**
 - Local profile with ratings per category, rating history, stats, Insights (accuracy by phase, colour and time control), a game archive (review or download any game as PGN), and achievements. Export and import your data.
 - Settings: dark or light appearance, 3D or 2D board, board and piece themes, top-down 3D camera, coordinates, animation speed, legal-move hints, sound.
@@ -39,10 +46,14 @@ bots, puzzles, lessons, Stockfish game review, and analysis.
     npm test         # server-rules + move-tree tests
     node tools/test-data.mjs     # data integrity (openings, puzzles, classics, lessons)
     node tools/test-engine.mjs   # Stockfish wrapper, bots, review (slow)
+    npm run test:social          # social API (server/social.ts) against SQLite
 
 `src/logic-src.js` is the online referee. It's bundled with chess.js into `dist/logic.js` for the
 room server. Version 2 of the rules adds chat, takeback requests, abort, and custom time controls;
 the client turns those features on automatically once the server runs v2.
+
+`server/social.ts` is the social API (friends, messages, clubs, leaderboard). It runs in the game
+server's Worker at `/api/social/*` on a D1 database; see `docs/online-server.md`.
 
 ## Credits
 

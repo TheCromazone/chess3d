@@ -1,5 +1,5 @@
 // Persistent settings, profile, ratings, and game archive (localStorage, all reads guarded).
-const KEY = { settings: "chess3d.settings", profile: "chess3d.profile", games: "chess3d.games", reviews: "chess3d.reviews", resume: "chess3d.resume", daily: "chess3d.daily" };
+const KEY = { settings: "chess3d.settings", profile: "chess3d.profile", games: "chess3d.games", reviews: "chess3d.reviews", resume: "chess3d.resume", daily: "chess3d.daily", social: "chess3d.social" };
 const MAX_GAMES = 300;
 const MAX_REVIEWS = 12;
 
@@ -171,6 +171,10 @@ export function upsertDaily(entry) {
 }
 export function removeDaily(room) { write(KEY.daily, getDailyGames().filter(e => e.room !== room)); }
 
+// ---------- social identity: this device's key for friends, messages and clubs ----------
+export function getSocialId() { const v = read(KEY.social, null); return v && v.id && v.secret ? v : null; }
+export function setSocialId(v) { if (v) write(KEY.social, v); else { try { localStorage.removeItem(KEY.social); } catch { /* noop */ } } }
+
 // ---------- resumable bot game ----------
 export function getResume() { return read(KEY.resume, null); }
 export function setResume(v) { if (v) write(KEY.resume, v); else { try { localStorage.removeItem(KEY.resume); } catch { /* noop */ } } }
@@ -217,7 +221,7 @@ export function unlock(id) {
 
 // ---------- export / import ----------
 export function exportAll() {
-  return JSON.stringify({ v: 1, settings, profile: getProfile(), games: getGames() });
+  return JSON.stringify({ v: 1, settings, profile: getProfile(), games: getGames(), social: getSocialId() });
 }
 export function importAll(json) {
   const data = JSON.parse(json);
@@ -225,6 +229,7 @@ export function importAll(json) {
   if (data.settings) { settings = { ...DEFAULT_SETTINGS, ...data.settings }; write(KEY.settings, settings); notifyAllSettings(); }
   if (data.profile) { profile = deepMerge(DEFAULT_PROFILE(), data.profile); saveProfile(); }
   if (Array.isArray(data.games)) write(KEY.games, data.games.slice(0, MAX_GAMES));
+  if (data.social && data.social.id && data.social.secret) setSocialId(data.social);
 }
 export function resetAll() {
   for (const k of Object.values(KEY)) { try { localStorage.removeItem(k); } catch { /* noop */ } }

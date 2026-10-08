@@ -12,6 +12,7 @@ const NAV = [
   { id: "puzzles", label: "Puzzles", icon: "puzzle", hash: "#/puzzles" },
   { id: "learn", label: "Learn", icon: "learn", hash: "#/learn" },
   { id: "watch", label: "Watch", icon: "watch", hash: "#/watch" },
+  { id: "social", label: "Social", icon: "users", hash: "#/social" },
   { id: "analysis", label: "Analysis", icon: "analysis", hash: "#/analysis" },
   { id: "profile", label: "Profile", icon: "profile", hash: "#/profile" },
   { id: "settings", label: "Settings", icon: "settings", hash: "#/settings" },
@@ -58,7 +59,7 @@ export class App {
     rail.appendChild(h("a.brand", { href: "#/", "aria-label": "Chess 3D home" },
       h("img", { src: "./assets/favicon.png", alt: "" }), h("span", "Chess 3D")));
     for (const n of NAV) {
-      const mk = () => h("a.nav-item", { href: n.hash, dataset: { nav: n.id } }, icon(n.icon, 24), h("span", n.label));
+      const mk = () => h("a.nav-item", { href: n.hash, dataset: { nav: n.id } }, icon(n.icon, 24), h("span", n.label), h("span.nav-badge", { hidden: true }));
       if (n.id === "settings") rail.appendChild(h("div.rail-spacer"));
       rail.appendChild(mk());
       // phones: Analysis gets a tab; Settings is reached from Profile
@@ -67,6 +68,16 @@ export class App {
   }
   _setNav(id) {
     for (const el of document.querySelectorAll(".nav-item")) el.classList.toggle("on", el.dataset.nav === id);
+  }
+  // a count on a nav item (unread messages + friend requests on Social)
+  setNavBadge(id, n) {
+    const label = (NAV.find(x => x.id === id) || {}).label || "";
+    for (const el of document.querySelectorAll(`.nav-item[data-nav="${id}"]`)) {
+      const b = el.querySelector(".nav-badge");
+      b.hidden = !n;
+      b.textContent = n > 9 ? "9+" : String(n || "");
+      if (n) el.setAttribute("aria-label", `${label}, ${n} new`); else el.removeAttribute("aria-label");
+    }
   }
 
   go(hash) {
@@ -102,6 +113,8 @@ export class App {
   // Start a controller directly (e.g. a configured game) and record its URL without re-routing.
   launch(factory, hash) {
     if (hash && location.hash !== hash) { history.pushState(null, "", location.pathname + location.search + hash); }
+    const r = hash && this.routes.find(x => x.pattern.test(hash));
+    if (r) this._setNav(r.nav);
     this._lastHash = hash || location.hash;
     this.setController(factory);
   }

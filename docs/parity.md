@@ -11,9 +11,10 @@ spoken moves for screen-reader users; and a flow-by-flow UX review at phone and 
 findings were all fixed (sticky actions on phones, review badges on the board, tolerant PGN import,
 live settings preview, contrast, tap targets).
 
-Rules v2 (chat, takebacks, abort, custom time controls) is deployed to the room server. What remains
-needs an accounts backend: friend requests and presence, clubs, direct messages, and a global
-leaderboard (the user chose to stay account-free).
+Rules v2 (chat, takebacks, abort, custom time controls) is deployed to the room server. Loop 5 added
+the social layer without sign-in: each device registers for a private key and a shareable friend
+code, and the game server (Cloudflare Worker + D1) holds friends with online status, direct messages
+and challenges, clubs with their own chat, and a global leaderboard of self-reported ratings.
 Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don't have (alternative noted)
 
 ## Play
@@ -94,15 +95,18 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 
 | chess.com feature | Status | Notes |
 |---|---|---|
-| Profile with ratings per category | ✅ | bullet / blitz / rapid / bots / puzzles / rush (local, no accounts) |
+| Profile with ratings per category | ✅ | bullet / blitz / rapid / bots / puzzles / rush, kept on the device |
 | Game archive, replay, review, PGN download | ✅ | |
 | Stats (W/L/D, rating trend, openings) | ✅ | |
 | Insights (accuracy trend, by phase, by colour / time control, mistakes per game) | ✅ | from your archive and reviews |
-| Achievements / streaks | ✅ | 21 achievements |
-| Friends | 🟡 | people you've played online or by daily game, your record vs each, one-click live/daily challenge; no presence or friend requests (needs accounts) |
-| Leaderboards | 🟡 | bot ladder (your rank among the bots); a global leaderboard needs an accounts backend |
-| Clubs, messages | ⛔ | need an accounts backend |
-| Data portability | ✅ | export / import backup |
+| Achievements / streaks | ✅ | 24 achievements |
+| Friends with online status | ✅ | friend codes and invite links, requests (accept / decline), online / playing / last seen, profiles with ratings; also "people you've played" with your record vs each |
+| Challenges | ✅ | challenge a friend to a live game (any time control) or a daily game; pop-up notice with Accept / Decline wherever they are in the app; challenge friends from the invite lobby |
+| Direct messages | ✅ | threads with friends, unread counts on the nav, notices for new messages |
+| Clubs | ✅ | create (public or invite-only), join by code or from the public list, club chat, member list with presence |
+| Leaderboards | ✅ | global top 50 per category (blitz, bullet, rapid, puzzles, bots) with your rank; ratings are self-reported by devices and labelled so; bot ladder on the profile |
+| Accounts | 🟡 | no sign-in by design: a device key instead of a password; move it with export / import; delete your social profile any time |
+| Data portability | ✅ | export / import backup (includes the social key) |
 
 ## Settings & polish
 

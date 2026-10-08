@@ -8,6 +8,8 @@ import { confirmModal, openModal, toast, tcLabel, closeAllModals } from "../ui/c
 import { RoomClient, makePlayerId, parsePlayerId, findMatch } from "../net/room.js";
 import { getProfile, applyRating, timeClass, unlock, getSettings, getDaily, upsertDaily } from "../store.js";
 import { SFX } from "../audio.js";
+import * as Social from "../net/social.js";
+import { userAvatar, presenceText } from "../ui/people.js";
 
 function myRatingFor(tcKey) {
   const cls = timeClass(tcKey) || "rapid";
@@ -421,6 +423,30 @@ export class OnlineGame extends BaseGame {
   }
 
   // ---------- lobby UI ----------
+  // waiting for a friend: challenge one of your Social friends to this room directly
+  _friendInvites() {
+    const box = h("div.invite-friends");
+    this._friendsP = this._friendsP || Social.api("GET", "/friends").then(d => d.friends).catch(() => []);
+    this._friendsP.then((friends) => {
+      if (!friends.length || this.phase !== "waiting") return;
+      const daily = this.kind === "daily";
+      box.append(h("div.lbl", "Or challenge a friend"), h("div.rows", ...friends.slice(0, 8).map(u => {
+        const btn = h("button.btn.small", {
+          onclick: async () => {
+            btn.disabled = true;
+            try {
+              await Social.api("POST", "/messages", { to: u.id, kind: "challenge", room: this.room, tc: daily ? "inf" : this.tcKey, mode: daily ? "daily" : "live" });
+              btn.textContent = "Sent";
+              toast(`Challenge sent to ${u.name}`);
+            } catch (e) { toast(e.message); btn.disabled = false; }
+          },
+        }, "Challenge");
+        return h("div.row", userAvatar(u), h("span.rt", h("b", u.name), h("small", presenceText(u))), btn);
+      })));
+    });
+    return box;
+  }
+
   _renderLobby(error) {
     const me = getProfile();
     this.app.strips(null, { name: me.name, rating: this.myRating, avatar: me.avatar });
@@ -434,15 +460,20 @@ export class OnlineGame extends BaseGame {
     } else if (this.phase === "waiting") {
       const link = location.origin + location.pathname + `?room=${this.room}&tc=${encodeURIComponent(this.tcKey)}#/online`;
       const input = h("input.input", { value: link, readonly: true, "aria-label": "Invite link", onfocus: (e) => e.target.select() });
+      const invitee = this.cfg.invitee;
       body.push(h("div.card",
-        h("h3", this.kind === "daily" ? "Invite a friend to a daily game" : "Invite a friend"),
-        h("p.note", this.kind === "daily"
-          ? "Send this link. There's no clock: moves are saved, so you can both come back and play at your own pace. You play White."
-          : `Send this link. The game starts (${tcLabel(this.tcKey)}) as soon as they open it. You play White.`),
+        h("h3", invitee ? `Challenge sent to ${invitee}` : this.kind === "daily" ? "Invite a friend to a daily game" : "Invite a friend"),
+        h("p.note", invitee
+          ? (this.kind === "daily" ? `The game starts when ${invitee} accepts. There's no clock, so you can both play at your own pace. You play White.`
+            : `The game (${tcLabel(this.tcKey)}) starts as soon as ${invitee} accepts. You play White. You can also send them this link.`)
+          : this.kind === "daily"
+            ? "Send this link. There's no clock: moves are saved, so you can both come back and play at your own pace. You play White."
+            : `Send this link. The game starts (${tcLabel(this.tcKey)}) as soon as they open it. You play White.`),
         h("div.field", input),
         h("div.btn-row",
           h("button.btn.primary", { onclick: async () => { if (await copyText(link)) toast("Link copied"); } }, icon("copy", 18), "Copy link"),
           navigator.share ? h("button.btn", { onclick: () => navigator.share({ title: "Play chess with me", url: link }).catch(() => {}) }, icon("share", 18), "Share") : null)));
+      if (!invitee && Social.registered()) body.push(this._friendInvites());
     } else if (this.phase === "failed") {
       body.push(h("div.status-line.bad", icon("close", 16), h("span", error || "Couldn't reach the pairing server.")));
       body.push(h("button.btn.primary.block", { onclick: () => this.app.setController(() => new OnlineGame(this.app, { kind: "pool", tcKey: this.tcKey })) }, "Try again"));

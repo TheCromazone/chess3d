@@ -35,3 +35,28 @@ The client turns chat, takebacks, abort and custom time controls on automaticall
 To update the rules: copy `dist/logic.js` to the project's `app/src/logic.js`, run
 `bun run build` and `bun run test` in `app/`, then deploy. Because the project was migrated,
 its logic check reports `Date.now()` (used by the clocks) as a warning rather than an error.
+
+## Social API
+
+`server/social.ts` runs in the same Worker at `/api/social/*` (copied to the project's
+`app/src/social.ts`; `app/src/worker.ts` routes the prefix and answers CORS preflights). It needs
+the project's D1 database (`"db": true` in `app/app.manifest.json`, `DB: D1Database` in
+`app/src/env.ts`). Tables are created on first use with `CREATE TABLE IF NOT EXISTS`.
+
+There's no sign-in. `POST /register` returns a random 64-hex secret (only its SHA-256 is stored)
+and an 8-character friend code; the client keeps the secret in localStorage and sends it as
+`Authorization: Bearer <secret>`. Routes:
+
+- `POST /heartbeat`: presence (online / playing), name, avatar and self-reported ratings; returns unread and request counts plus the newest unread messages, which drive the nav badge and the challenge pop-ups.
+- `GET /friends`, `POST /friends/request {code}`, `/friends/respond {id, accept}`, `/friends/remove {id}`.
+- `GET /conversations`, `GET /messages?with=&after=` (marks them read), `POST /messages {to, text}` or `{to, kind: "challenge", room, tc, mode}`. Only friends can message each other.
+- `GET /clubs`, `POST /clubs/create|join|leave`, `GET /clubs/:id`, `GET|POST /clubs/:id/messages`.
+- `GET /leaderboard?cat=blitz|bullet|rapid|puzzle|bots`: players active in the last 30 days with at least 5 rated games (10 puzzles).
+- `GET /users/:id`, `GET /me`, `POST /delete` (removes the player, friendships, messages and memberships).
+
+Limits: 20 registrations per IP per hour, 30 messages per minute, 40 friend requests per hour,
+5 clubs per owner, 500-character messages. Each request batches its queries into one D1 round trip
+after the key lookup. `npm run test:social` runs the API against SQLite through a D1-shaped shim.
+
+To update it: copy `server/social.ts` to `app/src/social.ts` (check the SHA-256 on both sides),
+commit, push and deploy.

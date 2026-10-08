@@ -14,6 +14,7 @@ import { DailyScreen } from "./modes/daily.js";
 import { InsightsPage } from "./screens/insights.js";
 import { maybeWelcome } from "./screens/welcome.js";
 import { BattleScreen } from "./modes/battle.js";
+import { SocialScreen, startSocial } from "./screens/social.js";
 import { getResume, setSettings } from "./store.js";
 import { unlockAudio } from "./audio.js";
 import { loadOpenings } from "./openings.js";
@@ -58,6 +59,11 @@ const routes = [
   { pattern: /^#\/analysis\/pgn\/(.+)$/, nav: "analysis", make: (app, m) => new AnalysisScreen(app, { pgn: dec(m[1]) }) },
   { pattern: /^#\/analysis\/([\w]+)$/, nav: "analysis", make: (app, m) => new AnalysisScreen(app, { gameId: m[1] }) },
   { pattern: /^#\/review\/([\w]+)$/, nav: "analysis", make: (app, m) => new ReviewScreen(app, m[1]) },
+  { pattern: /^#\/social$/, nav: "social", make: (app) => new SocialScreen(app) },
+  { pattern: /^#\/social\/(friends|messages|clubs|leaderboard)$/, nav: "social", make: (app, m) => new SocialScreen(app, { tab: m[1] }) },
+  { pattern: /^#\/social\/chat\/(u_[a-z0-9]+)$/, nav: "social", make: (app, m) => new SocialScreen(app, { tab: "messages", chat: m[1] }) },
+  { pattern: /^#\/social\/club\/(c_[a-z0-9]+)$/, nav: "social", make: (app, m) => new SocialScreen(app, { tab: "clubs", club: m[1] }) },
+  { pattern: /^#\/social\/add\/([0-9A-Za-z]{8})$/, nav: "social", make: (app, m) => new SocialScreen(app, { tab: "friends", add: m[1] }) },
   { pattern: /^#\/profile$/, nav: "profile", make: (app) => new ProfilePage(app) },
   { pattern: /^#\/insights$/, nav: "profile", make: (app) => new InsightsPage(app) },
   { pattern: /^#\/settings$/, nav: "settings", make: (app) => new SettingsPage(app) },
@@ -71,6 +77,8 @@ if (new URLSearchParams(location.search).get("room") && !location.hash) {
 const app = new App(routes);
 addEventListener("pointerdown", () => unlockAudio(), { once: true });
 app.start();
+// friends, messages and challenges: presence heartbeat and notices (only once social is turned on)
+startSocial(app);
 // the opening book (~460 KB) isn't needed for first paint; screens that use it load it on demand
 (window.requestIdleCallback || ((f) => setTimeout(f, 1500)))(() => loadOpenings());
 
