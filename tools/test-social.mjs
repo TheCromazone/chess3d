@@ -268,6 +268,17 @@ await call("POST", "/report", { secret: rep3.secret, body: { kind: "topic", id: 
 ok((await call("GET", `/forums/${t1.id}`, { secret: ann.secret })).status === 404, "three reports hide it");
 await call("POST", "/delete", { secret: rep3.secret });
 
+// variant ratings and leaderboards
+await call("POST", "/heartbeat", { secret: ann.secret, body: { status: "online", vratings: { atomic: { r: 1620, n: 4 }, duck: { r: 1490, n: 2 }, bogus: { r: 9999, n: 9 } } } });
+await call("POST", "/heartbeat", { secret: cid.secret, body: { status: "online", vratings: { atomic: { r: 1550, n: 1 }, crazyhouse: { r: 99999, n: 3 } } } });
+let vlb = (await call("GET", "/leaderboard", { secret: dee.secret, query: "?cat=atomic" })).data;
+ok(vlb.cat === "atomic" && vlb.top.length === 2 && vlb.top[0].name === "Ann" && vlb.top[0].variants.atomic.r === 1620 && vlb.me.rank === null, "a variant has its own leaderboard");
+ok(!("bogus" in vlb.top[0].variants), "only known variants are kept");
+vlb = (await call("GET", "/leaderboard", { secret: cid.secret, query: "?cat=crazyhouse" })).data;
+ok(vlb.top[0].variants.crazyhouse.r === 4000 && vlb.me.rank === 1, "ratings are clamped, and your rank shows");
+vlb = (await call("GET", "/leaderboard", { secret: cid.secret, query: "?cat=atomic" })).data;
+ok(vlb.me.rank === 2 && vlb.me.rating === 1550, "your place on a variant board");
+
 // blogs
 const bp = (await call("POST", "/blogs", { secret: ann.secret, body: { title: "How I beat the London", body: "Play ...c5 early, then ...Qb6.\nIt works." } })).data;
 ok(bp.id && bp.id.startsWith("b_"), "a blog post can be published");

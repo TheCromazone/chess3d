@@ -187,7 +187,24 @@ const BATTLE_FRESH_MS = 8_000;
 const MIGRATIONS = [
   `ALTER TABLE social_users ADD COLUMN room TEXT`,     // the live game a player is in, for friends to watch
   `ALTER TABLE social_users ADD COLUMN rush INTEGER NOT NULL DEFAULT 0`,   // best 5-minute Puzzle Rush
+  `ALTER TABLE social_users ADD COLUMN vratings TEXT NOT NULL DEFAULT '{}'`,   // variant ratings, {variant: {r, n}}
 ];
+
+// variants with their own rating (and leaderboard)
+const VARIANT_KEYS = ["crazyhouse", "chess960", "threecheck", "koth", "duck", "fog", "giveaway", "atomic", "horde", "fourplayer", "fourteams"];
+function cleanVariantRatings(v: unknown): Record<string, { r: number; n: number }> {
+  const out: Record<string, { r: number; n: number }> = {};
+  if (!v || typeof v !== "object") return out;
+  for (const k of VARIANT_KEYS) {
+    const slot = (v as Record<string, unknown>)[k] as Record<string, unknown> | undefined;
+    const r = Number(slot && slot["r"]), n = Number(slot && slot["n"]);
+    if (Number.isFinite(r) && Number.isFinite(n) && n >= 1) out[k] = { r: Math.max(100, Math.min(4000, Math.round(r))), n: Math.min(100_000, Math.round(n)) };
+  }
+  return out;
+}
+function variantRatingsOf(u: { vratings?: string | null }): Record<string, { r: number; n: number }> {
+  try { return cleanVariantRatings(JSON.parse(u.vratings || "{}")); } catch { return {}; }
+}
 
 // Live arenas run on a fixed schedule so there's always one to join: every 30 minutes a new one
 // starts (blitz on the hour, bullet on the half hour) and runs for 27 minutes.
@@ -216,6 +233,7 @@ interface UserRow {
   id: string; code: string; name: string; avatar: string; created: number; last_seen: number; status: string; games: number;
   room?: string | null;
   rush?: number;
+  vratings?: string | null;
   r_bullet: number; n_bullet: number; r_blitz: number; n_blitz: number; r_rapid: number; n_rapid: number;
   r_puzzle: number; n_puzzle: number; r_bots: number; n_bots: number;
 }
@@ -270,7 +288,7 @@ function publicUser(u: UserRow, now: number) {
   const online = now - u.last_seen < ONLINE_MS;
   return {
     id: u.id, name: u.name, code: u.code, avatar, online,
-    status: online ? u.status : "offline", lastSeen: u.last_seen, games: u.games, rush: u.rush ?? 0,
+    status: online ? u.status : "offline", lastSeen: u.last_seen, games: u.games, rush: u.rush ?? 0, variants: variantRatingsOf(u),
     ratings: Object.fromEntries(CATS.map((c) => [c, { r: u[`r_${c}`], n: u[`n_${c}`] }])),
   };
 }
@@ -596,11 +614,12 @@ export class Social {
       const room = typeof b["room"] === "string" && ROOM_RE.test(b["room"]) && status === "playing" ? b["room"] : null;
       const rushIn = Number(b["rush"]);
       const rush = Number.isFinite(rushIn) ? Math.max(0, Math.min(300, Math.round(rushIn))) : (me.rush ?? 0);
+      const vratings = b["vratings"] !== undefined ? JSON.stringify(cleanVariantRatings(b["vratings"])) : (me.vratings ?? "{}");
       const [, unread, reqs, latest, updated] = await this.many(
-        this.q(`UPDATE social_users SET last_seen = ?, status = ?, name = ?, avatar = ?, games = ?, room = ?, rush = ?,
+        this.q(`UPDATE social_users SET last_seen = ?, status = ?, name = ?, avatar = ?, games = ?, room = ?, rush = ?, vratings = ?,
             r_bullet = ?, n_bullet = ?, r_blitz = ?, n_blitz = ?, r_rapid = ?, n_rapid = ?,
             r_puzzle = ?, n_puzzle = ?, r_bots = ?, n_bots = ? WHERE id = ?`,
-          now, status, name, avatar, games, room, rush,
+          now, status, name, avatar, games, room, rush, vratings,
           vals["r_bullet"], vals["n_bullet"], vals["r_blitz"], vals["n_blitz"], vals["r_rapid"], vals["n_rapid"],
           vals["r_puzzle"], vals["n_puzzle"], vals["r_bots"], vals["n_bots"], me.id),
         this.q("SELECT COUNT(*) AS n FROM social_messages WHERE recipient = ? AND seen = 0", me.id),
@@ -823,6 +842,21 @@ export class Social {
       return {
         cat: "rush", minGames: 1, top: (top ?? []).map((u) => publicUser(u as unknown as UserRow, now)),
         me: { rank: mine > 0 ? Number(rank?.[0]?.["n"] ?? 0) + 1 : null, rating: mine, games: null },
+        total: Number(total?.[0]?.["n"] ?? 0),
+      };
+    }
+    if (method === "GET" && path === "/leaderboard" && VARIANT_KEYS.includes(url.searchParams.get("cat") || "")) {
+      // a variant's top players (the JSON path comes from the fixed list above, never from input)
+      const key = VARIANT_KEYS.find((k) => k === url.searchParams.get("cat"))!;
+      const since = now - 30 * 86_400_000, mine = variantRatingsOf(me)[key];
+      const r = `json_extract(vratings, '$.${key}.r')`, n = `json_extract(vratings, '$.${key}.n')`;
+      const [top, rank, total] = await this.many(
+        this.q(`SELECT * FROM social_users WHERE ${n} >= 1 AND last_seen > ? ORDER BY ${r} DESC, ${n} DESC LIMIT 50`, since),
+        this.q(`SELECT COUNT(*) AS n FROM social_users WHERE ${n} >= 1 AND last_seen > ? AND ${r} > ?`, since, mine ? mine.r : 0),
+        this.q(`SELECT COUNT(*) AS n FROM social_users WHERE ${n} >= 1 AND last_seen > ?`, since));
+      return {
+        cat: key, minGames: 1, top: (top ?? []).map((u) => publicUser(u as unknown as UserRow, now)),
+        me: { rank: mine ? Number(rank?.[0]?.["n"] ?? 0) + 1 : null, rating: mine ? mine.r : null, games: mine ? mine.n : 0 },
         total: Number(total?.[0]?.["n"] ?? 0),
       };
     }

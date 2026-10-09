@@ -10,6 +10,7 @@ import { gamePgn } from "./pages.js";
 import { signInModal } from "./account.js";
 import { SFX } from "../audio.js";
 import * as S from "../net/social.js";
+import { VARIANT_NAMES } from "../modes/variant-replay.js";
 
 const TABS = [
   { id: "friends", label: "Friends" },
@@ -23,7 +24,11 @@ const TABS = [
 const FORUM_LABEL = { general: "General", openings: "Openings", tactics: "Tactics", endgames: "Endgames", help: "Help and feedback" };
 let forumCat = null;
 const CAT_LABEL = { blitz: "Blitz", bullet: "Bullet", rapid: "Rapid", puzzle: "Puzzles", bots: "Vs bots", rush: "Puzzle Rush" };
-const LB_CATS = [...S.CATS, "rush"];
+const LB_CATS = [...S.CATS, "rush", "variants"];
+CAT_LABEL.variants = "Variants";
+// the variant boards, in the order of the Variants page
+const LB_VARIANTS = ["crazyhouse", "fourplayer", "fourteams", "duck", "fog", "giveaway", "atomic", "horde", "chess960", "koth", "threecheck"];
+let lbVariant = "crazyhouse";
 let lastTc = "10+0";
 let lastPace = "3d";
 const isDailyKey = (k) => k === "inf" || /^\d+d$/.test(k || "");
@@ -350,7 +355,9 @@ export class SocialScreen {
     const m = openModal({
       title: u.name,
       sub: `${presenceText(u)}${u.games ? `, ${u.games} game${u.games === 1 ? "" : "s"} played` : ""}`,
-      body: [h("div.profile-pop", userAvatar(u, ".lg"), grid), actions, remove, kick, h("div.lbl.note", "Recent games"), games],
+      body: [h("div.profile-pop", userAvatar(u, ".lg"), grid),
+        Object.keys(u.variants || {}).length ? h("p.note", "Variants: " + Object.entries(u.variants).sort((a, b) => b[1].n - a[1].n).map(([k, v]) => `${VARIANT_NAMES[k] || k} ${v.r}`).join(", ")) : null,
+        actions, remove, kick, h("div.lbl.note", "Recent games"), games],
     });
     S.api("GET", `/users/${u.id}/games`).then((d) => {
       if (!d.games.length) { games.replaceChildren(h("p.note", `${u.name} hasn't finished a game since turning on Social.`)); return; }
@@ -813,7 +820,10 @@ export class SocialScreen {
     const scope = segmented([{ value: "all", label: "Everyone" }, { value: "friends", label: "Friends" }], lbScope, (v) => { lbScope = v; this._leaderboard(++this.tok); });
     const box = h("div.lb-box", h("p.note", "Loading the leaderboard…"));
     this.body.replaceChildren(h("div.lb-controls", scope, seg), box);
-    const path = `/leaderboard?cat=${lbCat}`;
+    if (lbCat === "variants") {
+      box.before(h("div.seg.round-picker.lb-variants", ...LB_VARIANTS.map((v) => h(`button${v === lbVariant ? ".on" : ""}`, { onclick: () => { lbVariant = v; this._leaderboard(++this.tok); } }, VARIANT_NAMES[v] || v))));
+    }
+    const path = `/leaderboard?cat=${lbCat === "variants" ? lbVariant : lbCat}`;
     if (S.cached(path)) this._drawBoard(box, S.cached(path), S.cached("/friends"));
     let d, friends;
     try { [d, friends] = await Promise.all([S.api("GET", path), S.api("GET", "/friends")]); }
@@ -826,8 +836,8 @@ export class SocialScreen {
     const friendIds = new Set(friends.friends.map(u => u.id));
     const pendingIds = new Set(friends.outgoing.map(u => u.id));
     const unit = lbCat === "puzzle" ? "puzzles" : "games";
-    const rush = lbCat === "rush";
-    const score = (u) => (rush ? u.rush || 0 : u.ratings[lbCat].r);
+    const rush = lbCat === "rush", variant = lbCat === "variants" ? lbVariant : null;
+    const score = (u) => (rush ? u.rush || 0 : variant ? ((u.variants || {})[variant] || { r: 0 }).r : u.ratings[lbCat].r);
     let list = d.top, meLine;
     if (lbScope === "friends") {
       // you and your friends, whatever the number of games
@@ -837,6 +847,10 @@ export class SocialScreen {
       meLine = friends.friends.length
         ? h("div.status-line.good", icon("trophy", 18), h("span", `You're #${rank} of ${list.length} among your friends.`))
         : h("div.status-line", icon("users", 18), h("span", "Add friends to compare your ratings with theirs."));
+    } else if (variant) {
+      meLine = d.me.rank
+        ? h("div.status-line.good", icon("trophy", 18), h("span", `You're #${d.me.rank} of ${d.total} in ${VARIANT_NAMES[variant]}, with ${d.me.rating}.`))
+        : h("div.status-line", icon("trophy", 18), h("span", `Play a rated ${VARIANT_NAMES[variant]} game against a random opponent to get on this board.`));
     } else if (rush) {
       meLine = d.me.rank
         ? h("div.status-line.good", icon("trophy", 18), h("span", `You're #${d.me.rank} of ${d.total} with ${d.me.rating} puzzles.`))
@@ -855,7 +869,7 @@ export class SocialScreen {
         h("td.rank", String(i + 1)),
         h("td", h("button.lb-player", { onclick: () => this._profile(u, friendIds.has(u.id)) }, userAvatar(u, ".sm"), h("b", u.name))),
         h("td.num", String(score(u))),
-        h("td.num.wide-only", rush ? "" : String(u.ratings[lbCat].n)),
+        h("td.num.wide-only", rush ? "" : variant ? String(((u.variants || {})[variant] || { n: 0 }).n) : String(u.ratings[lbCat].n)),
         h("td", action));
     });
     box.replaceChildren(meLine,
