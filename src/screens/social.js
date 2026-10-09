@@ -253,7 +253,19 @@ export class SocialScreen {
         h("label.lbl", { for: "add-code" }, "Add a friend"),
         h("div.add-row", Object.assign(input, { id: "add-code" }), h("button.btn.primary", { onclick: add }, icon("plus", 18), "Add"))));
     const lists = h("div.friend-lists", h("p.note", "Loading friends…"));
-    this.body.replaceChildren(codeCard, this._searchBox(), lists);
+    const blockedBox = h("div");
+    this.body.replaceChildren(codeCard, this._searchBox(), lists, blockedBox);
+    S.loadBlocked().then((list) => {
+      if (!this._live(tok) || !list.length) return;
+      blockedBox.replaceChildren(h("section", h("h2", `Blocked (${list.length})`), h("div.rows",
+        ...list.map(u => h("div.row", userAvatar(u), h("span.rt", h("b", u.name), h("small", "Can't add, message or challenge you")),
+          h("button.btn.small.ghost", {
+            onclick: async (e) => {
+              e.currentTarget.disabled = true;
+              try { await S.unblock(u.id); toast(`Unblocked ${u.name}`); this.render(); } catch (err) { toast(err.message); }
+            },
+          }, "Unblock"))))));
+    }).catch(() => {});
 
     const refresh = async () => {
       let d;
@@ -345,6 +357,21 @@ export class SocialScreen {
         try { await S.api("POST", "/friends/remove", { id: u.id }); m.close(); toast(`Removed ${u.name}`); this.render(); } catch (e) { toast(e.message); }
       },
     }, "Remove friend") : null;
+    const blocked = S.isBlockedCode(u.code);
+    const blockBtn = mine ? null : h("button.btn.ghost.block", {
+      onclick: async () => {
+        try {
+          if (blocked) { await S.unblock(u.id); toast(`Unblocked ${u.name}`); }
+          else {
+            if (!(await confirmModal({ title: `Block ${u.name}?`, sub: "They won't be able to add, message or challenge you, you won't be paired with them, and you won't see their posts or chat. Any friendship between you ends.", yes: "Block", danger: true }))) return;
+            await S.block({ id: u.id });
+            toast(`Blocked ${u.name}`);
+          }
+          m.close();
+          this.render();
+        } catch (e) { toast(e.message); }
+      },
+    }, blocked ? "Unblock" : "Block");
     const kick = extra.onRemove ? h("button.btn.danger.block", {
       onclick: async () => {
         if (!(await confirmModal({ title: `Remove ${u.name} from the club?`, sub: "They leave the club and can't rejoin it.", yes: "Remove", danger: true }))) return;
@@ -359,7 +386,7 @@ export class SocialScreen {
       sub: `${presenceText(u)}${u.games ? `, ${u.games} game${u.games === 1 ? "" : "s"} played` : ""}`,
       body: [h("div.profile-pop", userAvatar(u, ".lg"), grid),
         Object.keys(u.variants || {}).length ? h("p.note", "Variants: " + Object.entries(u.variants).sort((a, b) => b[1].n - a[1].n).map(([k, v]) => `${VARIANT_NAMES[k] || k} ${v.r}`).join(", ")) : null,
-        actions, remove, kick, h("div.lbl.note", "Recent games"), games],
+        blocked ? h("p.note", "You've blocked this player.") : actions, remove, kick, blockBtn, h("div.lbl.note", "Recent games"), games],
     });
     S.api("GET", `/users/${u.id}/games`).then((d) => {
       if (!d.games.length) { games.replaceChildren(h("p.note", `${u.name} hasn't finished a game since turning on Social.`)); return; }

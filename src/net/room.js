@@ -35,6 +35,20 @@ export function parsePlayerId(id) {
   return m ? { name: m[1], rating: Number(m[2]), code: m[3] || null } : { name: "Opponent", rating: null, code: null };
 }
 
+// friend codes of the players you've blocked (the social client keeps this up to date): quick pairing
+// steers clear of them and their game chat is hidden
+const BLOCKED_KEY = "chess3d.blocked";
+export function blockedCodes() {
+  try { return new Set(JSON.parse(localStorage.getItem(BLOCKED_KEY) || "[]")); } catch { return new Set(); }
+}
+export function setBlockedCodes(codes) {
+  try { if (codes.length) localStorage.setItem(BLOCKED_KEY, JSON.stringify(codes)); else localStorage.removeItem(BLOCKED_KEY); } catch { /* noop */ }
+}
+export function isBlocked(playerId) {
+  const code = parsePlayerId(playerId).code;
+  return !!code && blockedCodes().has(code);
+}
+
 export class RoomClient {
   constructor(room, playerId, { onState, onError, onStatus } = {}) {
     this.room = room;
@@ -96,8 +110,16 @@ export function findMatch(tcKey, playerId, onProgress = () => {}, { prefix = "po
   const done = new Promise((res, rej) => { resolveFn = res; rejectFn = rej; });
 
   const tcSlug = tcKey.replace("+", "p").replace(".", "_");
-  const tryRoom = (bucket, i, id) => new Promise((resolve) => {
+  const avoid = (seats) => seats.some((p) => p !== playerId && isBlocked(p));
+  const tryRoom = async (bucket, i, id) => {
     const room = `${prefix}-${tcSlug}-${bucket}-${i}`;
+    // someone you've blocked is waiting here: look elsewhere (joining would seat you with them)
+    if (blockedCodes().size) {
+      try { if (avoid((await peekRoom(room)).seats || [])) return { next: true }; } catch { /* the join below finds out */ }
+    }
+    return joinRoom(room, id);
+  };
+  const joinRoom = (room, id) => new Promise((resolve) => {
     let settled = false;
     let waitingHere = false;
     const finish = (outcome) => { if (!settled) { settled = true; resolve(outcome); } };
@@ -114,6 +136,8 @@ export function findMatch(tcKey, playerId, onProgress = () => {}, { prefix = "po
           return;
         }
         if (s.status === "playing") {
+          // a player you've blocked sat down: leave (they'll see the seat empty and search on too)
+          if (avoid(s.seats)) { c.close(); finish({ next: true }); return; }
           if (s.connected < seats) {
             // opponent seat belongs to someone who already left
             setTimeout(() => {

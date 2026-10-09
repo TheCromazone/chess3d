@@ -247,7 +247,7 @@ export class OnlineGame extends BaseGame {
       this.chatSeen = v.chat.length;
       this.chat = v.chat;
       this._renderChat();
-      if (fresh.some(m => m.c !== this.myColor)) SFX.notify();
+      if (fresh.some(m => m.c !== this.myColor) && !Social.isBlockedCode(this.oppCode)) SFX.notify();
     }
 
     // takeback requests (server rules v2)
@@ -420,6 +420,17 @@ export class OnlineGame extends BaseGame {
       }, icon("plus", 18), "Add friend");
       btns.push(add);
     }
+    if (this.oppCode && Social.registered() && this.oppCode !== Social.myCode() && !already && !Social.isBlockedCode(this.oppCode)) {
+      const name = this.players[this.myColor === "w" ? "b" : "w"]?.name || "this player";
+      const blk = h("button.btn.ghost", {
+        onclick: async () => {
+          if (!(await confirmModal({ title: `Block ${name}?`, sub: "They won't be able to add, message or challenge you, you won't be paired with them, and you won't see their posts or chat. You can unblock them from Social.", yes: "Block", danger: true }))) return;
+          blk.disabled = true;
+          try { await Social.block({ code: this.oppCode }); toast(`Blocked ${name}`); blk.remove(); this._renderChat(); } catch (e) { toast(e.message); blk.disabled = false; }
+        },
+      }, "Block");
+      btns.push(blk);
+    }
     return btns;
   }
 
@@ -494,10 +505,14 @@ export class OnlineGame extends BaseGame {
     el.innerHTML = "";
     if (!this.v2 || !this.myColor) return;
     const log = h("div", { style: { display: "flex", flexDirection: "column", gap: "4px", maxHeight: "160px", overflowY: "auto" } });
+    // you blocked this opponent: their messages stay hidden
+    const muted = Social.isBlockedCode(this.oppCode);
     for (const m of (this.chat || []).slice(-30)) {
+      if (muted && m.c !== this.myColor) continue;
       const who = m.c === this.myColor ? "You" : (this.players[m.c]?.name || "Opponent");
       log.appendChild(h("div.chatline", h("b", who), h("span", m.text)));
     }
+    if (muted) log.appendChild(h("small.muted", "You blocked this player, so their messages are hidden."));
     const input = h("input.input", { placeholder: "Send a message", maxlength: "200", "aria-label": "Chat message" });
     const send = (text) => { text = (text || "").trim(); if (!text) return; this.client.action({ t: "chat", text }); input.value = ""; };
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") send(input.value); });

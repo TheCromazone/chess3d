@@ -2,7 +2,7 @@
 // leaderboard, served by the game's Higgsfield project (server/social.ts). There's no sign-in:
 // this device registers once and keeps a private key; the 8-character friend code is what you share.
 import { getProfile, updateProfile, getSocialId, setSocialId, exportAll, importAll } from "../store.js";
-import { live } from "./room.js";
+import { live, setBlockedCodes, blockedCodes } from "./room.js";
 
 const HOST = "https://timely-ibis-513.higgsfield.app";
 const BASE = (/(^|\.)higgsfield\.app$/.test(location.hostname) ? "" : HOST) + "/api/social";
@@ -202,7 +202,7 @@ let timer = null;
 export function socialState() { return state; }
 export function onSocial(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 function emit() { for (const fn of listeners) { try { fn(state); } catch (e) { console.error(e); } } }
-function reset() { state.me = null; state.unread = 0; state.requests = 0; firstBeat = true; cache.clear(); emit(); }
+function reset() { state.me = null; state.unread = 0; state.requests = 0; firstBeat = true; cache.clear(); setBlockedCodes([]); emit(); }
 
 // notify(message) is called for each new direct message or challenge (set by the app shell)
 export function setNotifier(fn) { notifier = fn; }
@@ -235,9 +235,26 @@ export async function beat() {
     if (firstBeat && !(m.kind === "challenge" && Date.now() - m.created < LIVE_CHALLENGE_MS)) continue;
     if (notifier) { try { notifier(m); } catch (e) { console.error(e); } }
   }
+  if (firstBeat) loadBlocked().catch(() => {});
   firstBeat = false;
   emit();
 }
+
+// ---------- blocking ----------
+// the server keeps the list; this device keeps the friend codes so pairing and game chat can use them offline
+export async function loadBlocked() {
+  const d = await api("GET", "/blocks");
+  setBlockedCodes(d.blocked.map(u => u.code).filter(Boolean));
+  return d.blocked;
+}
+// who: {id} or {code}
+export async function block(who) {
+  await api("POST", "/block", who.id ? { id: who.id } : { code: who.code });
+  cache.delete("/friends");
+  return loadBlocked();
+}
+export async function unblock(id) { await api("POST", "/unblock", { id }); return loadBlocked(); }
+export function isBlockedCode(code) { return !!code && blockedCodes().has(code); }
 
 // runs for the life of the page; beats faster while the tab is visible
 export function startHeartbeat() {

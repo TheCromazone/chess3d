@@ -51,6 +51,9 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS social_friends (
      a TEXT NOT NULL, b TEXT NOT NULL, state TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY (a, b))`,
   `CREATE INDEX IF NOT EXISTS social_friends_b ON social_friends (b, state)`,
+  // a player you block can't add you, message or challenge you, or nudge you about a move, and you stop seeing what they post
+  `CREATE TABLE IF NOT EXISTS social_blocks (uid TEXT NOT NULL, blocked TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY (uid, blocked))`,
+  `CREATE INDEX IF NOT EXISTS social_blocks_blocked ON social_blocks (blocked)`,
   `CREATE TABLE IF NOT EXISTS social_messages (
      id INTEGER PRIMARY KEY AUTOINCREMENT, sender TEXT NOT NULL, recipient TEXT, club TEXT,
      kind TEXT NOT NULL DEFAULT 'text', body TEXT NOT NULL, created INTEGER NOT NULL, seen INTEGER NOT NULL DEFAULT 0)`,
@@ -208,6 +211,9 @@ const LINK_MS = 10 * 60_000;         // a device link code works for 10 minutes,
 const BACKUP_MAX = 1_800_000;        // characters; D1 rows top out at 2 MB
 
 const GAMES_KEPT = 30;              // recent games shown on a profile
+const BLOCKS_KEPT = 1000;           // players one player can block
+// leaves out rows by players you've blocked (binds your id)
+const HIDE_BLOCKED = (col: string) => `${col} NOT IN (SELECT blocked FROM social_blocks WHERE uid = ?)`;
 const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
 const RESULTS = ["1-0", "0-1", "1/2-1/2", "*"];
 
@@ -525,6 +531,10 @@ export class Social {
     return this.q("SELECT * FROM social_users WHERE id = ?", id).first<UserRow>();
   }
 
+  private async blockedEitherWay(a: string, b: string): Promise<boolean> {
+    return !!(await this.q("SELECT 1 AS x FROM social_blocks WHERE (uid = ? AND blocked = ?) OR (uid = ? AND blocked = ?)", a, b, b, a).first());
+  }
+
   private async rateLimit(sql: string, args: unknown[], max: number, what: string) {
     const r = await this.q(sql, ...args).first<{ n: number }>();
     if (r && r.n >= max) throw new HttpError(429, `too many ${what}; slow down`);
@@ -666,6 +676,7 @@ export class Social {
       if (!ROOM_RE.test(room)) throw new HttpError(400, "bad room");
       const them = await this.q("SELECT id FROM social_users WHERE code = ?", code).first<{ id: string }>();
       if (!them || them.id === me.id) return { ok: false };
+      if (await this.blockedEitherWay(me.id, them.id)) return { ok: false };
       const recent = await this.q("SELECT COUNT(*) AS n FROM social_notes WHERE uid = ? AND created > ? AND body LIKE ?", them.id, now - 60_000, `%"room":"${room}"%`).first<{ n: number }>();
       if (recent && recent.n > 0) return { ok: true };
       await this.many(
@@ -737,10 +748,13 @@ export class Social {
       const them = await this.q("SELECT * FROM social_users WHERE code = ?", code).first<UserRow>();
       if (!them) throw new HttpError(404, "no player has that friend code");
       if (them.id === me.id) throw new HttpError(400, "that's your own code");
-      const [sent, mine, theirs] = await this.many(
+      const [sent, mine, theirs, blocks] = await this.many(
         this.q("SELECT COUNT(*) AS n FROM social_friends WHERE a = ? AND created > ?", me.id, now - 3_600_000),
         this.q("SELECT state FROM social_friends WHERE a = ? AND b = ?", me.id, them.id),
-        this.q("SELECT state FROM social_friends WHERE a = ? AND b = ?", them.id, me.id));
+        this.q("SELECT state FROM social_friends WHERE a = ? AND b = ?", them.id, me.id),
+        this.q("SELECT uid FROM social_blocks WHERE (uid = ? AND blocked = ?) OR (uid = ? AND blocked = ?)", me.id, them.id, them.id, me.id));
+      if (blocks?.some((k) => k["uid"] === me.id)) throw new HttpError(403, "you've blocked this player; unblock them first");
+      if (blocks?.length) throw new HttpError(403, "this player isn't taking friend requests from you");
       if (mine?.[0]?.["state"] === "accepted") return { status: "friends" };
       if (Number(sent?.[0]?.["n"] ?? 0) >= 40) throw new HttpError(429, "too many friend requests; slow down");
       // they already asked us: accept straight away
@@ -762,6 +776,31 @@ export class Social {
       const b = await body(request);
       const other = str(b["id"], 32);
       await this.q("DELETE FROM social_friends WHERE (a = ? AND b = ?) OR (a = ? AND b = ?)", me.id, other, other, me.id).run();
+      return { ok: true };
+    }
+
+    // ---- blocking ----
+    if (method === "GET" && path === "/blocks") {
+      const r = await this.q("SELECT u.* FROM social_blocks k JOIN social_users u ON u.id = k.blocked WHERE k.uid = ? ORDER BY k.created DESC", me.id).all<UserRow>();
+      return { blocked: r.results.map((u) => publicUser(u, now)) };
+    }
+    // POST /block {id} or {code}: ends any friendship or request between you, and their unread messages to you are put away
+    if (method === "POST" && path === "/block") {
+      const b = await body(request);
+      const byCode = b["code"] ? await this.q("SELECT id FROM social_users WHERE code = ?", str(b["code"], 8).toUpperCase()).first<{ id: string }>() : null;
+      const other = byCode ? byCode.id : str(b["id"], 32);
+      if (other === me.id) throw new HttpError(400, "you can't block yourself");
+      if (!(await this.user(other))) throw new HttpError(404, "no such player");
+      const n = await this.q("SELECT COUNT(*) AS n FROM social_blocks WHERE uid = ?", me.id).first<{ n: number }>();
+      if (n && n.n >= BLOCKS_KEPT) throw new HttpError(429, `you can block up to ${BLOCKS_KEPT} players`);
+      await this.many(
+        this.q("INSERT OR IGNORE INTO social_blocks (uid, blocked, created) VALUES (?, ?, ?)", me.id, other, now),
+        this.q("DELETE FROM social_friends WHERE (a = ? AND b = ?) OR (a = ? AND b = ?)", me.id, other, other, me.id),
+        this.q("UPDATE social_messages SET seen = 1 WHERE sender = ? AND recipient = ? AND seen = 0", other, me.id));
+      return { ok: true };
+    }
+    if (method === "POST" && path === "/unblock") {
+      await this.q("DELETE FROM social_blocks WHERE uid = ? AND blocked = ?", me.id, str((await body(request))["id"], 32)).run();
       return { ok: true };
     }
 
@@ -876,7 +915,7 @@ export class Social {
           this.q(`SELECT u.*, m.role FROM social_club_members m JOIN social_users u ON u.id = m.member
               WHERE m.club = ? ORDER BY u.r_blitz DESC LIMIT 200`, id),
           this.q(`SELECT m.id, m.sender, u.name AS sender_name, m.body, m.created FROM social_messages m
-              JOIN social_users u ON u.id = m.sender WHERE m.club = ? ORDER BY m.id DESC LIMIT 60`, id));
+              JOIN social_users u ON u.id = m.sender WHERE m.club = ? AND ${HIDE_BLOCKED("m.sender")} ORDER BY m.id DESC LIMIT 60`, id, me.id));
         if (!member?.length) throw denied();
         const mem = (members ?? []) as unknown as (UserRow & { role: string })[];
         return { club: club?.[0] ?? null, members: mem.map((u) => ({ ...publicUser(u, now), role: u.role })), messages: (msgs ?? []).reverse() };
@@ -885,7 +924,7 @@ export class Social {
         const after = Math.max(0, Number(url.searchParams.get("after")) || 0);
         const [member, msgs] = await this.many(memberQ,
           this.q(`SELECT m.id, m.sender, u.name AS sender_name, m.body, m.created FROM social_messages m
-              JOIN social_users u ON u.id = m.sender WHERE m.club = ? AND m.id > ? ORDER BY m.id DESC LIMIT 60`, id, after));
+              JOIN social_users u ON u.id = m.sender WHERE m.club = ? AND m.id > ? AND ${HIDE_BLOCKED("m.sender")} ORDER BY m.id DESC LIMIT 60`, id, after, me.id));
         if (!member?.length) throw denied();
         return { messages: (msgs ?? []).reverse() };
       }
@@ -1022,9 +1061,11 @@ export class Social {
 
     // GET /users/:id — a friend's or club-mate's public profile
     if (method === "GET" && seg0 === "users" && seg1) {
-      const u = await this.user(seg1);
+      const [ur, blocked] = await this.many(this.q("SELECT * FROM social_users WHERE id = ?", seg1),
+        this.q("SELECT 1 AS x FROM social_blocks WHERE uid = ? AND blocked = ?", me.id, seg1));
+      const u = ur?.[0] as UserRow | undefined;
       if (!u) throw new HttpError(404, "no such player");
-      return { user: publicUser(u, now) };
+      return { user: publicUser(u, now), blocked: !!blocked?.length };
     }
 
     // POST /delete: remove this player, their friendships, messages and club memberships
@@ -1032,6 +1073,7 @@ export class Social {
       const [clubs] = await this.many(
         this.q("SELECT club FROM social_club_members WHERE member = ?", me.id),
         this.q("DELETE FROM social_friends WHERE a = ? OR b = ?", me.id, me.id),
+        this.q("DELETE FROM social_blocks WHERE uid = ? OR blocked = ?", me.id, me.id),
         this.q("DELETE FROM social_messages WHERE sender = ? OR recipient = ?", me.id, me.id),
         this.q("DELETE FROM social_club_members WHERE member = ?", me.id),
         this.q("DELETE FROM social_club_bans WHERE member = ?", me.id),
@@ -1734,7 +1776,7 @@ export class Social {
     if (method === "GET" && seg.length === 1) {
       const cat = FORUM_CATS.includes(url.searchParams.get("cat") || "") ? url.searchParams.get("cat") : null;
       const r = await this.q(`SELECT t.id, t.cat, t.uid, t.title, t.created, t.last_at, t.replies, u.name, u.avatar FROM social_topics t
-          LEFT JOIN social_users u ON u.id = t.uid WHERE t.hidden = 0 AND (? IS NULL OR t.cat = ?) ORDER BY t.last_at DESC LIMIT 50`, cat, cat).all();
+          LEFT JOIN social_users u ON u.id = t.uid WHERE t.hidden = 0 AND (? IS NULL OR t.cat = ?) AND ${HIDE_BLOCKED("t.uid")} ORDER BY t.last_at DESC LIMIT 50`, cat, cat, me.id).all();
       return { cats: FORUM_CATS, topics: r.results.map((t) => ({ id: t["id"], cat: t["cat"], title: t["title"], created: t["created"], lastAt: t["last_at"], replies: t["replies"], author: author(t) })) };
     }
     // POST /forums {cat, title, body}: a new topic
@@ -1755,7 +1797,7 @@ export class Social {
       const [topic, posts] = await this.many(
         this.q(`SELECT t.*, u.name, u.avatar FROM social_topics t LEFT JOIN social_users u ON u.id = t.uid WHERE t.id = ? AND t.hidden = 0`, id),
         this.q(`SELECT p.id, p.uid, p.body, p.created, u.name, u.avatar FROM social_posts p LEFT JOIN social_users u ON u.id = p.uid
-            WHERE p.topic = ? AND p.hidden = 0 ORDER BY p.id LIMIT 300`, id));
+            WHERE p.topic = ? AND p.hidden = 0 AND ${HIDE_BLOCKED("p.uid")} ORDER BY p.id LIMIT 300`, id, me.id));
       const t = topic?.[0];
       if (!t) throw new HttpError(404, "that topic was removed");
       return {
@@ -1801,7 +1843,7 @@ export class Social {
     if (method === "GET" && seg.length === 1) {
       const by = url.searchParams.get("by") ? str(url.searchParams.get("by"), 32) : null;
       const r = await this.q(`SELECT b.id, b.uid, b.title, substr(b.body, 1, 280) AS excerpt, b.created, b.likes, u.name, u.avatar FROM social_blogs b
-          LEFT JOIN social_users u ON u.id = b.uid WHERE b.hidden = 0 AND (? IS NULL OR b.uid = ?) ORDER BY b.created DESC LIMIT 50`, by, by).all();
+          LEFT JOIN social_users u ON u.id = b.uid WHERE b.hidden = 0 AND (? IS NULL OR b.uid = ?) AND ${HIDE_BLOCKED("b.uid")} ORDER BY b.created DESC LIMIT 50`, by, by, me.id).all();
       return { posts: r.results.map((p) => ({ id: p["id"], title: p["title"], excerpt: p["excerpt"], created: p["created"], likes: p["likes"], author: authorOf(p), mine: p["uid"] === me.id })) };
     }
     // POST /blogs {title, body}: publish a post
@@ -1853,7 +1895,7 @@ export class Social {
     if (method === "GET" && seg.length === 1) {
       type Row = UserRow & { c_title: string; c_bio: string; c_langs: string; c_rate: string; c_topics: string; c_updated: number };
       const r = await this.q(`SELECT u.*, c.title AS c_title, c.bio AS c_bio, c.langs AS c_langs, c.rate AS c_rate, c.topics AS c_topics, c.updated AS c_updated
-          FROM social_coaches c JOIN social_users u ON u.id = c.uid WHERE c.hidden = 0 ORDER BY c.updated DESC LIMIT 100`).all<Row>();
+          FROM social_coaches c JOIN social_users u ON u.id = c.uid WHERE c.hidden = 0 AND ${HIDE_BLOCKED("c.uid")} ORDER BY c.updated DESC LIMIT 100`, me.id).all<Row>();
       return {
         coaches: r.results.map((x) => ({ user: publicUser(x, now), title: x.c_title, bio: x.c_bio, langs: x.c_langs, rate: x.c_rate, topics: x.c_topics, updated: x.c_updated, mine: x.id === me.id })),
       };

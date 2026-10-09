@@ -571,5 +571,48 @@ clock += 4 * 60_000;
 const again = (await call("POST", "/battles/find", { secret: ann.secret })).data.battle;
 ok(again && again.id !== o1.id && !again.opponent, "after a battle ends, searching opens a new one");
 
+// blocking
+{
+  const eve = (await call("POST", "/register", { body: { name: "Eve" }, ip: "10.1.1.1" })).data;
+  const fay = (await call("POST", "/register", { body: { name: "Fay" }, ip: "10.1.1.2" })).data;
+  await call("POST", "/friends/request", { secret: eve.secret, body: { code: fay.code } });
+  await call("POST", "/friends/respond", { secret: fay.secret, body: { id: eve.id, accept: true } });
+  await call("POST", "/messages", { secret: fay.secret, body: { to: eve.id, text: "hello" } });
+  ok((await call("POST", "/heartbeat", { secret: eve.secret, body: {} })).data.unread === 1, "a message from a friend is unread");
+  const club = (await call("POST", "/clubs/create", { secret: eve.secret, body: { name: "Blockers" } })).data;
+  await call("POST", "/clubs/join", { secret: fay.secret, body: { code: club.code } });
+  await call("POST", `/clubs/${club.id}/messages`, { secret: fay.secret, body: { text: "club hello" } });
+  const topic = (await call("POST", "/forums", { secret: fay.secret, body: { cat: "general", title: "Fay's thread", body: "Hi all" } })).data;
+  const etopic = (await call("POST", "/forums", { secret: eve.secret, body: { cat: "general", title: "Eve's thread", body: "Thoughts?" } })).data;
+  await call("POST", `/forums/${etopic.id}`, { secret: fay.secret, body: { body: "Fay's reply" } });
+  const blog = (await call("POST", "/blogs", { secret: fay.secret, body: { title: "Fay's blog", body: "Some thoughts about the Caro-Kann defence." } })).data;
+  await call("POST", "/coaches", { secret: fay.secret, body: { title: "Coach Fay", bio: "I teach beginners how to castle and why." } });
+  ok((await call("POST", "/block", { secret: eve.secret, body: { id: eve.id } })).status === 400, "you can't block yourself");
+  ok((await call("POST", "/block", { secret: eve.secret, body: { id: fay.id } })).data.ok, "a player can be blocked");
+  ok((await call("GET", "/friends", { secret: eve.secret })).data.friends.length === 0 && (await call("GET", "/friends", { secret: fay.secret })).data.friends.length === 0, "blocking ends the friendship both ways");
+  ok((await call("POST", "/heartbeat", { secret: eve.secret, body: {} })).data.unread === 0, "and puts away their unread messages");
+  ok((await call("POST", "/messages", { secret: fay.secret, body: { to: eve.id, text: "hi again" } })).status === 403, "they can't message you");
+  const back = await call("POST", "/friends/request", { secret: fay.secret, body: { code: eve.code } });
+  ok(back.status === 403 && !back.data.error.includes("blocked"), "or send a friend request (without being told they're blocked)");
+  ok((await call("POST", "/friends/request", { secret: eve.secret, body: { code: fay.code } })).data.error.includes("unblock"), "you unblock before adding them back");
+  ok((await call("POST", "/nudge", { secret: fay.secret, body: { code: eve.code, room: "d-blocked1", san: "e4" } })).data.ok === false, "they can't nudge you about a move");
+  ok(!(await call("GET", "/forums", { secret: eve.secret })).data.topics.some((t) => t.id === topic.id), "their forum topics are hidden from you");
+  ok((await call("GET", "/forums", { secret: dee.secret })).data.topics.some((t) => t.id === topic.id), "but not from anyone else");
+  ok(!(await call("GET", `/forums/${etopic.id}`, { secret: eve.secret })).data.posts.some((p) => p.body === "Fay's reply"), "nor their replies");
+  ok(!(await call("GET", "/blogs", { secret: eve.secret })).data.posts.some((p) => p.id === blog.id), "nor their blog posts");
+  ok(!(await call("GET", "/coaches", { secret: eve.secret })).data.coaches.some((c) => c.user.id === fay.id), "nor their coach listing");
+  ok(!(await call("GET", `/clubs/${club.id}`, { secret: eve.secret })).data.messages.some((m) => m.sender === fay.id), "nor their club chat");
+  ok((await call("GET", `/clubs/${club.id}`, { secret: fay.secret })).data.messages.some((m) => m.sender === fay.id), "which still shows for them");
+  ok((await call("GET", `/users/${fay.id}`, { secret: eve.secret })).data.blocked === true && (await call("GET", `/users/${eve.id}`, { secret: fay.secret })).data.blocked === false, "a profile says whether you've blocked them");
+  ok((await call("GET", "/blocks", { secret: eve.secret })).data.blocked.map((u) => u.id).join() === fay.id, "your blocked list");
+  await call("POST", "/unblock", { secret: eve.secret, body: { id: fay.id } });
+  ok((await call("GET", "/forums", { secret: eve.secret })).data.topics.some((t) => t.id === topic.id), "unblocking shows their posts again");
+  ok((await call("POST", "/friends/request", { secret: fay.secret, body: { code: eve.code } })).data.status === "pending", "and they can ask to be friends again");
+  ok((await call("POST", "/block", { secret: eve.secret, body: { code: fay.code } })).data.ok && (await call("GET", "/blocks", { secret: eve.secret })).data.blocked.length === 1, "a player can be blocked by friend code (from a finished game)");
+  await call("POST", "/delete", { secret: fay.secret });
+  ok((await call("GET", "/blocks", { secret: eve.secret })).data.blocked.length === 0 && sqlite.prepare("SELECT COUNT(*) AS n FROM social_blocks").get().n === 0, "deleting a profile removes its blocks");
+  await call("POST", "/delete", { secret: eve.secret });
+}
+
 console.log(failures === 0 ? "\nALL SOCIAL TESTS PASSED" : `\n${failures} FAILURES`);
 process.exit(failures ? 1 : 0);
