@@ -23,7 +23,8 @@ each other without any account system.
 Variants have their own pools with the same sweep: `vp<variant>-…` (Duck Chess, Fog of War,
 Giveaway, Atomic, Horde, Chess960, King of the Hill, Three-check), `zpcrazyhouse-…`, and
 `fp-p<ffa|teams>-…` for 4-Player Chess, which waits for four players. In those games the player
-ID carries the player's rating in that variant, and the result is rated on the device.
+ID carries the player's rating in that variant. With a social profile, the result is rated by the
+server (`POST /rated`, below); without one, on the device.
 
 ## Rules v2
 
@@ -94,11 +95,11 @@ There's no sign-in. `POST /register` returns a random 64-hex secret (only its SH
 and an 8-character friend code; the client keeps the secret in localStorage and sends it as
 `Authorization: Bearer <secret>`. Routes:
 
-- `POST /heartbeat`: presence (online / playing), name, avatar and self-reported ratings; returns unread and request counts plus the newest unread messages, which drive the nav badge and the challenge pop-ups.
+- `POST /heartbeat`: presence (online / playing), name, avatar and device ratings (ignored for any category the server already rates); returns unread and request counts plus the newest unread messages, which drive the nav badge and the challenge pop-ups.
 - `GET /friends`, `POST /friends/request {code}`, `/friends/respond {id, accept}`, `/friends/remove {id}`.
-- `GET /conversations`, `GET /messages?with=&after=` (marks them read), `POST /messages {to, text}` or `{to, kind: "challenge", room, tc, mode}`. Only friends can message each other.
+- `GET /conversations`, `GET /messages?with=&after=` (marks them read), `POST /messages {to, text}` or `{to, kind: "challenge", room, tc, mode}`. Friends can message each other; anyone may write to a listed coach, and a coach (or anyone) may reply to a player who wrote first. Never across a block; 20 messages an hour to non-friends; challenges are friends-only. Conversations include non-friend threads, flagged `friend: false`.
 - `GET /clubs`, `POST /clubs/create|join|leave`, `GET /clubs/:id`, `GET|POST /clubs/:id/messages`.
-- `GET /leaderboard?cat=blitz|bullet|rapid|puzzle|bots`: players active in the last 30 days with at least 5 rated games (10 puzzles). `cat=rush` ranks best Puzzle Rush scores, and `cat=<variant>` a variant's ratings (sent with the heartbeat as `vratings`, kept as a JSON column and read with `json_extract`).
+- `GET /leaderboard?cat=blitz|bullet|rapid|daily|puzzle|bots`: players active in the last 30 days with at least 5 server-rated games (10 puzzles, 3 daily games); the bots board uses device ratings. `cat=rush` ranks best Puzzle Rush scores, and `cat=<variant>` a variant's ratings (sent with the heartbeat as `vratings`, kept as a JSON column and read with `json_extract`).
 - `GET /users/:id`, `GET /me`, `POST /delete` (removes the player, friendships, messages and memberships).
 - The heartbeat may carry `room` (the live game you're seated in); `GET /friends` returns it to your
   friends only, as `watch`, so they can spectate.
@@ -158,6 +159,21 @@ and only against players with social on, at most four scoring games against one 
 arena games score double when the server scores them. A finished week's divisions are settled the
 next time one of their players looks: the top of each (by its tier's share of 50 places, at least
 one, with trophies) moves up a tier.
+
+Server ratings: `POST /rated {room}` reads the finished room (seats, result, time control, variant,
+rules version, ply count, from the room's `/__state`) and rates both players once (`social_rated_games`),
+with the same Elo as the client; the first server-rated game in a category starts from the device
+rating capped at 1500. Pool, private, arena, Swiss, club-match and daily-tournament rooms qualify;
+tournament rooms must exist in the server's own tables. The `rated` JSON column marks categories the
+server owns, and the heartbeat stops accepting device values for them. `POST /puzzles/attempt {id,
+moves, ms}` checks the moves against the published puzzle data (any mate ends it) and rates the
+first attempt at each puzzle. `POST /rush/start {mode}` then `POST /rush/finish {run, attempts}`: the
+server times the run and checks each solve against the same ladder of difficulty, misses (at most 3)
+and a minimum time per solve before recording the score.
+
+`GET /digest` (public, cached 10 minutes) reports the past week: rated games by category, puzzles solved,
+new players, arena and Swiss winners, finished daily tournaments and club matches, last week's league
+promotions (settling any division nobody has looked at yet) and the best 5-minute Puzzle Rush runs.
 
 Blocking (`GET /blocks`, `POST /block {id | code}`, `POST /unblock {id}`): ends the friendship,
 refuses friend requests and move nudges either way, and hides the blocked player's forum topics and

@@ -28,7 +28,10 @@ against random opponents with its own rating, leaderboard and replayable history
 events (top tournaments relayed move by move), video lessons, blogs and a coach directory. Loop
 10 added Swiss tournaments, club team matches, Vote Chess, the Vision trainer and Solo Chess. Loop 11
 added Leagues, daily tournaments, blocking players, top live games, and for daily games vacations and
-conditional moves (rules v8).
+conditional moves (rules v8). Loop 12 moved ratings to the server (every online game is rated from its
+room, puzzle attempts are checked against the puzzle data, Puzzle Rush runs are timed and checked),
+let students message coaches without being friends, translated the interface into ten languages,
+and added a weekly report of the site's own results to the Watch page.
 Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don't have (alternative noted)
 
 ## Play
@@ -94,8 +97,8 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 
 | chess.com feature | Status | Notes |
 |---|---|---|
-| Rated puzzles | ✅ | 17,452 puzzles (lichess, CC0), puzzle rating + streak |
-| Puzzle Rush (3 min / 5 min / survival) | ✅ | |
+| Rated puzzles | ✅ | 17,452 puzzles (lichess, CC0), puzzle rating + streak; with a profile, each attempt is checked and rated by the server, once per puzzle |
+| Puzzle Rush (3 min / 5 min / survival) | ✅ | with a profile, runs are timed by the server and every solve is checked, so the Rush leaderboard holds real scores |
 | Daily puzzle | ✅ | with day streak |
 | Puzzles by theme | ✅ | 73 themes |
 | Hints / show solution | ✅ | |
@@ -123,13 +126,13 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Spectate a live game | ✅ | Watch button on friends who are in a live game, or open any game link |
 | Live streamers | ✅ | who's streaming chess right now (Chess.com and Lichess streamer lists), linking to the stream |
 | Chess videos | ✅ | latest videos from GothamChess, Chess.com, Saint Louis Chess Club, agadmator and Hanging Pawns, played on the page |
-| News | ✅ | latest headlines from FIDE, Lichess and Chess.com, refreshed every 15 minutes by the game server |
+| News | ✅ | latest headlines from FIDE, Lichess and Chess.com, refreshed every 15 minutes by the game server; plus "This week on Chess 3D", the site's own results written up by the server (rated games, puzzles solved, new players, arena / Swiss / daily-tournament winners, club-match scores, league promotions, best Puzzle Rush runs) |
 
 ## Profile & social
 
 | chess.com feature | Status | Notes |
 |---|---|---|
-| Profile with ratings per category | ✅ | bullet / blitz / rapid / daily / bots / puzzles / rush, kept on the device; timed daily games are rated |
+| Profile with ratings per category | ✅ | bullet / blitz / rapid / daily / bots / puzzles / rush and each variant; with a profile, the server works out every online rating from the game room's own record (and puzzle ratings from each attempt), so a device can't set its own; bot ratings stay on the device |
 | Game archive, replay, review, PGN download | ✅ | |
 | Stats (W/L/D, rating trend, openings) | ✅ | |
 | Insights (accuracy trend, by phase, by colour / time control, mistakes per game) | ✅ | from your archive and reviews |
@@ -139,15 +142,15 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Member search | ✅ | find players by name (or add them by friend code) and open their profile; names are unique |
 | Forums | ✅ | five forums (general, openings, tactics, endgames, help): topics, replies, delete your own, anything three players report is hidden |
 | Blogs | ✅ | players publish posts (likes, delete your own, reporting) |
-| Coaches | ✅ | a directory of players who teach (description, languages, topics, rate); students add a coach as a friend to arrange lessons |
+| Coaches | ✅ | a directory of players who teach (description, languages, topics, rate); students message a coach directly to ask about lessons, no friendship needed; times and payment are arranged between them, as on chess.com |
 | Challenges | ✅ | challenge a friend to a live game (any time control) or a daily game; pop-up notice with Accept / Decline wherever they are in the app; challenge friends from the invite lobby |
-| Direct messages | ✅ | threads with friends, unread counts on the nav, notices for new messages |
+| Direct messages | ✅ | threads with friends and with coaches (a coach can reply to anyone who wrote first), unread counts on the nav, notices for new messages; limits on messages to non-friends |
 | Notifications | ✅ | in-app notices while open; opt-in browser notifications when closed (web push) for challenges, messages, friend requests and daily moves; verified end to end in Chrome with the site closed |
 | Block players | ✅ | a blocked player can't add, message, challenge or nudge you; their forum posts, blog posts, coach listing, club chat and game chat are hidden from you; quick pairing steers clear of them |
 | Clubs | ✅ | create (public or invite-only), join by code or from the public list, club chat, member list with presence |
 | Club team matches | ✅ | owners challenge other clubs; members sign up; boards pair by rating and each pair plays two daily games, one with each colour; scores from the rooms; checked live |
 | Vote Chess | ✅ | two clubs play one daily game, each move the one most members voted for, played at the deadline or early by the owner; checked live, with the server seating both clubs in a real room |
-| Leaderboards | ✅ | global top 50 per category (blitz, bullet, rapid, daily, puzzles, bots, Puzzle Rush) with your rank, or just your friends; ratings are self-reported by devices and labelled so; bot ladder on the profile |
+| Leaderboards | ✅ | global top 50 per category (blitz, bullet, rapid, daily, puzzles, bots, Puzzle Rush) with your rank, or just your friends; only server-rated players are listed (the bots board excepted); bot ladder on the profile |
 | Accounts | ✅ | passwordless by the user's choice: your profile key is the account, with a unique name; sign in on other devices with a one-time code or your recovery key; profile, ratings, settings and games back up to the cloud and follow you; sign out of this or all other devices; delete the profile |
 | Data portability | ✅ | automatic cloud backup with a profile, plus export / import of a backup file |
 
@@ -163,6 +166,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Light / dark site theme | ✅ | dark, light, or match device |
 | Keyboard shortcuts sheet | ✅ | press ? |
 | Mobile app | ✅ | installable PWA, works offline for bots / puzzles / analysis |
+| Languages | ✅ | English, Spanish, French, German, Italian, Polish, Portuguese, Turkish, Russian, Japanese and Chinese, chosen in Settings (the browser's language by default); players' own words are never translated |
 | Accessibility | ✅ | labelled controls, focus rings, reduced motion, keyboard play on the 2D board, spoken moves for screen readers |
 
 ## Still different from chess.com
@@ -170,18 +174,14 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 Everything above is built, deployed, and checked against the live servers. What chess.com still
 has that this doesn't, and why:
 
-- **Paid membership tiers.** Nothing here is behind a paywall, and charging players would need a
-  payment provider and the owner's decision, so it isn't built.
-- **Booking and paying coaches.** The coach directory connects students and coaches; lessons and
-  payment are arranged between them, not through the site.
+- **Paid membership tiers.** Nothing here is behind a paywall. Charging players needs a payment
+  provider and the owner's decision, so it isn't built.
 - **A newsroom and original video lessons.** chess.com employs editors and titled coaches. Here
   the news, videos, streamers, lessons and live events come from outside sources (FIDE, Lichess,
-  Chess.com and YouTube feeds, Lichess broadcasts), credited and linked.
-- **Server-verified ratings.** There's no password account, so ratings are kept and reported by
-  each player's device, and leaderboards say so. (League trophies are the exception: the server
-  reads every result from the game room.)
-- **Other languages.** chess.com is translated into dozens of languages; this is in English only
-  (country names follow the browser's language).
+  Chess.com and YouTube feeds, Lichess broadcasts), credited and linked; the only original news is
+  the server's weekly write-up of results on the site itself.
 - **A masters game database.** The opening explorer has statistics from about a million games
   between players rated 1800 and up; chess.com also has a masters database. The free masters
-  explorer we could use now needs a Lichess login, so it isn't wired in.
+  explorer we could use needs a Lichess login token on the server, so it isn't wired in.
+- **Dozens of languages.** chess.com is translated into more languages than the eleven here.
+- **Bot ratings** stay on each device (chess.com's bot games aren't rated at all).
