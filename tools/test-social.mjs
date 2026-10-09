@@ -192,6 +192,11 @@ ok(v.outcome === "void" && row("Cid").games === 1 && row("Dee").state === "idle"
 const notYet = (await call("POST", `/arenas/${later.id}/pair`, { secret: ann.secret, body: { pid: pidA } }));
 ok(notYet.status === 403 || notYet.data.running === false, "an arena that hasn't started doesn't pair");
 
+// finding players by name
+const found = (await call("GET", "/search", { secret: ann.secret, query: "?q=ci" })).data.players;
+ok(found.length === 1 && found[0].name === "Cid", "players can be found by the start of their name");
+ok((await call("GET", "/search", { secret: ann.secret, query: "?q=%25" })).data.players.length === 0, "wildcards aren't searches");
+
 // recent games on profiles
 const game = (i) => ({ id: "g" + i, white: { name: "Ann", rating: 1500 }, black: { name: "Stockfish", rating: 2000 }, result: "0-1", reason: "checkmate",
   tc: "5+0", mode: "bot", myColor: "w", moves: ["e2e4", "e7e5", "<script>", "g1f3"], date: clock });

@@ -229,7 +229,7 @@ export class SocialScreen {
         h("label.lbl", { for: "add-code" }, "Add a friend"),
         h("div.add-row", Object.assign(input, { id: "add-code" }), h("button.btn.primary", { onclick: add }, icon("plus", 18), "Add"))));
     const lists = h("div.friend-lists", h("p.note", "Loading friends…"));
-    this.body.replaceChildren(codeCard, lists);
+    this.body.replaceChildren(codeCard, this._searchBox(), lists);
 
     const refresh = async () => {
       let d;
@@ -259,6 +259,31 @@ export class SocialScreen {
     if (S.cached("/friends")) draw(S.cached("/friends"));
     await refresh();
     if (this._live(tok)) this.poll = setInterval(refresh, 20000);
+  }
+
+  // find players by name, like chess.com's member search
+  _searchBox() {
+    const input = h("input.input", { type: "search", placeholder: "Find players by name", "aria-label": "Find players by name", maxlength: "16", autocomplete: "off", spellcheck: "false" });
+    const results = h("div.rows.search-results");
+    let timer = null;
+    input.addEventListener("input", () => {
+      clearTimeout(timer);
+      const q = input.value.trim();
+      if (q.length < 2) { results.replaceChildren(); return; }
+      timer = setTimeout(async () => {
+        let d;
+        try { d = await S.api("GET", "/search?q=" + encodeURIComponent(q)); } catch (e) { results.replaceChildren(errorLine(e)); return; }
+        if (input.value.trim() !== q) return;
+        const friends = new Set(((S.cached("/friends") || {}).friends || []).map(f => f.id));
+        const list = d.players.filter(u => u.id !== S.myId());
+        results.replaceChildren(...(list.length ? list.map(u => h("div.row",
+          h("button.row-main", { onclick: () => this._profile(u, friends.has(u.id)), "aria-label": `${u.name}. Open profile` },
+            userAvatar(u), h("span.rt", h("b", u.name, h("span.muted", ` ${u.ratings.blitz.r}`)), h("small", friends.has(u.id) ? `Friend, ${presenceText(u).toLowerCase()}` : presenceText(u)))),
+          friends.has(u.id) ? null : h("button.btn.small", { onclick: async (e) => { e.currentTarget.disabled = true; await this._addByCode(u.code); }, "aria-label": `Add ${u.name} as a friend` }, icon("plus", 16), h("span.wide-only", "Add"))))
+          : [h("p.note", `Nobody's name starts with "${q}".`)]));
+      }, 300);
+    });
+    return h("section.search-sec", input, results);
   }
 
   _friendRow(u) {

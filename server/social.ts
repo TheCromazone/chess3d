@@ -554,6 +554,15 @@ export class Social {
       return { ok: true };
     }
 
+    // GET /search?q=: players whose name starts with q (most recently active first)
+    if (method === "GET" && path === "/search") {
+      const q = str(url.searchParams.get("q"), 16).replace(/[^A-Za-z0-9_]/g, "");
+      if (q.length < 2) return { players: [] };
+      const r = await this.q(`SELECT * FROM social_users WHERE name LIKE ? ESCAPE '\\' ORDER BY last_seen DESC LIMIT 20`,
+        q.replace(/_/g, "\\_") + "%").all<UserRow>();
+      return { players: r.results.map((u) => publicUser(u, now)) };
+    }
+
     // GET /users/:id/games: a player's recent games
     if (method === "GET" && seg0 === "users" && seg1 && seg2 === "games") {
       const r = await this.q("SELECT data FROM social_games WHERE uid = ? ORDER BY created DESC LIMIT ?", seg1, GAMES_KEPT).all<{ data: string }>();
