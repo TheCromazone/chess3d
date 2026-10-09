@@ -174,14 +174,14 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 Everything above is built, deployed, and checked against the live servers. What chess.com still
 has that this doesn't, and why:
 
-- **Paid membership tiers.** Nothing here is behind a paywall. Charging players needs a payment
-  provider and the owner's decision, so it isn't built.
+- **Paid membership tiers.** By the owner's choice, everything here is free: nothing is behind a
+  paywall or limited, so there's nothing for a membership to unlock.
 - **A newsroom and original video lessons.** chess.com employs editors and titled coaches. Here
   the news, videos, streamers, lessons and live events come from outside sources (FIDE, Lichess,
   Chess.com and YouTube feeds, Lichess broadcasts), credited and linked; the only original news is
   the server's weekly write-up of results on the site itself.
 - **A masters game database.** The opening explorer has statistics from about a million games
   between players rated 1800 and up; chess.com also has a masters database. The free masters
-  explorer we could use needs a Lichess login token on the server, so it isn't wired in.
+  explorer we could use needs a Lichess login token on the server, and the owner chose not to add one.
 - **Dozens of languages.** chess.com is translated into more languages than the eleven here.
 - **Bot ratings** stay on each device (chess.com's bot games aren't rated at all).
