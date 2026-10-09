@@ -75,6 +75,10 @@ bf = (await call("GET", "/friends", { secret: b.secret })).data;
 const af = (await call("GET", "/friends", { secret: a.secret })).data;
 ok(bf.friends.length === 1 && af.friends.length === 1 && af.friends[0].name === "Bob", "accepting makes both sides friends");
 ok(af.friends[0].online === true, "a fresh friend shows as online");
+await call("POST", "/heartbeat", { secret: b.secret, body: { status: "playing", room: "c-live123" } });
+ok((await call("GET", "/friends", { secret: a.secret })).data.friends[0].watch === "c-live123", "friends can see which game you're playing");
+await call("POST", "/heartbeat", { secret: b.secret, body: { status: "online", room: "c-live123" } });
+ok((await call("GET", "/friends", { secret: a.secret })).data.friends[0].watch === null, "and nothing once you're out of it");
 clock += 120_000;
 ok((await call("GET", "/friends", { secret: a.secret })).data.friends[0].online === false, "after 2 minutes without a heartbeat they're offline");
 

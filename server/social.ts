@@ -82,6 +82,12 @@ const BATTLE_MS = 180_000;
 const BATTLE_COUNTDOWN_MS = 5_000;
 const BATTLE_FRESH_MS = 8_000;
 
+// Columns added after the first release. SQLite has no ADD COLUMN IF NOT EXISTS, so each one runs
+// on its own and "duplicate column" errors are expected (and ignored) once it's in place.
+const MIGRATIONS = [
+  `ALTER TABLE social_users ADD COLUMN room TEXT`,     // the live game a player is in, for friends to watch
+];
+
 // Live arenas run on a fixed schedule so there's always one to join: every 30 minutes a new one
 // starts (blitz on the hour, bullet on the half hour) and runs for 27 minutes.
 const ARENA_SLOT_MS = 30 * 60_000;
@@ -107,6 +113,7 @@ const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 interface UserRow {
   id: string; code: string; name: string; avatar: string; created: number; last_seen: number; status: string; games: number;
+  room?: string | null;
   r_bullet: number; n_bullet: number; r_blitz: number; n_blitz: number; r_rapid: number; n_rapid: number;
   r_puzzle: number; n_puzzle: number; r_bots: number; n_bots: number;
 }
@@ -187,7 +194,9 @@ export class Social {
   private schema(): Promise<unknown> {
     let p = schemaReady.get(this.db);
     if (!p) {
-      p = this.db.batch(SCHEMA.map((sql) => this.q(sql.replace(/\s+/g, " "))));
+      p = this.db.batch(SCHEMA.map((sql) => this.q(sql.replace(/\s+/g, " ")))).then(async () => {
+        for (const sql of MIGRATIONS) { try { await this.q(sql).run(); } catch { /* already applied */ } }
+      });
       p.catch(() => schemaReady.delete(this.db));
       schemaReady.set(this.db, p);
     }
@@ -275,11 +284,12 @@ export class Social {
         vals[`n_${c}`] = Number.isFinite(n) ? Math.max(0, Math.min(1_000_000, Math.round(n))) : me[`n_${c}` as `n_${Cat}`];
       }
       const games = Number.isFinite(Number(b["games"])) ? Math.max(0, Math.min(1_000_000, Math.round(Number(b["games"])))) : me.games;
+      const room = typeof b["room"] === "string" && ROOM_RE.test(b["room"]) && status === "playing" ? b["room"] : null;
       const [, unread, reqs, latest, updated] = await this.many(
-        this.q(`UPDATE social_users SET last_seen = ?, status = ?, name = ?, avatar = ?, games = ?,
+        this.q(`UPDATE social_users SET last_seen = ?, status = ?, name = ?, avatar = ?, games = ?, room = ?,
             r_bullet = ?, n_bullet = ?, r_blitz = ?, n_blitz = ?, r_rapid = ?, n_rapid = ?,
             r_puzzle = ?, n_puzzle = ?, r_bots = ?, n_bots = ? WHERE id = ?`,
-          now, status, name, avatar, games,
+          now, status, name, avatar, games, room,
           vals["r_bullet"], vals["n_bullet"], vals["r_blitz"], vals["n_blitz"], vals["r_rapid"], vals["n_rapid"],
           vals["r_puzzle"], vals["n_puzzle"], vals["r_bots"], vals["n_bots"], me.id),
         this.q("SELECT COUNT(*) AS n FROM social_messages WHERE recipient = ? AND seen = 0", me.id),
@@ -303,7 +313,12 @@ export class Social {
         this.q(`SELECT u.* FROM social_friends f JOIN social_users u ON u.id = f.b
             WHERE f.a = ? AND f.state = 'pending' ORDER BY f.created DESC`, me.id));
       const map = (rows: Record<string, unknown>[] | undefined) => (rows ?? []).map((u) => publicUser(u as unknown as UserRow, now));
-      return { friends: map(friends), incoming: map(incoming), outgoing: map(outgoing) };
+      // friends (only) see which live game you're in, so they can watch it
+      const withRoom = (friends ?? []).map((u) => {
+        const p = publicUser(u as unknown as UserRow, now);
+        return { ...p, watch: p.status === "playing" && typeof u["room"] === "string" ? u["room"] : null };
+      });
+      return { friends: withRoom, incoming: map(incoming), outgoing: map(outgoing) };
     }
     if (method === "POST" && path === "/friends/request") {
       const b = await body(request);

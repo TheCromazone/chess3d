@@ -2,6 +2,7 @@
 // leaderboard, served by the game's Higgsfield project (server/social.ts). There's no sign-in:
 // this device registers once and keeps a private key; the 8-character friend code is what you share.
 import { getProfile, getSocialId, setSocialId } from "../store.js";
+import { live } from "./room.js";
 
 const HOST = "https://timely-ibis-513.higgsfield.app";
 const BASE = (/(^|\.)higgsfield\.app$/.test(location.hostname) ? "" : HOST) + "/api/social";
@@ -92,10 +93,10 @@ export async function beat() {
   const p = getProfile();
   const ratings = {};
   for (const c of CATS) ratings[c] = { r: p.ratings[c].r, n: p.ratings[c].n };
-  const playing = !!document.getElementById("app")?.classList.contains("in-game");
+  const playing = !!live.room || !!document.getElementById("app")?.classList.contains("in-game");
   let r;
   try {
-    r = await api("POST", "/heartbeat", { status: playing ? "playing" : "online", name: socialName(p.name), avatar: p.avatar, ratings, games: p.stats.games });
+    r = await api("POST", "/heartbeat", { status: playing ? "playing" : "online", room: live.room, name: socialName(p.name), avatar: p.avatar, ratings, games: p.stats.games });
   } catch {
     state.offline = true;
     emit();

@@ -31,6 +31,11 @@ export async function sendChallenge(app, user, mode, tc) {
   app.launch(() => new OnlineGame(app, { kind: mode === "daily" ? "daily" : "friend", room, tcKey, invitee: user.name }), "#/online");
 }
 
+// spectate a friend's live game: the room seats its two players, so a third visitor watches
+function watchFriend(app, u) {
+  app.launch(() => new OnlineGame(app, { kind: "friend", room: u.watch, tcKey: "10+0", spectate: true }), "#/online");
+}
+
 export function acceptChallenge(app, c) {
   app.launch(() => new OnlineGame(app, { kind: c.mode === "daily" ? "daily" : "friend", room: c.room, tcKey: c.mode === "daily" ? (isDailyKey(c.tc) ? c.tc : "inf") : c.tc }), "#/online");
 }
@@ -260,6 +265,7 @@ export class SocialScreen {
       h("button.row-main", { onclick: () => this._profile(u, true), "aria-label": `${u.name}, ${presenceText(u)}. Open profile` },
         userAvatar(u), h("span.rt", h("b", u.name, h("span.muted", ` ${u.ratings.blitz.r}`)), h("small", presenceText(u)))),
       h("div.row-actions",
+        u.watch ? h("button.btn.small", { onclick: () => watchFriend(this.app, u), "aria-label": `Watch ${u.name}'s game` }, icon("eye", 16), h("span.wide-only", "Watch")) : null,
         h("button.btn.small.primary", { onclick: () => challengeModal(this.app, u), "aria-label": `Challenge ${u.name}` }, icon("bolt", 16), h("span.wide-only", "Challenge")),
         h("button.btn.small", { onclick: () => this.app.go(`#/social/chat/${u.id}`), "aria-label": `Message ${u.name}` }, icon("chat", 16), h("span.wide-only", "Message"))));
   }

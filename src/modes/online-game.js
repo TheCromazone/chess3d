@@ -5,7 +5,7 @@ import { createChess } from "../core/chess960.js";
 import { BaseGame } from "./base-game.js";
 import { h, icon, copyText } from "../ui/dom.js";
 import { confirmModal, openModal, toast, tcLabel, closeAllModals } from "../ui/components.js";
-import { RoomClient, makePlayerId, parsePlayerId, findMatch } from "../net/room.js";
+import { RoomClient, makePlayerId, parsePlayerId, findMatch, live } from "../net/room.js";
 import { getProfile, applyRating, timeClass, unlock, getSettings, getDaily, upsertDaily } from "../store.js";
 import { SFX } from "../audio.js";
 import * as Social from "../net/social.js";
@@ -66,6 +66,7 @@ export class OnlineGame extends BaseGame {
     this.dead = true;
     if (this._onVis) document.removeEventListener("visibilitychange", this._onVis);
     clearTimeout(this._noShowT); clearTimeout(this._arenaNextT);
+    if (live.room === this.room) live.room = null;
     document.title = "Chess 3D";
     clearInterval(this._lobbyTimer);
     if (this.search) this.search.cancel();
@@ -266,6 +267,7 @@ export class OnlineGame extends BaseGame {
     }
     if (s.status === "playing") {
       if (this.phase !== "playing") { this.phase = "playing"; this._renderControls(); }
+      if (this.myColor && this.kind !== "daily") live.room = this.room;
     }
     this.renderStrips();
     this._renderStatus();
@@ -337,6 +339,7 @@ export class OnlineGame extends BaseGame {
 
   // finish is driven by the server; rating + bookkeeping happen here
   onFinish(r) {
+    if (live.room === this.room) live.room = null;
     // arena games are scored by the server from the room, aborted ones included (they don't count)
     if (this.cfg.arena && this.myColor) this._reportArena();
     if (r.reason === "aborted" || !this.myColor) return {};
