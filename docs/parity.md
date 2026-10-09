@@ -105,6 +105,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Achievements / streaks | ✅ | 24 achievements |
 | Friends with online status | ✅ | friend codes and invite links, requests (accept / decline), online / playing / last seen, watch their live games; also "people you've played" with your record vs each |
 | Player profiles | ✅ | any player's ratings and recent games (the last 30 online and bot games), each opening on the analysis board |
+| Member search | ✅ | find players by name (or add them by friend code) and open their profile |
 | Challenges | ✅ | challenge a friend to a live game (any time control) or a daily game; pop-up notice with Accept / Decline wherever they are in the app; challenge friends from the invite lobby |
 | Direct messages | ✅ | threads with friends, unread counts on the nav, notices for new messages |
 | Clubs | ✅ | create (public or invite-only), join by code or from the public list, club chat, member list with presence |
