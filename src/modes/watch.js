@@ -9,6 +9,7 @@ import { BOTS, botMove, botThinkDelay } from "../bots.js";
 import { playEngine } from "../core/engines.js";
 import { moveSound } from "../audio.js";
 import { openingForGame, loadOpenings } from "../openings.js";
+import { eventsSection } from "./events.js";
 
 let classicsCache = null;
 export async function loadClassics() {
@@ -22,7 +23,7 @@ export class WatchPage {
   constructor(app) { this.app = app; }
   async mount() {
     const page = h("div.page",
-      h("div.page-head", h("h1", "Watch"), h("p", "Chess streamers live now, the latest videos and news, famous games replayed, and the bots battling it out.")));
+      h("div.page-head", h("h1", "Watch"), h("p", "Top tournaments live, chess streamers, the latest videos and news, famous games replayed, and the bots battling it out.")));
     const tv = h("button.tile", { onclick: () => this.app.go("#/tv"), style: { minHeight: "auto", flexDirection: "row", alignItems: "center", gap: "14px" } },
       h("span.ti", "📺"), h("span", h("b", "Bot TV"), h("small", { style: { display: "block" } }, "Two random bots play a live game. A new match starts when one ends.")));
     const list = h("div.grid-cards");
@@ -30,6 +31,7 @@ export class WatchPage {
     const videoBox = h("div.video-grid");
     const newsBox = h("div.rows.news-list");
     page.append(
+      h("section", h("h2", "Events"), eventsSection(this.app)),
       h("section", h("h2", "Live now"), liveBox),
       h("section", h("h2", "Videos"), videoBox),
       h("section", tv),

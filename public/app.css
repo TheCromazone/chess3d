@@ -747,3 +747,21 @@ a.row { color: inherit; text-decoration: none; }
 .coach-facts { display: flex; flex-wrap: wrap; gap: 6px; }
 .coach-facts span { font-size: 12.5px; padding: 3px 8px; border-radius: 999px; background: var(--panel-3); color: var(--ink-2); }
 .coach-bio { white-space: pre-wrap; line-height: 1.55; color: var(--ink); margin: 0; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Events: live tournaments */
+.event-tile { position: relative; }
+.event-tile b { padding-right: 46px; }
+.event-tile .live-dot { position: absolute; top: 14px; right: 14px; }
+.round-picker { overflow-x: auto; flex-wrap: nowrap; margin: 4px 0 12px; }
+.round-picker button { flex: 0 0 auto; }
+.event-games { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.event-game { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: var(--radius-lg); background: var(--panel); border: 1px solid var(--line); text-align: left; }
+.event-game:hover { border-color: var(--line-2); }
+.event-game .mini-board { width: 100%; }
+.eg-players { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.eg-players span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eg-players small { color: var(--ink-3); }
+.eg-result { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 13px; }
+.eg-result.live { color: var(--danger); }
+.event-page .page-head .btn { margin-bottom: 6px; }
+.event-game .mini-board span { font-size: clamp(11px, 1.6vw, 17px); }

@@ -392,7 +392,8 @@ export class Social {
     news.sort((a, b) => b.date - a.date);
     const videos: { id: string; title: string; channel: string; date: number }[] = [];
     VIDEO_CHANNELS.forEach((c, i) => {
-      for (const e of ((videoXml[i] ?? "").match(/<entry>[\s\S]*?<\/entry>/g) || []).slice(0, 4)) {
+      // three per channel, so the busiest uploaders don't crowd out the rest
+      for (const e of ((videoXml[i] ?? "").match(/<entry>[\s\S]*?<\/entry>/g) || []).slice(0, 3)) {
         const id = tag(e, "yt:videoId");
         if (/^[A-Za-z0-9_-]{6,20}$/.test(id)) videos.push({ id, title: tag(e, "title").slice(0, 200), channel: c.channel, date: Date.parse(tag(e, "published")) || 0 });
       }

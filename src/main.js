@@ -9,6 +9,7 @@ import { ReviewScreen } from "./modes/review.js";
 import { PuzzleScreen, RushScreen } from "./modes/puzzles.js";
 import { LearnPage, LessonScreen, DrillScreen, OpeningTrainer } from "./modes/learn.js";
 import { WatchPage, ReplayScreen, BotTV } from "./modes/watch.js";
+import { EventScreen, BroadcastGame } from "./modes/events.js";
 import { ArenaScreen } from "./modes/arena.js";
 import { DailyScreen, watchDaily } from "./modes/daily.js";
 import { InsightsPage } from "./screens/insights.js";
@@ -86,6 +87,8 @@ const routes = [
   { pattern: /^#\/watch$/, nav: "watch", make: (app) => new WatchPage(app) },
   { pattern: /^#\/watch\/([\w-]+)$/, nav: "watch", make: (app, m) => new ReplayScreen(app, m[1]) },
   { pattern: /^#\/tv$/, nav: "watch", make: (app) => new BotTV(app) },
+  { pattern: /^#\/event\/([A-Za-z0-9]{8})(?:\/([A-Za-z0-9]{8}))?$/, nav: "watch", make: (app, m) => new EventScreen(app, m[1], m[2] || null) },
+  { pattern: /^#\/event\/([A-Za-z0-9]{8})\/([A-Za-z0-9]{8})\/(\d{1,3})$/, nav: "watch", make: (app, m) => new BroadcastGame(app, m[1], m[2], Number(m[3])) },
   { pattern: /^#\/analysis$/, nav: "analysis", make: (app) => new AnalysisScreen(app) },
   { pattern: /^#\/analysis\/fen\/(.+)$/, nav: "analysis", make: (app, m) => new AnalysisScreen(app, { fen: dec(m[1]) }) },
   { pattern: /^#\/analysis\/pgn\/(.+)$/, nav: "analysis", make: (app, m) => new AnalysisScreen(app, { pgn: dec(m[1]) }) },
