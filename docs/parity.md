@@ -92,7 +92,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | chess.com feature | Status | Notes |
 |---|---|---|
 | Watch games | ✅ | 40 classic games replayed + Bot TV (live bot vs bot) |
-| Spectate a live game | ✅ | open a friend's game link |
+| Spectate a live game | ✅ | Watch button on friends who are in a live game, or open any game link |
 
 ## Profile & social
 

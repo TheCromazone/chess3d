@@ -59,6 +59,11 @@ and an 8-character friend code; the client keeps the secret in localStorage and 
 - `GET /clubs`, `POST /clubs/create|join|leave`, `GET /clubs/:id`, `GET|POST /clubs/:id/messages`.
 - `GET /leaderboard?cat=blitz|bullet|rapid|puzzle|bots`: players active in the last 30 days with at least 5 rated games (10 puzzles).
 - `GET /users/:id`, `GET /me`, `POST /delete` (removes the player, friendships, messages and memberships).
+- The heartbeat may carry `room` (the live game you're seated in); `GET /friends` returns it to your
+  friends only, as `watch`, so they can spectate.
+
+Columns added after the first release go in `MIGRATIONS` (each `ALTER TABLE` runs once per isolate,
+and its "duplicate column" error is ignored after the first time).
 
 Limits: 20 registrations per IP per hour, 30 messages per minute, 40 friend requests per hour,
 5 clubs per owner, 500-character messages. Each request batches its queries into one D1 round trip
