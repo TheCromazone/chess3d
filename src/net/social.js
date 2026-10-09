@@ -11,6 +11,13 @@ const BEAT_HIDDEN_MS = 60000;
 export const CATS = ["blitz", "bullet", "rapid", "puzzle", "bots"];
 export const LIVE_CHALLENGE_MS = 15 * 60000;   // a live challenge nobody answered is stale after this
 
+// news, videos and live streamers for the Watch page (public; no profile needed)
+export async function getFeeds() {
+  const res = await fetch(BASE + "/feeds", { cache: "no-store" });
+  if (!res.ok) throw new SocialError(res.status, "Couldn't load the news right now.");
+  return res.json();
+}
+
 export class SocialError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }

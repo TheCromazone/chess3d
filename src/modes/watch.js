@@ -1,8 +1,10 @@
-// Watch: replay famous games on the 3D board, or tune in to Bot TV (bots playing each other live).
+// Watch: chess streamers live now, the latest videos and news, famous games replayed on the 3D
+// board, and Bot TV (bots playing each other live).
 import { Chess } from "chess.js";
 import { MoveTree, kingSquare, capturedFromFen } from "../core/tree.js";
-import { h, icon } from "../ui/dom.js";
-import { MoveList, toast } from "../ui/components.js";
+import { h, icon, timeAgo } from "../ui/dom.js";
+import { MoveList, toast, openModal } from "../ui/components.js";
+import { getFeeds } from "../net/social.js";
 import { BOTS, botMove, botThinkDelay } from "../bots.js";
 import { playEngine } from "../core/engines.js";
 import { moveSound } from "../audio.js";
@@ -20,12 +22,36 @@ export class WatchPage {
   constructor(app) { this.app = app; }
   async mount() {
     const page = h("div.page",
-      h("div.page-head", h("h1", "Watch"), h("p", "Replay the most famous games ever played, or watch the bots battle it out live.")));
+      h("div.page-head", h("h1", "Watch"), h("p", "Chess streamers live now, the latest videos and news, famous games replayed, and the bots battling it out.")));
     const tv = h("button.tile", { onclick: () => this.app.go("#/tv"), style: { minHeight: "auto", flexDirection: "row", alignItems: "center", gap: "14px" } },
       h("span.ti", "📺"), h("span", h("b", "Bot TV"), h("small", { style: { display: "block" } }, "Two random bots play a live game. A new match starts when one ends.")));
     const list = h("div.grid-cards");
-    page.append(h("section", tv), h("section", h("h2", "Classic games"), list));
+    const liveBox = h("div.stream-row", h("p.note", "Looking for live streams…"));
+    const videoBox = h("div.video-grid");
+    const newsBox = h("div.rows.news-list");
+    page.append(
+      h("section", h("h2", "Live now"), liveBox),
+      h("section", h("h2", "Videos"), videoBox),
+      h("section", tv),
+      h("section", h("h2", "News"), newsBox),
+      h("section", h("h2", "Classic games"), list));
     this.app.pageMode(page);
+    getFeeds().then((d) => {
+      if (this.dead) return;
+      liveBox.replaceChildren(...(d.streamers.length ? d.streamers.map((s) => h("a.stream", { href: s.url, target: "_blank", rel: "noopener" },
+        s.image ? h("img", { src: s.image, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }) : h("span.stream-ph", "♞"),
+        h("span.rt", h("b", s.name), h("small", s.title || (s.platform === "youtube" ? "Live on YouTube" : "Live on Twitch"))),
+        h("span.live-dot", "LIVE"))) : [h("p.note", "Nobody we follow is streaming right now.")]));
+      videoBox.replaceChildren(...d.videos.map((v) => h("button.video", { onclick: () => playVideo(v), "aria-label": `Play ${v.title}` },
+        h("img", { src: `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`, alt: "", loading: "lazy" }),
+        h("b", v.title), h("small", `${v.channel}, ${timeAgo(v.date)}`))));
+      newsBox.replaceChildren(...d.news.map((n) => h("a.row.news", { href: n.link, target: "_blank", rel: "noopener" },
+        h("span.rt", h("b", n.title), h("small", `${n.source}${n.date ? ", " + timeAgo(n.date) : ""}`)), icon("chevron", 18))));
+    }).catch(() => {
+      if (this.dead) return;
+      liveBox.replaceChildren(h("p.note", "Couldn't reach the news service. Classic games and Bot TV work offline."));
+      videoBox.replaceChildren();
+    });
     try {
       const games = await loadClassics();
       for (const g of games) {
@@ -34,7 +60,18 @@ export class WatchPage {
       }
     } catch { list.appendChild(h("p.note", "Couldn't load the games list.")); }
   }
-  destroy() {}
+  destroy() { this.dead = true; }
+}
+
+// videos play in the page through YouTube's privacy-enhanced player
+function playVideo(v) {
+  openModal({
+    title: v.title, sub: v.channel,
+    body: h("div.video-frame", h("iframe", {
+      src: `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0`, title: v.title,
+      allow: "autoplay; encrypted-media; picture-in-picture; fullscreen", allowfullscreen: true, referrerpolicy: "strict-origin-when-cross-origin",
+    })),
+  });
 }
 
 const SPEEDS = [{ label: "Slow", ms: 2600 }, { label: "Normal", ms: 1500 }, { label: "Fast", ms: 700 }];

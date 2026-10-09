@@ -26,6 +26,8 @@ export interface SocialHooks {
   waitUntil?: (p: Promise<unknown>) => void;
   // how push requests leave the Worker (tests swap it out)
   pushFetch?: (url: string, init: RequestInit) => Promise<Response>;
+  // how news/video/streamer feeds are fetched (tests swap it out)
+  feedFetch?: (url: string) => Promise<Response>;
 }
 
 export interface SocialDB {
@@ -116,6 +118,33 @@ function b64url(bytes: ArrayBuffer | Uint8Array): string {
 }
 function pushHostOk(endpoint: string): boolean {
   try { const u = new URL(endpoint); return u.protocol === "https:" && PUSH_HOSTS.some((re) => re.test(u.hostname)); } catch { return false; }
+}
+
+// News, videos and live streamers for the Watch page: public feeds, refreshed every 15 minutes
+const FEEDS_MS = 15 * 60_000;
+const NEWS_FEEDS = [
+  { source: "FIDE", url: "https://www.fide.com/feed/" },
+  { source: "Lichess", url: "https://lichess.org/@/Lichess/blog.atom" },
+  { source: "Chess.com", url: "https://www.chess.com/rss/news" },
+];
+const VIDEO_CHANNELS = [
+  { channel: "GothamChess", id: "UCQHX6ViZmPsWiYSFAyS0a3Q" },
+  { channel: "Chess.com", id: "UC5kS0l76kC0xOzMPtOmSFGw" },
+  { channel: "Saint Louis Chess Club", id: "UCM-ONC2bCHytG2mYtKDmIeA" },
+  { channel: "Daniel Naroditsky", id: "UCHP9CdeguNUI-_nBv_UXBhw" },
+  { channel: "Hanging Pawns", id: "UCkJdvwRC-oGPhRHW_XPNokg" },
+];
+function decode(s: string): string {
+  return s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").replace(/<[^>]+>/g, "")
+    .replace(/&#(\d+);/g, (_, n: string) => String.fromCharCode(Number(n))).replace(/&#x([0-9a-f]+);/gi, (_, n: string) => String.fromCharCode(parseInt(n, 16)))
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim();
+}
+function tag(xml: string, name: string): string {
+  const m = new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`).exec(xml);
+  return m && m[1] !== undefined ? decode(m[1]) : "";
+}
+function httpsUrl(u: string): string | null {
+  try { const x = new URL(u); return x.protocol === "https:" ? x.href : null; } catch { return null; }
 }
 
 // Forums: a few fixed categories; anything three different players report is hidden
@@ -317,6 +346,58 @@ export class Social {
     if (this.hooks.waitUntil) this.hooks.waitUntil(send); else send.catch(() => {});
   }
 
+  private async feeds(now: number): Promise<unknown> {
+    const row = await this.q("SELECT v FROM social_config WHERE k = 'feeds'").first<{ v: string }>();
+    const cached = row ? (JSON.parse(row.v) as { at: number }) : null;
+    if (cached && now - cached.at < FEEDS_MS) return cached;
+    const get = this.hooks.feedFetch ?? ((url: string) => fetch(url, { headers: { "User-Agent": "Chess3D/1.0 (+https://chess3d-five.vercel.app)" } }));
+    const text = async (url: string) => { try { const r = await get(url); return r.ok ? await r.text() : ""; } catch { return ""; } };
+    const json = async (url: string) => { try { const r = await get(url); return r.ok ? await r.json() : null; } catch { return null; } };
+    const [newsXml, videoXml, lichessLive, chesscomStreamers] = await Promise.all([
+      Promise.all(NEWS_FEEDS.map((f) => text(f.url))),
+      Promise.all(VIDEO_CHANNELS.map((c) => text(`https://www.youtube.com/feeds/videos.xml?channel_id=${c.id}`))),
+      json("https://lichess.org/api/streamer/live"),
+      json("https://api.chess.com/pub/streamers"),
+    ]);
+    const news: { title: string; link: string; source: string; date: number }[] = [];
+    NEWS_FEEDS.forEach((f, i) => {
+      const xml = newsXml[i] ?? "";
+      const items = xml.match(/<item[\s>][\s\S]*?<\/item>/g) || xml.match(/<entry[\s>][\s\S]*?<\/entry>/g) || [];
+      for (const it of items.slice(0, 6)) {
+        const link = httpsUrl(tag(it, "link") || (/<link[^>]*href="([^"]+)"/.exec(it)?.[1] ?? ""));
+        const date = Date.parse(tag(it, "pubDate") || tag(it, "published") || tag(it, "updated")) || 0;
+        const title = tag(it, "title");
+        if (title && link) news.push({ title: title.slice(0, 200), link, source: f.source, date });
+      }
+    });
+    news.sort((a, b) => b.date - a.date);
+    const videos: { id: string; title: string; channel: string; date: number }[] = [];
+    VIDEO_CHANNELS.forEach((c, i) => {
+      for (const e of ((videoXml[i] ?? "").match(/<entry>[\s\S]*?<\/entry>/g) || []).slice(0, 4)) {
+        const id = tag(e, "yt:videoId");
+        if (/^[A-Za-z0-9_-]{6,20}$/.test(id)) videos.push({ id, title: tag(e, "title").slice(0, 200), channel: c.channel, date: Date.parse(tag(e, "published")) || 0 });
+      }
+    });
+    videos.sort((a, b) => b.date - a.date);
+    const streamers: { name: string; title: string; platform: string; url: string; image: string | null; source: string }[] = [];
+    for (const s of Array.isArray(lichessLive) ? (lichessLive as Record<string, any>[]).slice(0, 12) : []) {
+      const st = s["streamer"] || {}, stream = s["stream"] || {};
+      const url = httpsUrl(st["twitch"] || st["youTube"] || "");
+      if (url) streamers.push({ name: String(st["name"] || s["name"] || "").slice(0, 60), title: String(stream["status"] || "").slice(0, 140), platform: String(stream["service"] || ""), url, image: httpsUrl(st["image"] || ""), source: "Lichess" });
+    }
+    const cs = chesscomStreamers && Array.isArray((chesscomStreamers as Record<string, unknown>)["streamers"]) ? ((chesscomStreamers as Record<string, any>)["streamers"] as Record<string, any>[]) : [];
+    for (const s of cs.filter((x) => x["is_live"]).slice(0, 12)) {
+      const live = (Array.isArray(s["platforms"]) ? s["platforms"] : []).find((p: Record<string, unknown>) => p["is_live"]) || {};
+      const url = httpsUrl(live["stream_url"] || live["channel_url"] || s["twitch_url"] || "");
+      if (url) streamers.push({ name: String(s["username"] || "").slice(0, 60), title: "", platform: String(live["type"] || ""), url, image: httpsUrl(s["avatar"] || ""), source: "Chess.com" });
+    }
+    const fresh = { at: now, news: news.slice(0, 18), videos: videos.slice(0, 15), streamers };
+    // keep the old copy if every source failed this time
+    if (!news.length && !videos.length && !streamers.length && cached) return cached;
+    await this.q("INSERT OR REPLACE INTO social_config (k, v) VALUES ('feeds', ?)", JSON.stringify(fresh)).run();
+    return fresh;
+  }
+
   private async nameTaken(name: string, exceptId: string): Promise<boolean> {
     return !!(await this.q("SELECT 1 AS x FROM social_users WHERE name = ? COLLATE NOCASE AND id <> ?", name, exceptId).first());
   }
@@ -372,6 +453,9 @@ export class Social {
         this.q("INSERT INTO social_reg_log (ip, at) VALUES (?, ?)", ip, now));
       return { id, secret, code, name: finalName };
     }
+
+    // GET /feeds: news, videos and live streamers (public, no key needed)
+    if (method === "GET" && path === "/feeds") return this.feeds(now);
 
     // POST /link/claim {code}: sign this device in to a profile with a code made on another device
     if (method === "POST" && path === "/link/claim") {

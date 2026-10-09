@@ -40,10 +40,20 @@ const rooms = new Map();
 const pushes = [];
 let pushStatus = 201;
 const pending = [];
+let feedCalls = 0;
 const api = new Social(d1(new DatabaseSync(":memory:")), () => clock, {
   roomState: async (room) => rooms.get(room) ?? null,
   waitUntil: (p) => pending.push(p),
   pushFetch: async (url, init) => { pushes.push({ url, init }); return new Response(null, { status: pushStatus }); },
+  feedFetch: async (url) => {
+    feedCalls++;
+    if (url.includes("fide")) return new Response(`<rss><channel><item><title>Candidates &amp; more</title><link>https://www.fide.com/news/1</link><pubDate>Wed, 07 Oct 2026 08:00:00 GMT</pubDate></item></channel></rss>`);
+    if (url.includes("lichess.org/@")) return new Response(`<feed><entry><title>New lessons</title><link href="https://lichess.org/@/Lichess/blog/x"/><published>2026-10-06T10:00:00Z</published></entry></feed>`);
+    if (url.includes("youtube")) return new Response(`<feed><entry><yt:videoId>abcDEF12345</yt:videoId><title>Best traps</title><published>2026-10-05T10:00:00Z</published></entry></feed>`);
+    if (url.includes("streamer/live")) return Response.json([{ name: "x", stream: { service: "twitch", status: "Blitz!" }, streamer: { name: "Streamer X", twitch: "https://www.twitch.tv/x" } }]);
+    if (url.includes("api.chess.com")) return Response.json({ streamers: [{ username: "Live1", is_live: true, platforms: [{ type: "youtube", stream_url: "https://www.youtube.com/watch?v=1", is_live: true }] }, { username: "Off", is_live: false }] });
+    return new Response("", { status: 404 });
+  },
 });
 async function call(method, path, { body, secret, query = "", ip = "1.1.1.1" } = {}) {
   const req = new Request("https://x/api/social" + path + query, {
@@ -288,6 +298,15 @@ const before = pushes.length;
 await call("POST", "/nudge", { secret: cid.secret, body: { code: ann.code, room: "daily-new", san: "d4" } });
 await Promise.all(pending.splice(0));
 ok(pushes.length === before, "a push address the service says is gone is dropped");
+
+// news, videos and streamers
+const f1 = (await call("GET", "/feeds")).data;
+ok(f1.news.length === 2 && f1.news[0].title === "Candidates & more" && f1.news[1].source === "Lichess", "news from several feeds, newest first, entities decoded");
+ok(f1.videos.length === 5 && f1.videos[0].id === "abcDEF12345", "latest videos from the channels");
+ok(f1.streamers.length === 2 && f1.streamers.some((x) => x.name === "Live1" && x.platform === "youtube"), "only live streamers are listed");
+const callsBefore = feedCalls;
+await call("GET", "/feeds");
+ok(feedCalls === callsBefore, "feeds are cached between visits");
 
 // finding players by name
 const found = (await call("GET", "/search", { secret: ann.secret, query: "?q=ci" })).data.players;
