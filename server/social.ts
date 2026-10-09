@@ -1880,6 +1880,17 @@ export class Social {
   private async dropClub(id: string) {
     await this.many(this.q("DELETE FROM social_messages WHERE club = ?", id), this.q("DELETE FROM social_club_bans WHERE club = ?", id),
       this.q("DELETE FROM social_clubs WHERE id = ?", id));
+    // its team matches and Vote Chess games go too: those that never started, and those with neither club left to see them
+    // (one under way against a club that's still there stays, so that club keeps its result)
+    const orphan = "(a_club NOT IN (SELECT id FROM social_clubs) AND b_club NOT IN (SELECT id FROM social_clubs))";
+    const mids = `SELECT id FROM social_club_matches WHERE (a_club = ? OR b_club = ?) AND (status IN ('challenge', 'signup', 'declined') OR ${orphan})`;
+    const vids = `SELECT id FROM social_vote_games WHERE (a_club = ? OR b_club = ?) AND (status IN ('challenge', 'declined') OR ${orphan})`;
+    await this.many(
+      this.q(`DELETE FROM social_club_match_players WHERE mid IN (${mids})`, id, id),
+      this.q(`DELETE FROM social_club_match_games WHERE mid IN (${mids})`, id, id),
+      this.q(`DELETE FROM social_vote_votes WHERE game IN (${vids})`, id, id),
+      this.q(`DELETE FROM social_club_matches WHERE id IN (${mids})`, id, id),
+      this.q(`DELETE FROM social_vote_games WHERE id IN (${vids})`, id, id));
   }
 
   private async accept(requester: string, accepter: string, now: number) {

@@ -44,7 +44,8 @@ const pushes = [];
 let pushStatus = 201;
 const pending = [];
 let feedCalls = 0;
-const api = new Social(d1(new DatabaseSync(":memory:")), () => clock, {
+const sqlite = new DatabaseSync(":memory:");
+const api = new Social(d1(sqlite), () => clock, {
   roomState: async (room) => rooms.get(room) ?? null,
   roomAct: async (room, pid, action) => {
     const r = actRooms.get(room) || { seats: [], status: "waiting", state: null, result: null };
@@ -413,6 +414,29 @@ await call("POST", "/delete", { secret: rep3.secret });
   const outsider = (await call("POST", "/register", { body: { name: "Out2" }, ip: "8.8.8.8" })).data;
   ok((await call("GET", `/votechess/${vg.id}`, { secret: outsider.secret })).status === 403, "outsiders can't see or vote");
   await call("POST", "/delete", { secret: outsider.secret });
+}
+
+// a club that's dropped takes its unplayed matches and Vote Chess games with it, and any nobody can see any more
+{
+  const count = (t, col, v) => sqlite.prepare(`SELECT COUNT(*) AS n FROM ${t} WHERE ${col} = ?`).get(v).n;
+  const ka = (await call("POST", "/clubs/create", { secret: ann.secret, body: { name: "Gone Rooks" } })).data;
+  const kb = (await call("POST", "/clubs/create", { secret: cid.secret, body: { name: "Gone Knights" } })).data;
+  const open = (await call("POST", `/clubs/${ka.id}/matches`, { secret: ann.secret, body: { opponent: kb.id } })).data;
+  const run = (await call("POST", `/clubs/${ka.id}/matches`, { secret: ann.secret, body: { opponent: kb.id, boards: 1 } })).data;
+  await call("POST", `/matches/${run.id}/accept`, { secret: cid.secret });
+  await call("POST", `/matches/${run.id}/join`, { secret: ann.secret, body: { pid: "p-gonea.Ann.1500" } });
+  await call("POST", `/matches/${run.id}/join`, { secret: cid.secret, body: { pid: "p-goneb.Cid.1500" } });
+  await call("POST", `/matches/${run.id}/start`, { secret: ann.secret });
+  const vote = (await call("POST", `/clubs/${ka.id}/votechess`, { secret: ann.secret, body: { opponent: kb.id } })).data;
+  await call("POST", `/votechess/${vote.id}/accept`, { secret: cid.secret });
+  await call("POST", `/votechess/${vote.id}/vote`, { secret: ann.secret, body: { move: "e2e4" } });
+  await call("POST", "/clubs/leave", { secret: ann.secret, body: { id: ka.id } });
+  ok(count("social_club_matches", "id", open.id) === 0, "a dropped club's open challenges go");
+  ok(count("social_club_matches", "id", run.id) === 1 && count("social_vote_games", "id", vote.id) === 1, "games under way stay while the other club is there");
+  ok((await call("GET", `/matches/${run.id}`, { secret: cid.secret })).data.games.length === 2, "and the other club still sees them");
+  await call("POST", "/clubs/leave", { secret: cid.secret, body: { id: kb.id } });
+  ok(count("social_club_matches", "id", run.id) === 0 && count("social_club_match_games", "mid", run.id) === 0 && count("social_club_match_players", "mid", run.id) === 0, "with both clubs gone the match goes");
+  ok(count("social_vote_games", "id", vote.id) === 0 && count("social_vote_votes", "game", vote.id) === 0, "and so does the Vote Chess game");
 }
 
 // variant ratings and leaderboards
