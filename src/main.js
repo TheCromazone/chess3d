@@ -9,6 +9,7 @@ import { ReviewScreen } from "./modes/review.js";
 import { PuzzleScreen, RushScreen } from "./modes/puzzles.js";
 import { LearnPage, LessonScreen, DrillScreen, OpeningTrainer } from "./modes/learn.js";
 import { WatchPage, ReplayScreen, BotTV } from "./modes/watch.js";
+import { LichessTV } from "./modes/lichess-tv.js";
 import { EventScreen, BroadcastGame } from "./modes/events.js";
 import { VisionTrainer, SoloChess } from "./modes/trainers.js";
 import { VoteChess } from "./modes/vote-chess.js";
@@ -97,6 +98,7 @@ const routes = [
   { pattern: /^#\/drill\/([\w-]+)$/, nav: "learn", make: (app, m) => new DrillScreen(app, m[1]) },
   { pattern: /^#\/opening\/([\w-]+)$/, nav: "learn", make: (app, m) => new OpeningTrainer(app, m[1]) },
   { pattern: /^#\/watch$/, nav: "watch", make: (app) => new WatchPage(app) },
+  { pattern: /^#\/watch\/tv(?:\/([a-z0-9]+))?$/, nav: "watch", make: (app, m) => new LichessTV(app, m[1]) },
   { pattern: /^#\/watch\/([\w-]+)$/, nav: "watch", make: (app, m) => new ReplayScreen(app, m[1]) },
   { pattern: /^#\/tv$/, nav: "watch", make: (app) => new BotTV(app) },
   { pattern: /^#\/vgame\/([a-z0-9]+)$/, nav: "profile", make: (app, m) => new VariantReplay(app, m[1]) },

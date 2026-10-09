@@ -27,8 +27,8 @@ Loop 9 took Chess960, King of the Hill and Three-check online, gave every varian
 against random opponents with its own rating, leaderboard and replayable history, and added live
 events (top tournaments relayed move by move), video lessons, blogs and a coach directory. Loop
 10 added Swiss tournaments, club team matches, Vote Chess, the Vision trainer and Solo Chess. Loop 11
-added Leagues, daily tournaments, blocking players, and for daily games vacations and conditional
-moves (rules v8).
+added Leagues, daily tournaments, blocking players, top live games, and for daily games vacations and
+conditional moves (rules v8).
 Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don't have (alternative noted)
 
 ## Play
@@ -116,6 +116,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | chess.com feature | Status | Notes |
 |---|---|---|
 | Watch games | ✅ | 40 classic games replayed + Bot TV (live bot vs bot) |
+| Top live games | ✅ | the highest-rated game being played right now in each speed (top rated, bullet, blitz, rapid, classical, Chess960), streamed from Lichess TV onto the board with names, titles, ratings and running clocks |
 | Events (top tournaments live) | ✅ | the main over-the-board events running now (Lichess broadcasts): rounds, every game on a small board, and any game on the main board with clocks, following each new move |
 | Spectate a live game | ✅ | Watch button on friends who are in a live game, or open any game link |
 | Live streamers | ✅ | who's streaming chess right now (Chess.com and Lichess streamer lists), linking to the stream |
