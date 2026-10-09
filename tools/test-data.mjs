@@ -555,5 +555,24 @@ if (process.argv.includes("--engine")) {
   send("quit"); eng.stdin.end();
 }
 
+// ---- articles: complete entries, and every diagram replays to a legal position ----
+{
+  const arts = JSON.parse(readFileSync(join(root, "public/data/articles.json"), "utf8"));
+  check(Array.isArray(arts) && arts.length >= 10, `articles: ${arts.length} of them`);
+  check(new Set(arts.map((a) => a.id)).size === arts.length && arts.every((a) => /^[a-z0-9-]+$/.test(a.id)), "articles: unique ids usable in a URL");
+  check(arts.every((a) => a.title && a.topic && a.summary && Array.isArray(a.body) && a.body.length >= 4), "articles: each has a title, topic, summary and a body");
+  let boards = 0, bad = [];
+  for (const a of arts) for (const b of a.body) {
+    if (typeof b === "string" || b.h) continue;
+    if (!b.board || !b.board.caption) { bad.push(a.id + ": unknown block"); continue; }
+    boards++;
+    try {
+      const c = new Chess(b.board.fen || undefined);
+      for (const tok of (b.board.moves || "").split(/\s+/)) if (tok && !/^\d+\.+$/.test(tok)) c.move(tok);
+    } catch (e) { bad.push(a.id + ": " + e.message); }
+  }
+  check(bad.length === 0 && boards >= 15, `articles: all ${boards} diagrams replay legally${bad.length ? " — " + bad.join("; ") : ""}`);
+}
+
 console.log(`\n${failures === 0 ? "ALL DATA CHECKS PASSED" : failures + " FAILURE(S)"}${warnings ? ` (${warnings} warning(s))` : ""}`);
 process.exit(failures ? 1 : 0);

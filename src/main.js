@@ -9,6 +9,7 @@ import { AnalysisScreen } from "./modes/analysis.js";
 import { ReviewScreen } from "./modes/review.js";
 import { PuzzleScreen, RushScreen } from "./modes/puzzles.js";
 import { LearnPage, LessonScreen, DrillScreen, OpeningTrainer } from "./modes/learn.js";
+import { ArticleScreen } from "./screens/articles.js";
 import { WatchPage, ReplayScreen, BotTV } from "./modes/watch.js";
 import { LichessTV } from "./modes/lichess-tv.js";
 import { EventScreen, BroadcastGame } from "./modes/events.js";
@@ -95,6 +96,7 @@ const routes = [
   { pattern: /^#\/daily$/, nav: "play", make: (app) => new DailyScreen(app) },
   { pattern: /^#\/puzzles\/theme\/([\w-]+)$/, nav: "puzzles", make: (app, m) => new PuzzleScreen(app, { mode: "rated", theme: m[1] }) },
   { pattern: /^#\/learn$/, nav: "learn", make: (app) => new LearnPage(app) },
+  { pattern: /^#\/article\/([\w-]+)$/, nav: "learn", make: (app, m) => new ArticleScreen(app, m[1]) },
   { pattern: /^#\/lesson\/([\w-]+)$/, nav: "learn", make: (app, m) => new LessonScreen(app, m[1]) },
   { pattern: /^#\/drill\/([\w-]+)$/, nav: "learn", make: (app, m) => new DrillScreen(app, m[1]) },
   { pattern: /^#\/opening\/([\w-]+)$/, nav: "learn", make: (app, m) => new OpeningTrainer(app, m[1]) },

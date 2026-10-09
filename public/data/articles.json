@@ -1,0 +1,482 @@
+[
+ {
+  "id": "first-ten-moves",
+  "title": "Five habits for your first ten moves",
+  "topic": "Openings",
+  "summary": "You don't need long memorised lines to come out of the opening in good shape. Five habits cover most of it.",
+  "date": "2026-10-09",
+  "body": [
+   "Most games between club players are decided long before the endgame, often by something that went wrong in the first ten moves. You don't need to memorise long lines to avoid that. Five habits cover most of it.",
+   {
+    "h": "1. Put a pawn in the centre"
+   },
+   "The squares e4, d4, e5 and d5 are the most valuable on the board: a piece there reaches the most squares, and a pawn there takes squares away from your opponent's pieces. Starting with 1.e4 or 1.d4 claims one of them straight away and opens a diagonal for a bishop and for the queen.",
+   {
+    "h": "2. Develop knights and bishops first"
+   },
+   "Every move in the opening should bring a new piece into play. Knights usually go to f3 and c3 (f6 and c6 for Black), where they eye the centre; bishops go where they have open diagonals. A useful test: if a move doesn't develop a piece, fight for the centre or make your king safe, ask what it does.",
+   {
+    "board": {
+     "caption": "Both sides have followed the habits: centre pawns, knights and bishops out, and White has already castled.",
+     "moves": "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. O-O Nf6"
+    }
+   },
+   {
+    "h": "3. Castle early"
+   },
+   "Your king is safest behind its pawns in a corner, and castling also brings a rook towards the centre. Leaving the king in the middle while the centre opens up is how many short games are lost. Castling within the first ten moves is a good rule of thumb.",
+   {
+    "h": "4. Don't move the same piece twice without a reason"
+   },
+   "Each extra move with one piece is a move your other pieces didn't get. There are good reasons to break this rule (winning material, answering a threat), but “it looked active” isn't one of them.",
+   {
+    "h": "5. Keep the queen at home for now"
+   },
+   "The queen is your strongest piece, which is exactly why bringing it out early is risky: your opponent can attack it with minor pieces and develop at the same time, gaining a move with every chase. Scholar's mate only works if the defender ignores the threat to f7; meet it with developing moves and the early queen becomes a target.",
+   {
+    "board": {
+     "caption": "Black meets the early queen with developing moves. White's queen has already moved twice, and 4...Nf6 blocks the threat to f7 while bringing out another piece.",
+     "moves": "1. e4 e5 2. Qh5 Nc6 3. Bc4 g6 4. Qf3 Nf6"
+    }
+   },
+   "Put the habits together and the opening takes care of itself: by move ten you'll have a safe king, active pieces and a share of the centre, which is all an opening is for. The opening trainer on the Learn page drills the main lines of popular openings once the habits feel natural."
+  ]
+ },
+ {
+  "id": "italian-game",
+  "title": "The Italian Game: plans for both sides",
+  "topic": "Openings",
+  "summary": "One of the oldest openings in chess, and still a favourite at every level. What each side is aiming for.",
+  "date": "2026-10-09",
+  "body": [
+   "After 1.e4 e5 2.Nf3 Nc6 3.Bc4 the bishop points at f7, the one square near Black's king that only the king defends. The Italian Game is among the oldest openings in chess and is still played by the world's best, because it leads to rich positions without forcing either side into long memorised tactics.",
+   {
+    "board": {
+     "caption": "The Italian Game. The bishop on c4 eyes f7.",
+     "moves": "1. e4 e5 2. Nf3 Nc6 3. Bc4"
+    }
+   },
+   {
+    "h": "The quiet main line"
+   },
+   "Modern games usually continue 3...Bc5 4.c3 Nf6 5.d3. White doesn't hurry with d4; the pawns on c3 and d3 keep the centre solid while White prepares it. Both sides castle, and the real fight starts a few moves later.",
+   {
+    "board": {
+     "caption": "A typical position from the quiet Italian, the Giuoco Pianissimo.",
+     "moves": "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3 Nf6 5. d3 d6 6. O-O O-O"
+    }
+   },
+   {
+    "h": "White's plans"
+   },
+   "White's main ideas are the d3-d4 break, prepared by Re1 and h3; the knight manoeuvre Nb1-d2-f1-g3, which brings a knight towards Black's king; and a2-a4, which gains space on the queenside and gives the bishop a retreat on a2 if Black chases it with ...a6 and ...b5.",
+   {
+    "h": "Black's plans"
+   },
+   "Black mirrors much of this. ...a6 and ...Ba7 tuck the bishop away from a later c3-d4 push, ...h6 stops an annoying pin with Bg5, and the knight can travel ...Ne7-g6 just as White's goes to g3. When White finally plays d4, Black often answers ...exd4, opening the e-file for the rooks.",
+   {
+    "h": "The sharp alternatives"
+   },
+   "If you want a fight from move four, the Evans Gambit (4.b4) gives a pawn to build a big centre with c3 and d4 at speed. Black can also choose the Two Knights Defense, 3...Nf6, which invites 4.Ng5 and the old attack on f7.",
+   "Whichever line you play, the themes stay the same: the pressure on f7, the timing of the d4 break, and the race to bring knights to the kingside. The Italian Game is one of the openings in the trainer on the Learn page."
+  ]
+ },
+ {
+  "id": "knight-outposts",
+  "title": "Knight outposts: squares that can't be taken back",
+  "topic": "Strategy",
+  "summary": "An outpost is a square no enemy pawn can ever attack. Put a knight there and it often outplays a bishop.",
+  "date": "2026-10-09",
+  "body": [
+   "An outpost is a square in or near your opponent's half that no enemy pawn can ever attack. A knight that lands there can only be removed by trading it off, and from a central outpost it reaches eight squares, several of them deep in the opponent's camp.",
+   "Outposts are created by pawn moves. Every pawn move leaves behind squares it can no longer guard, and once the neighbouring pawns have advanced or been traded, those squares are permanent.",
+   {
+    "board": {
+     "caption": "White's knight on d5 can never be attacked by a pawn: Black's c-pawn is gone and the e-pawn has gone past e6. Black's bishop is hemmed in by its own pawns on d6 and e5, which stand on its colour.",
+     "fen": "2r3k1/4bppp/3p4/1p1Np3/4P3/8/PP3PPP/2R3K1 w - - 0 1"
+    }
+   },
+   "The diagram shows one of the most common pictures in chess, a good knight against a bad bishop. The knight on d5 eyes c7, e7, f6 and b6, while the bishop on e7 can only shuffle along a few dark squares behind its own pawns.",
+   {
+    "h": "How to make an outpost"
+   },
+   "Because outposts come from your opponent's pawn moves, look for chances to provoke those moves, or to trade off the one pawn that could guard a square. A knight on the fifth rank supported by one of your own pawns is ideal: if it's captured, the pawn recaptures and keeps the square.",
+   {
+    "h": "How to fight one"
+   },
+   "If your opponent has a dominant knight, trade it for a bishop or a knight of your own as soon as you can, or change the pawn structure with a pawn break. In the diagram Black might try ...f5 to challenge e4 and open lines. A piece you can't chase away has to be exchanged or made irrelevant."
+  ]
+ },
+ {
+  "id": "open-files",
+  "title": "Rooks belong on open files",
+  "topic": "Strategy",
+  "summary": "Rooks need open lines to do anything. Take the open file, then aim for the seventh rank.",
+  "date": "2026-10-09",
+  "body": [
+   "Rooks are usually the last pieces to join the game, and they need open lines to do anything. A file with no pawns on it is open; one with only your opponent's pawn on it is half-open. Putting a rook on an open file, and then doubling rooks there, is one of the simplest ways to improve a position.",
+   {
+    "board": {
+     "caption": "White has doubled rooks on the only open file. Rd7 next puts a rook on the seventh rank, unless Black contests the file at once with ...Rfd8.",
+     "fen": "r4rk1/pp3ppp/2n1p3/8/8/2N1P3/PP1R1PPP/3R2K1 w - - 0 1"
+    }
+   },
+   {
+    "h": "Why the seventh rank"
+   },
+   "Once a rook controls a file, it can travel down it to the seventh rank (the second rank for Black). There it attacks pawns that haven't moved yet and keeps the enemy king shut in on the back rank. Two rooks on the seventh are often decisive on their own.",
+   {
+    "h": "Fighting for the file"
+   },
+   "When both sides want the same file, the player who doubles rooks first usually wins it: a single rook can be challenged and traded, but a doubled pair keeps the file after the exchange. If you can't win the file, put your rooks on squares that deny the entry points instead, so that the open file leads nowhere.",
+   {
+    "h": "Half-open files"
+   },
+   "A half-open file is just as useful when you're attacking. A rook behind the c-file in the Sicilian Defense, or on the e-file after an exchange of central pawns, piles up on the one pawn in its way and supports a breakthrough later."
+  ]
+ },
+ {
+  "id": "good-bad-bishop",
+  "title": "Good bishop, bad bishop",
+  "topic": "Strategy",
+  "summary": "A bishop is only as good as the pawns around it. How to recognise a bad bishop, and what to do with one.",
+  "date": "2026-10-09",
+  "body": [
+   "A bishop moves on squares of one colour for the whole game. When your own pawns are fixed on that colour, they block its lines and it becomes a “bad” bishop; when your pawns stand on the other colour, the bishop has open diagonals and is “good”.",
+   {
+    "board": {
+     "caption": "The French Defense, Advance Variation. Black's pawns on e6 and d5 stand on light squares, so the bishop on c8 has few prospects.",
+     "moves": "1. e4 e6 2. d4 d5 3. e5"
+    }
+   },
+   {
+    "h": "What to do with a bad bishop"
+   },
+   "There are three standard cures. Trade it: in the French, Black often plays ...b6 and ...Ba6 to exchange it for White's good light-squared bishop. Change the pawns: breaks such as ...c5 and ...f6 attack the chain and can free the bishop's diagonals. Or get it outside the chain before the pawns close it in.",
+   {
+    "board": {
+     "caption": "The Caro-Kann, Advance Variation: the same kind of pawn chain, but Black brought the bishop out to f5 before playing ...e6.",
+     "moves": "1. e4 c6 2. d4 d5 3. e5 Bf5 4. Nf3 e6"
+    }
+   },
+   {
+    "h": "Bad doesn't mean useless"
+   },
+   "A bad bishop can still be an excellent defender, guarding the pawns that block it. The label matters most in endgames, where a good knight or a good bishop against a bad bishop can be enough to win. When you plan your pawn moves, think about which of your bishops they help and which they bury."
+  ]
+ },
+ {
+  "id": "passed-pawns",
+  "title": "Passed pawns must be pushed",
+  "topic": "Endgames",
+  "summary": "A pawn with no enemy pawns in its way is a winning weapon in the endgame. How to use one, and how to stop one.",
+  "date": "2026-10-09",
+  "body": [
+   "A passed pawn has no enemy pawns in front of it on its own file or the files next to it, so only pieces can stop it. In the endgame, when there are fewer pieces left to do the stopping, a passed pawn is often the most important thing on the board.",
+   "An old saying puts it simply: passed pawns must be pushed. Every square a passed pawn advances makes it more dangerous and ties down more of your opponent's pieces.",
+   {
+    "h": "The outside passed pawn"
+   },
+   {
+    "board": {
+     "caption": "White's a-pawn is an outside passed pawn. White pushes it; Black's king has to run across to stop it, and White's king walks into the kingside pawns.",
+     "fen": "8/8/4k1pp/8/P3K3/6PP/8/8 w - - 0 1"
+    }
+   },
+   "A passed pawn far from the other pawns is called an outside passed pawn. Even if it can be stopped, it works as a decoy: the defending king has to go and deal with it, and the attacking king takes whatever it leaves behind. In king-and-pawn endings this is usually decisive.",
+   {
+    "h": "Protected and connected passed pawns"
+   },
+   "A passed pawn defended by another pawn can't be won by the enemy king, so it pins the defender in front of it. Two passed pawns side by side, connected passers, defend each other as they advance and can often beat a rook on their own once they reach the sixth rank.",
+   {
+    "h": "Stopping a passed pawn"
+   },
+   "The way to meet a passed pawn is to blockade it: put a piece on the square in front of it. A knight is an ideal blockader because it keeps its full range while it sits there, whereas a rook or queen doing the same job is wasted. And remember the rule of the square: if your king can step into the square drawn from the pawn to its promotion square, it catches the pawn in time."
+  ]
+ },
+ {
+  "id": "king-pawn-endings",
+  "title": "King and pawn endings: opposition and key squares",
+  "topic": "Endgames",
+  "summary": "Two ideas decide most king-and-pawn endings. Learn them once and you'll win the won ones and hold the drawn ones.",
+  "date": "2026-10-09",
+  "body": [
+   "With only kings and pawns left, every move counts and there is no hiding a mistake. Two ideas decide most of these endings: key squares and the opposition.",
+   {
+    "h": "Key squares"
+   },
+   "For a pawn that hasn't passed its fourth rank, the key squares are the three squares two ranks in front of it: for a pawn on e4, they are d6, e6 and f6. If the stronger side's king reaches a key square, the pawn promotes whoever is to move. So the fight is not about the pawn at all, but about whose king gets where first.",
+   {
+    "h": "The opposition"
+   },
+   "When the two kings face each other on the same file with one square between them, they are in opposition. The side that does not have to move has the opposition: the other king must step aside and let it through. Because the kings can't approach each other, having the opposition is how a king forces its way to a key square.",
+   {
+    "board": {
+     "caption": "White to move. The kings face each other and Black has the opposition, but White has a spare tempo: 1.e3! hands the move back. Now Black's king has to give way, and White's king reaches a key square.",
+     "fen": "8/8/4k3/8/4K3/8/4P3/8 w - - 0 1"
+    }
+   },
+   "Spare pawn moves like 1.e3 here are worth remembering: a pawn that can move one or two squares lets you choose who ends up with the opposition.",
+   {
+    "h": "King in front of the pawn"
+   },
+   {
+    "board": {
+     "caption": "White's king is on the sixth rank in front of its pawn, so White wins whoever is to move: Black's king must eventually step aside.",
+     "fen": "4k3/8/4K3/4P3/8/8/8/8 b - - 0 1"
+    }
+   },
+   "With the king on the sixth rank in front of its pawn (for any pawn except a rook's pawn), the stronger side wins no matter who moves. Rook's pawns are the exception: if the defending king reaches the corner in front of the pawn, the game is a draw. The endgame drills on the Learn page let you practise both against Stockfish."
+  ]
+ },
+ {
+  "id": "rook-endgames",
+  "title": "Two rook endings everyone should know",
+  "topic": "Endgames",
+  "summary": "Rook endings are the most common endings in chess. The Lucena position wins; the Philidor position draws.",
+  "date": "2026-10-09",
+  "body": [
+   "Rook endings come up more often than any other kind, and two positions sit at the heart of them. The Lucena position is the standard win with an extra pawn; the Philidor position is the standard way to hold the draw.",
+   {
+    "h": "The Lucena position: building a bridge"
+   },
+   {
+    "board": {
+     "caption": "The Lucena position. White's king is in front of the pawn, but the black rook is ready to give checks from the side as soon as it steps out.",
+     "fen": "1K1k4/1P6/8/8/8/8/r7/2R5 w - - 0 1"
+    }
+   },
+   "White wins with 1.Rd1+ Ke7 2.Rd4!, lifting the rook to the fourth rank. Now the king walks out: 2...Ra1 3.Kc7 Rc1+ 4.Kb6 Rb1+ 5.Kc6 Rc1+ 6.Kb5 Rb1+ 7.Rb4, and the rook blocks the last check. That is the bridge, and the pawn promotes.",
+   {
+    "board": {
+     "caption": "After 7.Rb4 the checks are over and the pawn promotes.",
+     "moves": "1. Rd1+ Ke7 2. Rd4 Ra1 3. Kc7 Rc1+ 4. Kb6 Rb1+ 5. Kc6 Rc1+ 6. Kb5 Rb1+ 7. Rb4",
+     "fen": "1K1k4/1P6/8/8/8/8/r7/2R5 w - - 0 1"
+    }
+   },
+   {
+    "h": "The Philidor position: the third-rank defence"
+   },
+   {
+    "board": {
+     "caption": "The Philidor position. Black's rook guards the sixth rank, so White's king can't come forward.",
+     "fen": "3k4/8/r7/3PK3/8/8/8/7R b - - 0 1"
+    }
+   },
+   "Black keeps the rook on the sixth rank (the third rank from Black's side), waiting with moves like ...Rb6. White's king can't advance without leaving the pawn behind. The moment White pushes the pawn to d6, the black rook drops to the first rank and checks from behind: the white king has no shelter from those checks, and the game is drawn.",
+   "Learn these two positions and many rook endings become simple: the attacker tries to reach a Lucena, the defender tries to reach a Philidor. Both are endgame drills on the Learn page, where you can play them out against Stockfish."
+  ]
+ },
+ {
+  "id": "checkmate-patterns",
+  "title": "Five checkmate patterns to recognise",
+  "topic": "Tactics",
+  "summary": "Most checkmates are variations on a handful of shapes. Spot the shape and the mate finds itself.",
+  "date": "2026-10-09",
+  "body": [
+   "Strong players don't calculate every mate from scratch; they recognise a familiar shape and then check that it works. Here are five of the most common.",
+   {
+    "h": "Back-rank mate"
+   },
+   {
+    "board": {
+     "caption": "White to move: Rd8 is mate. Black's own pawns take away every escape square.",
+     "fen": "6k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1"
+    }
+   },
+   "The king is boxed in on its back rank by its own pawns, and a rook or queen checks along the rank. The cure is cheap: a pawn move such as h6 (or h3 for White) gives the king an escape square, which is called making luft.",
+   {
+    "h": "Smothered mate"
+   },
+   {
+    "board": {
+     "caption": "White to move: Nf7 is mate. The king is surrounded by its own rook and pawns.",
+     "fen": "6rk/6pp/8/6N1/8/8/8/6K1 w - - 0 1"
+    }
+   },
+   "A knight checks a king that is completely surrounded by its own pieces. It often comes at the end of a queen sacrifice that forces a rook onto g8, a combination known as Philidor's legacy.",
+   {
+    "h": "Anastasia's mate"
+   },
+   {
+    "board": {
+     "caption": "White to move: Rh3 is mate. The knight on e7 covers g8 and g6.",
+     "fen": "8/4N1pk/8/8/8/R7/8/6K1 w - - 0 1"
+    }
+   },
+   "A knight on e7 (or e2) covers the squares next to a king trapped on the edge, and a rook or queen delivers check along the edge file.",
+   {
+    "h": "Arabian mate"
+   },
+   {
+    "board": {
+     "caption": "White to move: Rh7 is mate. The knight on f6 covers g8 and protects the rook.",
+     "fen": "7k/R7/5N2/8/8/8/8/6K1 w - - 0 1"
+    }
+   },
+   "One of the oldest patterns in chess: a rook next to the cornered king, defended by a knight that also covers the remaining escape square.",
+   {
+    "h": "Scholar's mate"
+   },
+   {
+    "board": {
+     "caption": "Queen and bishop meet on f7: checkmate in four moves.",
+     "moves": "1. e4 e5 2. Bc4 Nc6 3. Qh5 Nf6 4. Qxf7#"
+    }
+   },
+   "The queen and a bishop aim at f7 (or f2), the square only the king defends. Every beginner meets it once; after that, ...Qe7 or ...g6 at the right moment, or simply developing a piece that guards f7, stops it.",
+   "Solving puzzles by theme on the Puzzles page is the fastest way to make these patterns automatic."
+  ]
+ },
+ {
+  "id": "calculation",
+  "title": "How to calculate: checks, captures and threats",
+  "topic": "Improvement",
+  "summary": "A simple order for looking at moves that stops you missing the one that matters.",
+  "date": "2026-10-09",
+  "body": [
+   "Most tactical mistakes aren't failures of calculation depth; they are moves that were never looked at. A fixed order for looking at moves fixes most of that.",
+   {
+    "h": "Start with your opponent"
+   },
+   "Before choosing a move, ask what your opponent's last move does. What does it attack, what does it defend, what has it stopped guarding? Then ask the same question about the move you are about to play: what does it allow?",
+   {
+    "h": "Checks, captures, threats"
+   },
+   "Next, list the forcing moves, for both sides: checks first, then captures, then moves that make a direct threat. Forcing moves limit the replies, so they can be calculated to the end, and they are where almost every combination hides. Only after that, look at quiet moves.",
+   {
+    "board": {
+     "caption": "Black's 4...Qg5 attacks the knight on e5 and the pawn on g2 at once. The natural 5.Nxf7?? loses to 5...Qxg2 6.Rf1 Qxe4+ 7.Be2 Nf3#.",
+     "moves": "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nd4 4. Nxe5 Qg5"
+    }
+   },
+   "The position above comes from a well-known trap. White's 4.Nxe5 grabbed a pawn without asking what Black's forcing replies were; listing Black's checks, captures and threats first would have found 4...Qg5 before it happened.",
+   {
+    "h": "Candidate moves and stopping points"
+   },
+   "Pick two or three candidate moves and look at each one in turn rather than jumping between them. Follow each line until the position is quiet (no more checks, captures or immediate threats), then judge it: material, king safety, and piece activity. If a line keeps going, it isn't finished.",
+   {
+    "h": "Make it a habit"
+   },
+   "Rated puzzles train exactly this: every puzzle starts with a forcing move. Puzzle Rush trains recognition at speed, while longer puzzles (set the difficulty to Harder on the Puzzles page) train the patience to calculate to the end."
+  ]
+ },
+ {
+  "id": "review-routine",
+  "title": "Learning from your games: a review routine",
+  "topic": "Improvement",
+  "summary": "Playing a lot helps; looking back at what happened helps more. A short routine for reviewing a game.",
+  "date": "2026-10-09",
+  "body": [
+   "Playing more games makes you better, but reviewing them is where most of the learning happens. A review doesn't need to take long if you do it in the right order.",
+   {
+    "h": "1. Your own thoughts first"
+   },
+   "Before turning on any engine, go through the game and mark the moments where you were unsure, surprised, or short of time. Write down what you were thinking. In daily games the notes beside each game are made for this; for live games, a minute right after the game is enough.",
+   {
+    "h": "2. Find the turning point"
+   },
+   "Most games have one or two moments where the evaluation changed for good. Game Review marks them as key moments and shows them on the evaluation graph. Compare them with your own list: did you notice the critical moment while you were playing?",
+   {
+    "h": "3. Understand the mistake, then fix it"
+   },
+   "For each mistake, ask which kind it was: a tactic you missed, a plan that didn't fit the position, or a move made too fast. Then use Retry in Game Review to find a better move yourself before looking at the engine's suggestion. Finding it yourself sticks far better than reading it.",
+   {
+    "h": "4. Look for patterns across games"
+   },
+   "One loss tells you little; ten tell you a lot. The Insights page shows your accuracy by phase of the game, by colour and by time control, and how many mistakes you make per game. If most of your points disappear in the endgame, the endgame drills are a better use of your time than another opening.",
+   "Five minutes of review after each serious game adds up quickly. Make it part of the routine, like setting up the pieces."
+  ]
+ },
+ {
+  "id": "time-management",
+  "title": "Using your clock in rapid and blitz",
+  "topic": "Improvement",
+  "summary": "Running out of time loses as surely as being mated. How to spend your minutes where they matter.",
+  "date": "2026-10-09",
+  "body": [
+   "A good move played with two seconds left still loses if the clock falls. Managing the clock is a skill like any other, and in rapid and blitz it decides a lot of games.",
+   {
+    "h": "Have a budget"
+   },
+   "Divide your time by the number of moves you expect to play, say forty, to get an average. You won't spend exactly that on every move, but knowing it tells you when you are falling behind. With an increment, the time you get back after each move is part of the budget.",
+   {
+    "h": "Save time in the opening"
+   },
+   "Play the moves you know quickly. Time spent recalling a familiar line is time you won't have in the middlegame, when the position is new and the decisions are harder.",
+   {
+    "h": "Spend it at the critical moments"
+   },
+   "Slow down when the position changes character: when material is about to come off, when a pawn break opens the centre, when your opponent's move surprised you, or when you're deciding whether to go into an endgame. These are the moves where a few extra seconds pay back the most.",
+   {
+    "h": "When you're short of time"
+   },
+   "Keep things simple: choose safe moves, avoid complications you can't calculate, and keep your pieces protected. Premoves help when the reply is forced, such as a recapture, but a premove played without looking can blunder a piece. Settings has a low-time warning that ticks and turns the clock red under 20 seconds.",
+   "Above all, don't spend half your time on one move early in the game. A move that is a little worse but played on time is better than the best move with nothing left on the clock."
+  ]
+ },
+ {
+  "id": "opera-game",
+  "title": "Morphy's Opera Game, move by move",
+  "topic": "History",
+  "summary": "Seventeen moves played in a box at the Paris Opera in 1858, and still the best lesson in fast development.",
+  "date": "2026-10-09",
+  "body": [
+   "In 1858 the American Paul Morphy, the strongest player of his time, was invited to a box at the Paris Opera and played a casual game against two strong amateurs consulting together: the Duke Karl of Brunswick and Count Isouard. The result is probably the most famous short game ever played.",
+   {
+    "h": "A pin, and an early trade"
+   },
+   "After 1.e4 e5 2.Nf3 d6 3.d4 Bg4, Black pins the knight to the queen. Morphy simply took on e5: 4.dxe5 Bxf3 5.Qxf3 dxe5. Black has given up the bishop pair and White's queen is already active.",
+   {
+    "h": "Development over material"
+   },
+   "6.Bc4 Nf6 7.Qb3! attacks both f7 and b7. Black defends with 7...Qe7, and instead of grabbing the b7 pawn Morphy keeps developing: 8.Nc3 c6 9.Bg5 b5?, and now comes the sacrifice that opens the position.",
+   {
+    "board": {
+     "caption": "After 12.O-O-O. White has given a knight for two pawns, but every white piece is in play and Black's are tangled in pins.",
+     "moves": "1. e4 e5 2. Nf3 d6 3. d4 Bg4 4. dxe5 Bxf3 5. Qxf3 dxe5 6. Bc4 Nf6 7. Qb3 Qe7 8. Nc3 c6 9. Bg5 b5 10. Nxb5 cxb5 11. Bxb5+ Nbd7 12. O-O-O"
+    }
+   },
+   "10.Nxb5! cxb5 11.Bxb5+ Nbd7 12.O-O-O. The knight on d7 is pinned by the bishop on b5, and the rook on d1 is already lined up against it.",
+   {
+    "h": "The finish"
+   },
+   "12...Rd8 13.Rxd7! Rxd7 14.Rd1 Qe6 15.Bxd7+ Nxd7 16.Qb8+!! Nxb8 17.Rd8#. Morphy gives up his queen so that the last rook can deliver mate, protected by the bishop on g5.",
+   {
+    "board": {
+     "caption": "The final position: a rook and a bishop are enough because Black's pieces never got into the game.",
+     "moves": "1. e4 e5 2. Nf3 d6 3. d4 Bg4 4. dxe5 Bxf3 5. Qxf3 dxe5 6. Bc4 Nf6 7. Qb3 Qe7 8. Nc3 c6 9. Bg5 b5 10. Nxb5 cxb5 11. Bxb5+ Nbd7 12. O-O-O Rd8 13. Rxd7 Rxd7 14. Rd1 Qe6 15. Bxd7+ Nxd7 16. Qb8+ Nxb8 17. Rd8#"
+    }
+   },
+   "The lesson is the one every coach repeats: in an open position, the side with more pieces in play usually wins, whatever the material count says. The game is among the classic games you can replay move by move on the Watch page."
+  ]
+ },
+ {
+  "id": "world-championship",
+  "title": "A short history of the World Championship",
+  "topic": "History",
+  "summary": "From Steinitz in 1886 to Gukesh in 2024: the matches and the champions who shaped chess.",
+  "date": "2026-10-09",
+  "body": [
+   "The title of World Chess Champion has been decided over the board since 1886. Its history is also a history of how chess itself has been played.",
+   {
+    "h": "The first champions"
+   },
+   "Wilhelm Steinitz beat Johannes Zukertort in 1886 in the first match recognised as a World Championship. Steinitz is remembered as the father of positional play, the idea that small advantages can be accumulated and converted. He lost the title in 1894 to Emanuel Lasker, who held it for 27 years, the longest reign in the title's history.",
+   "José Raúl Capablanca, famous for his effortless endgame technique, took the title from Lasker in 1921 and lost it to Alexander Alekhine in 1927. Alekhine, an attacking genius, lost to Max Euwe in 1935, won the rematch in 1937, and died as champion in 1946.",
+   {
+    "h": "The Soviet era"
+   },
+   "With the title vacant, FIDE organised a match-tournament in 1948, won by Mikhail Botvinnik. Soviet players then held the title for 24 years: Botvinnik, Vasily Smyslov, Mikhail Tal, Tigran Petrosian and Boris Spassky.",
+   "In 1972 in Reykjavik, the American Bobby Fischer beat Spassky in the most famous match of all, played at the height of the Cold War. Fischer did not defend the title, and Anatoly Karpov became champion in 1975 without a match.",
+   {
+    "h": "Kasparov and the split"
+   },
+   "Garry Kasparov beat Karpov in 1985 and held the title for fifteen years; the two played five world championship matches in all. In 1993 Kasparov and Nigel Short played their match outside FIDE, and for thirteen years there were two world champions. Vladimir Kramnik took the “classical” title from Kasparov in 2000 and won the reunification match against Veselin Topalov in 2006.",
+   {
+    "h": "The modern era"
+   },
+   "Viswanathan Anand became undisputed champion in 2007 and defended the title three times. Magnus Carlsen beat Anand in 2013 and defended it in 2014, 2016, 2018 and 2021 before choosing not to play the 2023 match. Ding Liren won that match against Ian Nepomniachtchi, and in December 2024 Gukesh Dommaraju of India beat Ding to become, at 18, the youngest undisputed world champion in history."
+  ]
+ }
+]

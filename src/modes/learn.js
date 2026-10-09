@@ -11,6 +11,7 @@ import { playEngine } from "../core/engines.js";
 import { moveSound, SFX } from "../audio.js";
 import { THEME_INFO, loadPuzzles, themesAvailable } from "../puzzles.js";
 import { VIDEO_LESSONS } from "../video-lessons.js";
+import { loadArticles, articleTiles } from "../screens/articles.js";
 
 const GOOD = "rgba(82,179,106,.6)", BAD = "rgba(224,55,42,.55)";
 
@@ -50,6 +51,12 @@ export class LearnPage {
       h("div.grid-cards", ...POPULAR_OPENINGS.map(o => h("button.tile", { onclick: () => this.app.go(`#/opening/${o.id}`) },
         h("b", o.name), h("small", o.blurb), h("small", `${o.eco} · as ${o.side === "w" ? "White" : "Black"}`),
         p.openings[o.id] ? h("span.done", `✓ Practiced ${p.openings[o.id]}×`) : null)))));
+    // articles: written guides, loaded with the page's data
+    addChip("Articles", "learn-articles");
+    const articles = h("div", h("p.note", "Loading…"));
+    page.append(h("section", { id: "learn-articles" }, h("h2", "Articles"), articles));
+    loadArticles().then((list) => articles.replaceChildren(articleTiles(this.app, list)))
+      .catch(() => articles.replaceChildren(h("p.note", "Couldn't load the articles right now.")));
     // video lessons: series you've opened are remembered on this device
     let opened = {};
     try { opened = JSON.parse(localStorage.getItem("c3d-video-lessons") || "{}"); } catch { /* storage blocked */ }
