@@ -80,6 +80,7 @@ const SCHEMA = [
   // more devices on the same profile: each linked device has its own key
   `CREATE TABLE IF NOT EXISTS social_keys (hash TEXT PRIMARY KEY, uid TEXT NOT NULL, created INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS social_keys_uid ON social_keys (uid)`,
+  `CREATE INDEX IF NOT EXISTS social_users_name ON social_users (name COLLATE NOCASE)`,
   `CREATE TABLE IF NOT EXISTS social_links (code TEXT PRIMARY KEY, uid TEXT NOT NULL, expires INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS social_backups (uid TEXT PRIMARY KEY, data TEXT NOT NULL, updated INTEGER NOT NULL)`,
 ];
@@ -236,6 +237,10 @@ export class Social {
     return u;
   }
 
+  private async nameTaken(name: string, exceptId: string): Promise<boolean> {
+    return !!(await this.q("SELECT 1 AS x FROM social_users WHERE name = ? COLLATE NOCASE AND id <> ?", name, exceptId).first());
+  }
+
   private async user(id: string): Promise<UserRow | null> {
     return this.q("SELECT * FROM social_users WHERE id = ?", id).first<UserRow>();
   }
@@ -271,6 +276,11 @@ export class Social {
       const secret = randomSecret();
       const id = "u_" + randomString(12).toLowerCase();
       let code = randomString(8);
+      // names are unique (ignoring case): a taken one gets a number on the end
+      let finalName = name;
+      for (let i = 0; i < 6 && (await this.nameTaken(finalName, "")); i++) {
+        finalName = name.slice(0, 11) + String(Math.floor(10 + Math.random() * (i < 3 ? 990 : 99990)));
+      }
       const [recent, taken] = await this.many(
         this.q("SELECT COUNT(*) AS n FROM social_reg_log WHERE ip = ? AND at > ?", ip, now - 3_600_000),
         this.q("SELECT 1 AS x FROM social_users WHERE code = ?", code));
@@ -278,9 +288,9 @@ export class Social {
       for (let i = 0; taken?.length && i < 4 && (await this.q("SELECT 1 AS x FROM social_users WHERE code = ?", code).first()); i++) code = randomString(8);
       await this.many(
         this.q("INSERT INTO social_users (id, secret_hash, code, name, avatar, created, last_seen) VALUES (?, ?, ?, ?, ?, ?, ?)",
-          id, await sha256(secret), code, name, cleanAvatar(b["avatar"]), now, now),
+          id, await sha256(secret), code, finalName, cleanAvatar(b["avatar"]), now, now),
         this.q("INSERT INTO social_reg_log (ip, at) VALUES (?, ?)", ip, now));
-      return { id, secret, code, name };
+      return { id, secret, code, name: finalName };
     }
 
     // POST /link/claim {code}: sign this device in to a profile with a code made on another device
@@ -346,7 +356,9 @@ export class Social {
     if (method === "POST" && path === "/heartbeat") {
       const b = await body(request);
       const status = b["status"] === "playing" ? "playing" : "online";
-      const name = NAME_RE.test(str(b["name"], 16)) ? str(b["name"], 16) : me.name;
+      // a rename only goes through if nobody else has that name
+      const wanted = NAME_RE.test(str(b["name"], 16)) ? str(b["name"], 16) : me.name;
+      const name = wanted.toLowerCase() === me.name.toLowerCase() || !(await this.nameTaken(wanted, me.id)) ? wanted : me.name;
       const avatar = b["avatar"] ? cleanAvatar(b["avatar"]) : me.avatar;
       const ratings = (b["ratings"] && typeof b["ratings"] === "object" ? b["ratings"] : {}) as Record<string, unknown>;
       const vals: Record<string, number> = {};
@@ -619,6 +631,12 @@ export class Social {
         this.q(`DELETE FROM social_games WHERE uid = ? AND id NOT IN (
             SELECT id FROM social_games WHERE uid = ? ORDER BY created DESC LIMIT ?)`, me.id, me.id, GAMES_KEPT));
       return { ok: true };
+    }
+
+    // GET /names?n=: is a name free?
+    if (method === "GET" && path === "/names") {
+      const n = str(url.searchParams.get("n"), 16);
+      return { name: n, valid: NAME_RE.test(n), available: NAME_RE.test(n) && !(await this.nameTaken(n, me.id)) };
     }
 
     // GET /search?q=: players whose name starts with q (most recently active first)

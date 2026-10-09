@@ -7,7 +7,7 @@ import { BOARD_THEMES as B3, PIECE_THEMES as P3 } from "../board3d.js";
 import { BOARD_THEMES as B2, PIECE_THEMES as P2 } from "../board2d.js";
 import { MoveTree } from "../core/tree.js";
 import { createChess } from "../core/chess960.js";
-import { registered as socialOn, leave as leaveSocial } from "../net/social.js";
+import { registered as socialOn, leave as leaveSocial, api as socialApi } from "../net/social.js";
 import { accountSection } from "./account.js";
 
 const EMOJIS = ["♞", "♛", "♜", "♝", "♚", "♟", "🦁", "🦊", "🐺", "🦉", "🐉", "🐙", "🦅", "🐢", "🎩", "👑", "⚡", "🔥", "🌙", "🍀"];
@@ -154,9 +154,17 @@ export class ProfilePage {
       title: "Edit profile",
       body: [h("div.field", h("label", "Display name (letters, numbers, _)"), name), h("div.field", h("div.lbl", "Avatar"), emojiGrid), h("div.field", h("div.lbl", "Color"), bgGrid),
         h("button.btn.primary.block", {
-          onclick: () => {
+          onclick: async () => {
             const n = name.value.replace(/[^A-Za-z0-9_]/g, "").slice(0, 16);
             if (!n) { toast("Pick a name with letters or numbers."); return; }
+            // with a profile, names are unique across players
+            if (socialOn() && n.toLowerCase() !== p.name.toLowerCase()) {
+              try {
+                const r = await socialApi("GET", "/names?n=" + encodeURIComponent(n));
+                if (!r.valid) { toast("Names need 2 to 16 letters, numbers or _."); return; }
+                if (!r.available) { toast(`${n} is taken. Try another name.`); return; }
+              } catch (e) { toast(e.message); return; }
+            }
             updateProfile(pr => { pr.name = n; pr.avatar = { emoji, bg }; });
             m.close(); this.render();
           },

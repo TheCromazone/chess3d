@@ -107,7 +107,14 @@ export function startSocial(app) {
       });
     }
   });
-  S.onSocial((st) => app.setNavBadge("social", st.unread + st.requests));
+  S.onSocial((st) => {
+    app.setNavBadge("social", st.unread + st.requests);
+    if (st.signedOut) {
+      st.signedOut = false;
+      toast("This device was signed out of your profile. Sign in again from Social.");
+      if (app.controller instanceof SocialScreen) app.controller.render();
+    }
+  });
   S.startHeartbeat();
 }
 

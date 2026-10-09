@@ -214,6 +214,17 @@ clock += 11 * 60_000;
 ok((await call("POST", "/link/claim", { body: { code: stale.code }, ip: "3.3.3.4" })).status === 404, "link codes expire after 10 minutes");
 function LINK_WAIT() { return 1000; }
 
+// names are unique
+const ann2 = (await call("POST", "/register", { body: { name: "ann" }, ip: "4.4.4.4" })).data;
+ok(ann2.name !== "ann" && ann2.name.toLowerCase().startsWith("ann"), "a taken name gets a number on the end");
+ok((await call("GET", "/names", { secret: ann2.secret, query: "?n=ANN" })).data.available === false, "name checks ignore case");
+await call("POST", "/heartbeat", { secret: ann2.secret, body: { name: "Ann" } });
+ok((await call("GET", "/me", { secret: ann2.secret })).data.me.name === ann2.name, "renaming to someone else's name doesn't go through");
+await call("POST", "/heartbeat", { secret: ann.secret, body: { name: "ANN" } });
+ok((await call("GET", "/me", { secret: ann.secret })).data.me.name === "ANN", "you can change the case of your own name");
+await call("POST", "/heartbeat", { secret: ann.secret, body: { name: "Ann" } });
+await call("POST", "/delete", { secret: ann2.secret });
+
 // finding players by name
 const found = (await call("GET", "/search", { secret: ann.secret, query: "?q=ci" })).data.players;
 ok(found.length === 1 && found[0].name === "Cid", "players can be found by the start of their name");

@@ -1,7 +1,7 @@
 // Social client: friends and presence, direct messages and challenges, clubs, and the global
 // leaderboard, served by the game's Higgsfield project (server/social.ts). There's no sign-in:
 // this device registers once and keeps a private key; the 8-character friend code is what you share.
-import { getProfile, getSocialId, setSocialId, exportAll, importAll } from "../store.js";
+import { getProfile, updateProfile, getSocialId, setSocialId, exportAll, importAll } from "../store.js";
 import { live } from "./room.js";
 
 const HOST = "https://timely-ibis-513.higgsfield.app";
@@ -46,8 +46,9 @@ export async function api(method, path, body) {
   }
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && id) {
-    // the server no longer knows this key (deleted elsewhere): forget it so the page offers to join again
+    // the server no longer knows this key (signed out or deleted elsewhere): forget it here too
     setSocialId(null);
+    state.signedOut = true;
     reset();
   }
   if (!res.ok) {
@@ -62,6 +63,8 @@ export async function join() {
   const p = getProfile();
   const r = await api("POST", "/register", { name: socialName(p.name), avatar: p.avatar });
   setSocialId({ id: r.id, secret: r.secret, code: r.code, created: Date.now() });
+  // names are unique across players: adopt the one the server gave us
+  if (r.name !== p.name) updateProfile(pr => { pr.name = r.name; });
   await beat();
   backupNow().catch(() => {});
   return r;
@@ -174,6 +177,8 @@ export async function beat() {
   }
   state.offline = false;
   state.me = r.me;
+  // a rename to a taken name doesn't go through: keep this device in step with what others see
+  if (r.me && r.me.name !== socialName(p.name)) { state.nameTaken = socialName(p.name); updateProfile(pr => { pr.name = r.me.name; }); }
   state.unread = r.unread;
   state.requests = r.requests;
   // the newest unread messages: on the first beat after loading only fresh live challenges pop up
