@@ -98,6 +98,16 @@ const SCHEMA = [
      created INTEGER NOT NULL, hidden INTEGER NOT NULL DEFAULT 0)`,
   `CREATE INDEX IF NOT EXISTS social_posts_topic ON social_posts (topic, id)`,
   `CREATE TABLE IF NOT EXISTS social_reports (kind TEXT NOT NULL, item TEXT NOT NULL, uid TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY (kind, item, uid))`,
+  // blogs: articles players write, with likes; and the coach directory (players offering lessons)
+  `CREATE TABLE IF NOT EXISTS social_blogs (
+     id TEXT PRIMARY KEY, uid TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL, created INTEGER NOT NULL,
+     likes INTEGER NOT NULL DEFAULT 0, hidden INTEGER NOT NULL DEFAULT 0)`,
+  `CREATE INDEX IF NOT EXISTS social_blogs_recent ON social_blogs (hidden, created)`,
+  `CREATE INDEX IF NOT EXISTS social_blogs_uid ON social_blogs (uid, created)`,
+  `CREATE TABLE IF NOT EXISTS social_blog_likes (blog TEXT NOT NULL, uid TEXT NOT NULL, PRIMARY KEY (blog, uid))`,
+  `CREATE TABLE IF NOT EXISTS social_coaches (
+     uid TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT '', bio TEXT NOT NULL, langs TEXT NOT NULL DEFAULT '',
+     rate TEXT NOT NULL DEFAULT '', topics TEXT NOT NULL DEFAULT '', updated INTEGER NOT NULL, hidden INTEGER NOT NULL DEFAULT 0)`,
   // web push: the server's VAPID key pair, each device's push endpoint, and "your move" notes
   `CREATE TABLE IF NOT EXISTS social_config (k TEXT PRIMARY KEY, v TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS social_push (endpoint TEXT PRIMARY KEY, uid TEXT NOT NULL, created INTEGER NOT NULL)`,
@@ -131,7 +141,7 @@ const VIDEO_CHANNELS = [
   { channel: "GothamChess", id: "UCQHX6ViZmPsWiYSFAyS0a3Q" },
   { channel: "Chess.com", id: "UC5kS0l76kC0xOzMPtOmSFGw" },
   { channel: "Saint Louis Chess Club", id: "UCM-ONC2bCHytG2mYtKDmIeA" },
-  { channel: "Daniel Naroditsky", id: "UCHP9CdeguNUI-_nBv_UXBhw" },
+  { channel: "agadmator", id: "UCL5YbN5WLFD8dLIegT5QAbA" },
   { channel: "Hanging Pawns", id: "UCkJdvwRC-oGPhRHW_XPNokg" },
 ];
 function decode(s: string): string {
@@ -150,6 +160,15 @@ function httpsUrl(u: string): string | null {
 // Forums: a few fixed categories; anything three different players report is hidden
 const FORUM_CATS = ["general", "openings", "tactics", "endgames", "help"];
 const REPORTS_TO_HIDE = 3;
+// what can be reported: [table, key column]
+const REPORTABLE: Record<string, [string, string]> = {
+  topic: ["social_topics", "id"], post: ["social_posts", "id"], blog: ["social_blogs", "id"], coach: ["social_coaches", "uid"],
+};
+const authorOf = (r: Record<string, unknown>) => {
+  let avatar: unknown = null;
+  try { avatar = r["avatar"] ? JSON.parse(String(r["avatar"])) : null; } catch { avatar = null; }
+  return { id: r["uid"], name: r["name"] ?? "Deleted player", avatar };
+};
 
 const LINK_MS = 10 * 60_000;         // a device link code works for 10 minutes, once
 const BACKUP_MAX = 1_800_000;        // characters; D1 rows top out at 2 MB
@@ -854,8 +873,10 @@ export class Social {
       return { ok: true };
     }
 
-    // ---- forums ----
+    // ---- forums, blogs, coaches ----
     if (seg0 === "forums" || path === "/report") return this.forums(request, me, seg, url, now);
+    if (seg0 === "blogs") return this.blogs(request, me, seg, url, now);
+    if (seg0 === "coaches") return this.coaches(request, me, seg, now);
 
     // GET /names?n=: is a name free?
     if (method === "GET" && path === "/names") {
@@ -901,6 +922,9 @@ export class Social {
         this.q("DELETE FROM social_backups WHERE uid = ?", me.id),
         this.q("DELETE FROM social_posts WHERE uid = ?", me.id),
         this.q("DELETE FROM social_topics WHERE uid = ?", me.id),
+        this.q("DELETE FROM social_blog_likes WHERE blog IN (SELECT id FROM social_blogs WHERE uid = ?)", me.id),
+        this.q("DELETE FROM social_blogs WHERE uid = ?", me.id),
+        this.q("DELETE FROM social_coaches WHERE uid = ?", me.id),
         this.q("DELETE FROM social_reports WHERE uid = ?", me.id),
         this.q("DELETE FROM social_push WHERE uid = ?", me.id),
         this.q("DELETE FROM social_notes WHERE uid = ?", me.id),
@@ -1148,20 +1172,16 @@ export class Social {
 
   private async forums(request: Request, me: UserRow, seg: string[], url: URL, now: number): Promise<unknown> {
     const method = request.method;
-    const author = (r: Record<string, unknown>) => {
-      let avatar: unknown = null;
-      try { avatar = r["avatar"] ? JSON.parse(String(r["avatar"])) : null; } catch { avatar = null; }
-      return { id: r["uid"], name: r["name"] ?? "Deleted player", avatar };
-    };
-    // POST /report {kind: "topic" | "post", id}
+    const author = authorOf;
+    // POST /report {kind: "topic" | "post" | "blog" | "coach", id}
     if (method === "POST" && seg[0] === "report") {
       const b = await body(request);
-      const kind = b["kind"] === "post" ? "post" : "topic", item = str(String(b["id"] ?? ""), 32);
-      const table = kind === "post" ? "social_posts" : "social_topics";
+      const kind = String(b["kind"]) in REPORTABLE ? String(b["kind"]) : "topic", item = str(String(b["id"] ?? ""), 32);
+      const [table, key] = REPORTABLE[kind]!;
       const [, count] = await this.many(
         this.q("INSERT OR IGNORE INTO social_reports (kind, item, uid, created) VALUES (?, ?, ?, ?)", kind, item, me.id, now),
         this.q("SELECT COUNT(*) AS n FROM social_reports WHERE kind = ? AND item = ?", kind, item));
-      if (Number(count?.[0]?.["n"] ?? 0) >= REPORTS_TO_HIDE) await this.q(`UPDATE ${table} SET hidden = 1 WHERE id = ?`, item).run();
+      if (Number(count?.[0]?.["n"] ?? 0) >= REPORTS_TO_HIDE) await this.q(`UPDATE ${table} SET hidden = 1 WHERE ${key} = ?`, item).run();
       return { ok: true };
     }
     // GET /forums?cat=: topics, most recently active first
@@ -1224,6 +1244,88 @@ export class Social {
       await this.many(
         this.q("UPDATE social_topics SET replies = replies - 1 WHERE id = ? AND EXISTS (SELECT 1 FROM social_posts WHERE id = ? AND topic = ? AND uid = ?)", id, pid, id, me.id),
         this.q("DELETE FROM social_posts WHERE id = ? AND topic = ? AND uid = ?", pid, id, me.id));
+      return { ok: true };
+    }
+    throw new HttpError(404, "not found");
+  }
+
+  private async blogs(request: Request, me: UserRow, seg: string[], url: URL, now: number): Promise<unknown> {
+    const method = request.method;
+    // GET /blogs (?by=player): the newest posts, each with the start of its text
+    if (method === "GET" && seg.length === 1) {
+      const by = url.searchParams.get("by") ? str(url.searchParams.get("by"), 32) : null;
+      const r = await this.q(`SELECT b.id, b.uid, b.title, substr(b.body, 1, 280) AS excerpt, b.created, b.likes, u.name, u.avatar FROM social_blogs b
+          LEFT JOIN social_users u ON u.id = b.uid WHERE b.hidden = 0 AND (? IS NULL OR b.uid = ?) ORDER BY b.created DESC LIMIT 50`, by, by).all();
+      return { posts: r.results.map((p) => ({ id: p["id"], title: p["title"], excerpt: p["excerpt"], created: p["created"], likes: p["likes"], author: authorOf(p), mine: p["uid"] === me.id })) };
+    }
+    // POST /blogs {title, body}: publish a post
+    if (method === "POST" && seg.length === 1) {
+      const b = await body(request);
+      const title = cleanText(b["title"], 120).trim(), text = cleanText(b["body"], 20000).trim();
+      if (title.length < 4) throw new HttpError(400, "titles need at least 4 characters");
+      if (text.length < 20) throw new HttpError(400, "write at least a few sentences");
+      await this.rateLimit("SELECT COUNT(*) AS n FROM social_blogs WHERE uid = ? AND created > ?", [me.id, now - 86_400_000], 5, "blog posts today");
+      const id = "b_" + randomString(10).toLowerCase();
+      await this.q("INSERT INTO social_blogs (id, uid, title, body, created) VALUES (?, ?, ?, ?, ?)", id, me.id, title, text, now).run();
+      return { id };
+    }
+    const id = str(seg[1], 32);
+    // GET /blogs/:id: the whole post
+    if (method === "GET" && seg.length === 2) {
+      const [post, liked] = await this.many(
+        this.q(`SELECT b.*, u.name, u.avatar FROM social_blogs b LEFT JOIN social_users u ON u.id = b.uid WHERE b.id = ? AND b.hidden = 0`, id),
+        this.q("SELECT 1 AS x FROM social_blog_likes WHERE blog = ? AND uid = ?", id, me.id));
+      const p = post?.[0];
+      if (!p) throw new HttpError(404, "that post was removed");
+      return { post: { id: p["id"], title: p["title"], body: p["body"], created: p["created"], likes: p["likes"], liked: !!liked?.length, author: authorOf(p), mine: p["uid"] === me.id } };
+    }
+    // POST /blogs/:id/like: like it, or take the like back
+    if (method === "POST" && seg[2] === "like") {
+      const had = await this.q("SELECT 1 AS x FROM social_blog_likes WHERE blog = ? AND uid = ?", id, me.id).first();
+      if (had) {
+        await this.many(this.q("DELETE FROM social_blog_likes WHERE blog = ? AND uid = ?", id, me.id), this.q("UPDATE social_blogs SET likes = likes - 1 WHERE id = ?", id));
+      } else {
+        const exists = await this.q("SELECT 1 AS x FROM social_blogs WHERE id = ? AND hidden = 0", id).first();
+        if (!exists) throw new HttpError(404, "that post was removed");
+        await this.many(this.q("INSERT OR IGNORE INTO social_blog_likes (blog, uid) VALUES (?, ?)", id, me.id), this.q("UPDATE social_blogs SET likes = likes + 1 WHERE id = ?", id));
+      }
+      return { liked: !had };
+    }
+    // POST /blogs/:id/delete: authors remove their own posts
+    if (method === "POST" && seg[2] === "delete") {
+      await this.many(
+        this.q("DELETE FROM social_blog_likes WHERE blog = ? AND EXISTS (SELECT 1 FROM social_blogs WHERE id = ? AND uid = ?)", id, id, me.id),
+        this.q("DELETE FROM social_blogs WHERE id = ? AND uid = ?", id, me.id));
+      return { ok: true };
+    }
+    throw new HttpError(404, "not found");
+  }
+
+  private async coaches(request: Request, me: UserRow, seg: string[], now: number): Promise<unknown> {
+    const method = request.method;
+    // GET /coaches: players offering lessons, most recently updated first
+    if (method === "GET" && seg.length === 1) {
+      type Row = UserRow & { c_title: string; c_bio: string; c_langs: string; c_rate: string; c_topics: string; c_updated: number };
+      const r = await this.q(`SELECT u.*, c.title AS c_title, c.bio AS c_bio, c.langs AS c_langs, c.rate AS c_rate, c.topics AS c_topics, c.updated AS c_updated
+          FROM social_coaches c JOIN social_users u ON u.id = c.uid WHERE c.hidden = 0 ORDER BY c.updated DESC LIMIT 100`).all<Row>();
+      return {
+        coaches: r.results.map((x) => ({ user: publicUser(x, now), title: x.c_title, bio: x.c_bio, langs: x.c_langs, rate: x.c_rate, topics: x.c_topics, updated: x.c_updated, mine: x.id === me.id })),
+      };
+    }
+    // POST /coaches {title, bio, langs, rate, topics}: list yourself as a coach, or update your listing
+    if (method === "POST" && seg.length === 1) {
+      const b = await body(request);
+      const bio = cleanText(b["bio"], 1500).trim();
+      if (bio.length < 40) throw new HttpError(400, "tell students a little more about how you teach (40 characters or more)");
+      const field = (k: string, max: number) => cleanText(b[k], max).replace(/\s+/g, " ").trim();
+      await this.q(`INSERT INTO social_coaches (uid, title, bio, langs, rate, topics, updated) VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT (uid) DO UPDATE SET title = excluded.title, bio = excluded.bio, langs = excluded.langs, rate = excluded.rate, topics = excluded.topics, updated = excluded.updated`,
+        me.id, field("title", 40), bio, field("langs", 80), field("rate", 60), field("topics", 120), now).run();
+      return { ok: true };
+    }
+    // POST /coaches/remove: take your listing down
+    if (method === "POST" && seg[1] === "remove") {
+      await this.q("DELETE FROM social_coaches WHERE uid = ?", me.id).run();
       return { ok: true };
     }
     throw new HttpError(404, "not found");

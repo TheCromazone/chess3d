@@ -268,6 +268,43 @@ await call("POST", "/report", { secret: rep3.secret, body: { kind: "topic", id: 
 ok((await call("GET", `/forums/${t1.id}`, { secret: ann.secret })).status === 404, "three reports hide it");
 await call("POST", "/delete", { secret: rep3.secret });
 
+// blogs
+const bp = (await call("POST", "/blogs", { secret: ann.secret, body: { title: "How I beat the London", body: "Play ...c5 early, then ...Qb6.\nIt works." } })).data;
+ok(bp.id && bp.id.startsWith("b_"), "a blog post can be published");
+ok((await call("POST", "/blogs", { secret: ann.secret, body: { title: "Hi", body: "too short" } })).status === 400, "blog posts need a title and some text");
+let feed = (await call("GET", "/blogs", { secret: cid.secret })).data.posts;
+ok(feed[0].id === bp.id && feed[0].author.name === "Ann" && feed[0].excerpt.startsWith("Play ...c5") && !feed[0].mine, "the blog feed shows the newest posts");
+ok((await call("GET", "/blogs", { secret: cid.secret, query: `?by=${ann.id}` })).data.posts.length === 1 && (await call("GET", "/blogs", { secret: cid.secret, query: `?by=${cid.id}` })).data.posts.length === 0, "and one player's posts");
+ok((await call("POST", `/blogs/${bp.id}/like`, { secret: cid.secret })).data.liked === true, "a post can be liked");
+await call("POST", `/blogs/${bp.id}/like`, { secret: dee.secret });
+let full = (await call("GET", `/blogs/${bp.id}`, { secret: cid.secret })).data.post;
+ok(full.likes === 2 && full.liked && full.body.includes("\n"), "likes count, and the body keeps its line breaks");
+await call("POST", `/blogs/${bp.id}/like`, { secret: cid.secret });
+ok((await call("GET", `/blogs/${bp.id}`, { secret: cid.secret })).data.post.likes === 1, "liking again takes the like back");
+await call("POST", `/blogs/${bp.id}/delete`, { secret: cid.secret });
+ok((await call("GET", `/blogs/${bp.id}`, { secret: ann.secret })).status === 200, "only the author can delete a post");
+for (let i = 0; i < 5; i++) await call("POST", "/blogs", { secret: dee.secret, body: { title: `Post number ${i}`, body: "Some thoughts about the game today." } });
+ok((await call("POST", "/blogs", { secret: dee.secret, body: { title: "One too many", body: "Some thoughts about the game today." } })).status === 429, "five posts a day");
+await call("POST", `/blogs/${bp.id}/delete`, { secret: ann.secret });
+ok((await call("GET", `/blogs/${bp.id}`, { secret: ann.secret })).status === 404, "the author can delete it");
+
+// the coach directory
+ok((await call("POST", "/coaches", { secret: cid.secret, body: { bio: "Hi" } })).status === 400, "a coach listing needs a real description");
+ok((await call("POST", "/coaches", { secret: cid.secret, body: { title: "FM", bio: "I teach club players to think in plans, with homework and game reviews.", langs: "English, Spanish", rate: "$30 an hour", topics: "openings, endgames" } })).data.ok, "a player can list themselves as a coach");
+let coaches = (await call("GET", "/coaches", { secret: dee.secret })).data.coaches;
+ok(coaches.length === 1 && coaches[0].user.name === "Cid" && coaches[0].title === "FM" && coaches[0].langs === "English, Spanish" && !coaches[0].mine, "the directory lists coaches with their details");
+await call("POST", "/coaches", { secret: cid.secret, body: { title: "IM", bio: "I teach club players to think in plans, with homework and game reviews.", rate: "$40 an hour" } });
+coaches = (await call("GET", "/coaches", { secret: cid.secret })).data.coaches;
+ok(coaches.length === 1 && coaches[0].title === "IM" && coaches[0].rate === "$40 an hour" && coaches[0].mine, "updating a listing replaces it");
+for (const u of [ann, dee]) await call("POST", "/report", { secret: u.secret, body: { kind: "coach", id: cid.id } });
+const rep4 = (await call("POST", "/register", { body: { name: "Roy" }, ip: "6.6.6.6" })).data;
+await call("POST", "/report", { secret: rep4.secret, body: { kind: "coach", id: cid.id } });
+ok((await call("GET", "/coaches", { secret: ann.secret })).data.coaches.length === 0, "three reports hide a coach listing");
+await call("POST", "/delete", { secret: rep4.secret });
+await call("POST", "/coaches", { secret: dee.secret, body: { bio: "Patient lessons for beginners and returning players, any age." } });
+await call("POST", "/coaches/remove", { secret: dee.secret });
+ok((await call("GET", "/coaches", { secret: ann.secret })).data.coaches.length === 0, "a coach can take their listing down");
+
 // notifications when the app is closed: web push with VAPID
 const key = (await call("GET", "/push/key", { secret: ann.secret })).data.key;
 ok(/^[A-Za-z0-9_-]{87}$/.test(key), "the server publishes a P-256 VAPID key");

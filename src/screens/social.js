@@ -16,6 +16,8 @@ const TABS = [
   { id: "messages", label: "Messages" },
   { id: "clubs", label: "Clubs" },
   { id: "forums", label: "Forums" },
+  { id: "blogs", label: "Blogs" },
+  { id: "coaches", label: "Coaches" },
   { id: "leaderboard", label: "Leaderboard" },
 ];
 const FORUM_LABEL = { general: "General", openings: "Openings", tactics: "Tactics", endgames: "Endgames", help: "Help and feedback" };
@@ -168,7 +170,8 @@ export class SocialScreen {
     const tok = this.tok;
     const run = { friends: () => this._friends(tok), messages: () => (this.view.chat ? this._thread(tok, this.view.chat) : this._conversations(tok)),
       clubs: () => (this.view.club ? this._club(tok, this.view.club) : this._clubs(tok)), leaderboard: () => this._leaderboard(tok),
-      forums: () => (this.view.topic ? this._topic(tok, this.view.topic) : this._forums(tok)) };
+      forums: () => (this.view.topic ? this._topic(tok, this.view.topic) : this._forums(tok)),
+      blogs: () => (this.view.blog ? this._blogPost(tok, this.view.blog) : this._blogs(tok)), coaches: () => this._coaches(tok) };
     (run[this.view.tab] || run.friends)();
   }
 
@@ -663,6 +666,145 @@ export class SocialScreen {
       h("div.thread-posts", post({ ...t, mine: t.mine }, "topic", `/forums/${t.id}/delete`),
         ...d.posts.map(p => post(p, "post", `/forums/${t.id}/posts/${p.id}/delete`))),
       h("section.card.reply-box", reply, h("div.btn-row.reply-actions", send)));
+  }
+
+  // ---------- blogs ----------
+  async _blogs(tok) {
+    const box = h("div.rows", h("p.note", "Loading posts…"));
+    this.body.replaceChildren(h("div.forum-bar", h("p.note.grow", "Articles by players: game stories, opening ideas, study notes."),
+      h("button.btn.primary", { onclick: () => this._writeBlog() }, icon("edit", 18), "Write a post")), box);
+    const draw = (d) => {
+      box.replaceChildren(...(d.posts.length ? d.posts.map((p) => h("a.row.blog-row", { href: `#/social/blog/${p.id}` },
+        userAvatar(p.author, ".sm"),
+        h("span.rt", h("b", p.title), h("small.blog-excerpt", p.excerpt.replace(/\s+/g, " ")), h("small", `${p.author.name}, ${timeAgo(p.created)}${p.likes ? `, ${p.likes} like${p.likes === 1 ? "" : "s"}` : ""}`)),
+        h("span.rv", icon("chevron", 18))))
+        : [h("p.note", "No posts yet. Be the first to write one.")]));
+    };
+    if (S.cached("/blogs")) draw(S.cached("/blogs"));
+    try { const d = await S.api("GET", "/blogs"); if (this._live(tok)) draw(d); }
+    catch (e) { if (this._live(tok)) box.replaceChildren(errorLine(e, () => this._blogs(++this.tok))); }
+  }
+
+  _writeBlog() {
+    const title = h("input.input", { maxlength: "120", placeholder: "Title", "aria-label": "Post title" });
+    const text = h("textarea.input.prose", { maxlength: "20000", rows: "12", placeholder: "Write your post. Leave a blank line between paragraphs.", "aria-label": "Post" });
+    const go = h("button.btn.primary.block", {
+      onclick: async () => {
+        go.disabled = true;
+        try { const r = await S.api("POST", "/blogs", { title: title.value, body: text.value }); m.close(); toast("Published"); this.app.go(`#/social/blog/${r.id}`); }
+        catch (e) { toast(e.message); go.disabled = false; }
+      },
+    }, "Publish");
+    const m = openModal({
+      title: "New blog post", wide: true,
+      body: [h("div.field", h("label", "Title"), title), h("div.field", h("label", "Post"), text),
+        h("p.note", "Everyone can read your posts. Posts that three players report are hidden."), go],
+    });
+    title.focus();
+  }
+
+  async _blogPost(tok, id) {
+    let d;
+    try { d = await S.api("GET", `/blogs/${id}`); } catch (e) { this.body.replaceChildren(errorLine(e, () => this.app.go("#/social/blogs"))); return; }
+    if (!this._live(tok)) return;
+    const p = d.post;
+    let liked = p.liked, likes = p.likes;
+    const likeBtn = h(`button.btn.small${liked ? ".primary" : ""}`, {
+      "aria-pressed": String(liked),
+      onclick: async () => {
+        try {
+          const r = await S.api("POST", `/blogs/${p.id}/like`, {});
+          liked = r.liked; likes += liked ? 1 : -1;
+          likeBtn.classList.toggle("primary", liked);
+          likeBtn.setAttribute("aria-pressed", String(liked));
+          likeBtn.lastChild.textContent = `${likes} like${likes === 1 ? "" : "s"}`;
+        } catch (e) { toast(e.message); }
+      },
+    }, icon("star", 14), h("span", `${likes} like${likes === 1 ? "" : "s"}`));
+    const other = p.mine
+      ? h("button.btn.small.ghost", {
+        onclick: async () => {
+          if (!(await confirmModal({ title: "Delete this post?", yes: "Delete", danger: true }))) return;
+          try { await S.api("POST", `/blogs/${p.id}/delete`, {}); toast("Deleted"); this.app.go("#/social/blogs"); } catch (e) { toast(e.message); }
+        },
+      }, icon("trash", 14), "Delete")
+      : h("button.btn.small.ghost", {
+        onclick: async (e) => {
+          if (!(await confirmModal({ title: "Report this post?", sub: "Report posts that are abusive or spam. Anything three players report is hidden.", yes: "Report" }))) return;
+          try { await S.api("POST", "/report", { kind: "blog", id: p.id }); toast("Thanks, reported"); e.target.closest("button").disabled = true; } catch (err) { toast(err.message); }
+        },
+      }, icon("flag", 14), "Report");
+    this.body.replaceChildren(
+      h("div.club-head", h("a.btn.small.ghost", { href: "#/social/blogs", "aria-label": "All posts" }, icon("back", 16))),
+      h("article.blog-post",
+        h("h2", p.title),
+        h("div.blog-byline", userAvatar(p.author, ".sm"), h("b", p.author.name), h("small.muted", timeAgo(p.created))),
+        h("div.blog-body", ...p.body.split(/\n\s*\n/).map((para) => h("p", para))),
+        h("div.btn-row.blog-actions", likeBtn, other)));
+  }
+
+  // ---------- coaches ----------
+  async _coaches(tok) {
+    const box = h("div.coach-list", h("p.note", "Loading coaches…"));
+    const mineBox = h("div");
+    this.body.replaceChildren(
+      h("p.note.coach-intro", "Players who give lessons. To book one, add them as a friend and message them; lessons and payment are arranged between you and the coach."),
+      mineBox, box);
+    let d, friends;
+    try { [d, friends] = await Promise.all([S.api("GET", "/coaches"), S.api("GET", "/friends")]); }
+    catch (e) { if (this._live(tok)) box.replaceChildren(errorLine(e, () => this._coaches(++this.tok))); return; }
+    if (!this._live(tok)) return;
+    const friendIds = new Set(friends.friends.map((f) => f.id));
+    const mine = d.coaches.find((c) => c.mine);
+    mineBox.replaceChildren(h("div.btn-row", h("button.btn", { onclick: () => this._coachForm(mine) }, icon("learn", 18), mine ? "Edit your coach listing" : "Offer lessons"),
+      mine ? h("button.btn.ghost", {
+        onclick: async () => {
+          if (!(await confirmModal({ title: "Take your listing down?", yes: "Remove", danger: true }))) return;
+          try { await S.api("POST", "/coaches/remove", {}); toast("Listing removed"); this.render(); } catch (e) { toast(e.message); }
+        },
+      }, "Remove listing") : null));
+    const R = (u, c) => (u.ratings && u.ratings[c] && u.ratings[c].n ? `${CAT_LABEL[c]} ${u.ratings[c].r}` : null);
+    box.replaceChildren(...(d.coaches.length ? d.coaches.map((c) => {
+      const u = c.user;
+      const facts = [c.langs && `Speaks ${c.langs}`, c.topics && `Teaches ${c.topics}`, c.rate].filter(Boolean);
+      return h("article.coach-card",
+        h("header", userAvatar(u), h("div.coach-name", h("b", `${c.title ? c.title + " " : ""}${u.name}`), h("small", [presenceText(u), R(u, "blitz"), R(u, "rapid")].filter(Boolean).join(", ")))),
+        facts.length ? h("div.coach-facts", ...facts.map((f) => h("span", f))) : null,
+        h("p.coach-bio", c.bio),
+        c.mine ? null : h("div.btn-row",
+          friendIds.has(u.id)
+            ? h("button.btn.primary", { onclick: () => this.app.go(`#/social/chat/${u.id}`) }, icon("chat", 18), "Message")
+            : h("button.btn.primary", { onclick: async (e) => { if (await this._addByCode(u.code)) e.target.closest("button").replaceChildren(icon("check", 18), "Request sent"); } }, icon("plus", 18), "Add friend to message"),
+          h("button.btn", { onclick: () => this._profile(u, friendIds.has(u.id)) }, "Profile"),
+          h("button.btn.ghost", {
+            "aria-label": `Report ${u.name}'s listing`,
+            onclick: async (e) => {
+              if (!(await confirmModal({ title: "Report this listing?", sub: "Report listings that are fake, abusive or spam. Anything three players report is hidden.", yes: "Report" }))) return;
+              try { await S.api("POST", "/report", { kind: "coach", id: u.id }); toast("Thanks, reported"); e.target.closest("button").disabled = true; } catch (err) { toast(err.message); }
+            },
+          }, icon("flag", 16))));
+    }) : [h("p.note", "No coaches listed yet. If you teach, offer lessons here.")]));
+  }
+
+  _coachForm(cur) {
+    const input = (key, label, max, ph) => { const el = h("input.input", { maxlength: String(max), placeholder: ph, value: cur ? cur[key] : "", "aria-label": label }); return [el, h("div.field", h("label", label), el)]; };
+    const [title, titleF] = input("title", "Title (optional)", 40, "e.g. FM, coach, club captain");
+    const [langs, langsF] = input("langs", "Languages", 80, "e.g. English, Spanish");
+    const [topics, topicsF] = input("topics", "What you teach", 120, "e.g. openings, endgames, beginners");
+    const [rate, rateF] = input("rate", "Rate", 60, "e.g. $30 an hour, or free");
+    const bio = h("textarea.input.prose", { maxlength: "1500", rows: "6", placeholder: "How you teach, who you work with, your experience.", "aria-label": "About your lessons" }, cur ? cur.bio : "");
+    const go = h("button.btn.primary.block", {
+      onclick: async () => {
+        go.disabled = true;
+        try { await S.api("POST", "/coaches", { title: title.value, bio: bio.value, langs: langs.value, topics: topics.value, rate: rate.value }); m.close(); toast(cur ? "Listing updated" : "You're listed as a coach"); this.render(); }
+        catch (e) { toast(e.message); go.disabled = false; }
+      },
+    }, cur ? "Save listing" : "List me as a coach");
+    const m = openModal({
+      title: cur ? "Your coach listing" : "Offer lessons",
+      body: [titleF, h("div.field", h("label", "About your lessons"), bio), langsF, topicsF, rateF,
+        h("p.note", "Your name, avatar and ratings show with your listing. Students add you as a friend to get in touch."), go],
+    });
   }
 
   // ---------- leaderboard ----------
