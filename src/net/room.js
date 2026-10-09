@@ -86,7 +86,8 @@ export class RoomClient {
 const BUCKET_MS = 120000;
 const POOL_SIZE = 10;
 
-export function findMatch(tcKey, playerId, onProgress = () => {}) {
+// opts.prefix names the pool (variants have their own); opts.seats is how many players a game needs
+export function findMatch(tcKey, playerId, onProgress = () => {}, { prefix = "pool", seats = 2 } = {}) {
   let cancelled = false;
   let client = null;
   let rolloverTimer = null;
@@ -96,7 +97,7 @@ export function findMatch(tcKey, playerId, onProgress = () => {}) {
 
   const tcSlug = tcKey.replace("+", "p").replace(".", "_");
   const tryRoom = (bucket, i, id) => new Promise((resolve) => {
-    const room = `pool-${tcSlug}-${bucket}-${i}`;
+    const room = `${prefix}-${tcSlug}-${bucket}-${i}`;
     let settled = false;
     let waitingHere = false;
     const finish = (outcome) => { if (!settled) { settled = true; resolve(outcome); } };
@@ -113,15 +114,16 @@ export function findMatch(tcKey, playerId, onProgress = () => {}) {
           return;
         }
         if (s.status === "playing") {
-          if (s.connected < 2) {
+          if (s.connected < seats) {
             // opponent seat belongs to someone who already left
             setTimeout(() => {
               if (settled) return;
-              if ((c.last && c.last.connected) < 2) { c.close(); finish({ next: true }); }
+              if ((c.last && c.last.connected) < seats) { c.close(); finish({ next: true }); }
             }, 1500);
             return;
           }
-          if (s.view && s.view.moves && s.view.moves.length) { c.close(); finish({ next: true }); return; }
+          // a game already under way isn't ours to join
+          if (s.view && ((s.view.moves && s.view.moves.length) || (s.view.four && s.view.four.log.length))) { c.close(); finish({ next: true }); return; }
           finish({ matched: true, room, client: c });
         }
       },

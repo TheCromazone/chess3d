@@ -6,8 +6,8 @@ import { MoveInput } from "../core/input.js";
 import { VxGame, VX_VARIANTS, vxTextToMove, vxMoveToText } from "../core/vx.js";
 import { VX_LEVELS } from "../core/vx-engine.js";
 import { think } from "./zh-game.js";
-import { RoomClient, makePlayerId, parsePlayerId, live } from "../net/room.js";
-import { getProfile, getSettings } from "../store.js";
+import { RoomClient, makePlayerId, parsePlayerId, live, findMatch } from "../net/room.js";
+import { getProfile, getSettings, variantRating, applyVariantRating, saveVariantGame, newGameId } from "../store.js";
 import { presetVariant } from "../screens/play.js";
 import { SFX } from "../audio.js";
 import * as Social from "../net/social.js";
@@ -50,7 +50,8 @@ function lostPieces(g, colour) {
 }
 
 export class VxPlay {
-  // cfg: { variant, mode: "bot"|"local"|"online", level, myColor, room, tcKey }
+  // cfg: { variant, mode: "bot"|"local"|"online"|"pool", level, myColor, room, tcKey }
+  // ("online" is a friend's invite; "pool" a rated game against a random opponent)
   constructor(app, cfg) {
     this.app = app;
     this.cfg = cfg;
@@ -59,12 +60,15 @@ export class VxPlay {
     this.mode = cfg.mode;
     this.start = cfg.variant === "chess960" ? cfg.start ?? Math.floor(Math.random() * 960) : undefined;
     this.g = new VxGame(this.variant, { start: this.start });
+    this.startFen = this.g.fen;
+    this.moveTexts = [];
+    this.id = newGameId();
     this.sans = [];
     this.last = null;
     this.result = null;
     this.myColor = cfg.myColor || "w";
     this.level = VX_LEVELS.find((l) => l.id === cfg.level) || VX_LEVELS[1];
-    this.phase = this.mode === "online" ? "connecting" : "playing";
+    this.phase = this.online ? "connecting" : "playing";
     this.duckFor = null;      // Duck Chess: { m, opts } while the duck is being placed
     this.curtain = false;     // Fog of War, pass and play: the board is hidden while the device changes hands
     this.clock = null;
@@ -76,6 +80,7 @@ export class VxPlay {
     });
   }
 
+  get online() { return this.mode === "online" || this.mode === "pool"; }
   title() { return this.rules.name; }
   canInput() { return !this.result && this.phase === "playing" && !this.duckFor && !this.curtain && !this.sent; }
   canMove(c) {
@@ -95,7 +100,7 @@ export class VxPlay {
 
   mount() {
     this.app.setInGame(true);
-    live.busy = this.mode !== "online";
+    live.busy = !this.online;
     this.app.bindBoard({
       onSquareTap: (sq) => this.tap(sq),
       canDrag: (sq) => this.input.canDrag(sq),
@@ -107,9 +112,9 @@ export class VxPlay {
     this.render();
     this.tick = setInterval(() => this._clockTick(), 200);
     if (this.mode === "bot" && this.myColor !== this.g.turn()) this.botMove();
-    if (this.mode === "online") this.connect();
+    if (this.online) this.connect();
     this.app.leaveGuard = async () => {
-      if (this.result || this.phase !== "playing" || this.mode !== "online") return true;
+      if (this.result || this.phase !== "playing" || !this.online) return true;
       const ok = await confirmModal({ title: "Leave and resign?", sub: "Leaving a live game counts as a loss.", yes: "Resign and leave", danger: true });
       if (ok && this.client) this.client.action({ t: "resign" });
       return ok;
@@ -123,6 +128,7 @@ export class VxPlay {
     this.input.clear();
     // both boards (2D and 3D) may have drawn the duck or the fog
     for (const b of Object.values(this.app.boards)) if (b) { b.setDuck(null); b.setFog([]); b.setMarks([]); }
+    if (this.search) this.search.cancel();
     if (this.client) this.client.close();
     const params = new URLSearchParams(location.search);
     if (params.has("room")) { params.delete("room"); params.delete("tc"); history.replaceState(null, "", location.pathname + (params.size ? "?" + params : "") + location.hash); }
@@ -171,12 +177,13 @@ export class VxPlay {
   play(m, { remote = false, shown = false } = {}) {
     const d = this.g.move(m);
     if (!d) return null;
+    if (!this.online) this.moveTexts.push(vxMoveToText(m));
     this.sans.push(d.san);
     this.last = d;
     this.input.clear();
     const b = this.app.board;
     const sound = () => {
-      const over = this.mode !== "online" && this.g.outcome().over;   // online, the server decides
+      const over = !this.online && this.g.outcome().over;   // online, the server decides
       if (over) SFX.end(); else if (/\+$/.test(d.san)) SFX.check(); else if (d.captured) SFX.capture(); else if (remote) SFX.moveOpp(); else SFX.move();
     };
     if (this.rules.fog || shown || d.castle960) { this.redraw(); sound(); }
@@ -188,7 +195,7 @@ export class VxPlay {
       });
       sound();
     }
-    if (this.mode === "online" && !remote) {
+    if (this.online && !remote) {
       this.client.action({ t: "move", move: vxMoveToText(m) });
       this.sent = true;
     }
@@ -226,6 +233,7 @@ export class VxPlay {
   finish(o) {
     if (this.result) return;
     this.result = o;
+    const extra = this.record(o);
     this.duckFor = null;
     this.curtain = false;
     live.busy = false;
@@ -238,29 +246,75 @@ export class VxPlay {
     setTimeout(() => {
       if (this.dead) return;
       const m = openModal({
-        title, sub: REASONS[o.reason] || "",
+        title, sub: (REASONS[o.reason] || "") + (extra.delta != null ? `. ${this.rules.name} rating ${extra.rating} (${extra.delta >= 0 ? "+" : ""}${extra.delta})` : ""),
         body: h("div.btn-row",
           h("button.btn", { onclick: () => { m.close(); this.app.go(`#/variant/${this.variant}`); } }, "New game"),
-          this.mode !== "online" ? h("button.btn.primary", { onclick: () => { m.close(); this.app.setController(() => new VxPlay(this.app, { ...this.cfg, myColor: this.mode === "bot" ? other(this.myColor) : "w" })); } }, "Rematch") : null),
+          this.mode === "pool" ? h("button.btn.primary", { onclick: () => { m.close(); this.app.setController(() => new VxPlay(this.app, this.cfg)); } }, "New opponent") : null,
+          !this.online ? h("button.btn.primary", { onclick: () => { m.close(); this.app.setController(() => new VxPlay(this.app, { ...this.cfg, myColor: this.mode === "bot" ? other(this.myColor) : "w" })); } }, "Rematch") : null),
       });
     }, 500);
   }
 
+  // the game for the archive (and the rating, for games against a random opponent)
+  record(o) {
+    if (o.reason === "aborted") return {};
+    const v = this.lastState && this.lastState.view;
+    // online, the server has the whole game (in Fog of War it's revealed once the game ends)
+    const texts = this.online ? (v ? v.moves.filter(Boolean) : []) : this.moveTexts;
+    const startFen = this.online && v && v.vx && v.vx.keys && v.vx.keys[0] ? v.vx.keys[0] + " 0 1" : this.startFen;
+    if (!texts.length) return {};
+    const z = new VxGame(this.variant, { fen: startFen });
+    const plies = [];
+    for (const t of texts) { const d = z.move(vxTextToMove(t)); if (!d) break; plies.push({ fen: z.fen, san: d.san }); }
+    const my = this.mode === "local" ? null : this.myColor;
+    const myResult = !my ? null : !o.winner ? "draw" : o.winner === my ? "win" : "loss";
+    let delta = null, rating = null;
+    if (this.mode === "pool" && my) {
+      const opp = this.oppInfo && this.oppInfo.rating ? this.oppInfo.rating : 1500;
+      delta = applyVariantRating(this.variant, opp, myResult === "win" ? 1 : myResult === "loss" ? 0 : 0.5);
+      rating = variantRating(this.variant);
+    }
+    const name = (c) => this.player(c).name;
+    saveVariantGame({
+      id: this.id, date: Date.now(), variant: this.variant, mode: this.mode, tc: this.cfg.tcKey || null, rated: this.mode === "pool",
+      white: { name: name("w"), rating: this.player("w").rating || null }, black: { name: name("b"), rating: this.player("b").rating || null },
+      myColor: my, myResult, result: !o.winner ? "1/2-1/2" : o.winner === "w" ? "1-0" : "0-1", reason: o.reason, delta,
+      start: startFen, plies,
+    });
+    return { delta, rating };
+  }
+
   // ---- online ----
   connect() {
-    this.room = this.cfg.room;
     const me = getProfile();
+    const handlers = {
+      onState: (s) => this._state(s),
+      onError: (err) => { if (!/not your turn|already/.test(err)) toast(err); this.sent = false; if (this.lastState) this._state(this.lastState); },
+      onStatus: (st) => { this.netNote = st === "disconnected" ? "Connection lost. Reconnecting…" : null; this.render(); },
+    };
+    if (this.mode === "pool") {
+      // rated: you show with your rating in this variant
+      this.playerId = makePlayerId(me.name, variantRating(this.variant), Social.myCode());
+      this.phase = "searching";
+      this.search = findMatch(this.cfg.tcKey || "3+0", this.playerId, () => this.render(), { prefix: "vp" + this.variant });
+      this.search.promise.then(({ room, client }) => {
+        if (this.dead) { client.close(); return; }
+        this.search = null;
+        this.room = room;
+        this.client = client;
+        SFX.notify();
+        client.rebind(handlers);
+      }).catch((e) => { this.search = null; if (!this.dead) { this.phase = "failed"; this.failNote = e.message; this.render(); } });
+      return;
+    }
+    this.room = this.cfg.room;
     this.playerId = sessionStorage.getItem("mp-pid-" + this.room) || makePlayerId(me.name, me.ratings.blitz.r, Social.myCode());
     sessionStorage.setItem("mp-pid-" + this.room, this.playerId);
     const params = new URLSearchParams(location.search);
     params.set("room", this.room);
     params.set("tc", this.cfg.tcKey || "3+0");
     history.replaceState(null, "", location.pathname + "?" + params + `#/variant/${this.variant}/online`);
-    this.client = new RoomClient(this.room, this.playerId, {
-      onState: (s) => this._state(s),
-      onError: (err) => { if (!/not your turn|already/.test(err)) toast(err); this.sent = false; if (this.lastState) this._state(this.lastState); },
-      onStatus: (st) => { this.netNote = st === "disconnected" ? "Connection lost. Reconnecting…" : null; this.render(); },
-    });
+    this.client = new RoomClient(this.room, this.playerId, handlers);
   }
 
   _state(s) {
@@ -341,9 +395,9 @@ export class VxPlay {
     }
     const eyes = this.viewer();
     // online, the server already hid what we can't see; offline we hide it here
-    const fogged = eyes && this.mode !== "online";
+    const fogged = eyes && !this.online;
     b.syncFromBoard(fogged ? this.g.foggedBoard(eyes) : this.g.board());
-    const seen = eyes ? new Set(this.mode === "online" && this.visible ? this.visible : this.g.visible(eyes)) : null;
+    const seen = eyes ? new Set(this.online && this.visible ? this.visible : this.g.visible(eyes)) : null;
     b.setFog(seen ? ALL_SQUARES.filter((sq) => !seen.has(sq)) : []);
     b.setDuck(this.g.duck());
     const s = getSettings();
@@ -381,7 +435,8 @@ export class VxPlay {
     const mover = this.g.turn();
     const body = [];
     if (this.phase === "unsupported") body.push(h("div.status-line.bad", h("span", `The game server hasn't been updated for ${this.rules.name} yet. Try again in a few minutes.`)));
-    if (this.phase === "waiting" || this.phase === "connecting" || this.phase === "config") body.push(this._lobby());
+    if (this.phase === "searching" || this.phase === "failed") body.push(this._searching());
+    else if (this.phase === "waiting" || this.phase === "connecting" || this.phase === "config") body.push(this.mode === "pool" ? this._searching() : this._lobby());
     if (this.netNote) body.push(h("div.status-line.bad", h("span", this.netNote)));
     const name = (c) => (c === "w" ? "White" : "Black");
     const status = this.result ? (this.result.winner ? `${name(this.result.winner)} won ${REASONS[this.result.reason] || ""}` : `Draw ${REASONS[this.result.reason] || ""}`)
@@ -397,7 +452,7 @@ export class VxPlay {
       body.push(h("div.card", h("p.note", `The board is hidden so ${name(mover)} can't see ${name(other(mover))}'s pieces. Hand over the device, then show the board.`),
         h("button.btn.primary.block", { onclick: () => { this.curtain = false; this.app.board.viewSide(mover, false); this.redraw(); this.render(); } }, icon("eye", 18), `Show ${name(mover)}'s board`)));
     }
-    body.push(h("div.zh-moves", ...this.sans.map((san, i) => h("span", i % 2 === 0 ? h("b.muted", `${i / 2 + 1}.`) : null, " ", this.viewer() && this.mode !== "online" && (i % 2 === 0 ? "w" : "b") !== this.viewer() ? "?" : san, " "))));
+    body.push(h("div.zh-moves", ...this.sans.map((san, i) => h("span", i % 2 === 0 ? h("b.muted", `${i / 2 + 1}.`) : null, " ", this.viewer() && !this.online && (i % 2 === 0 ? "w" : "b") !== this.viewer() ? "?" : san, " "))));
     if (this.rules.threeCheck) body.push(h("div.status-line", h("span", `Checks given: White ${this.g.checksGiven("w")}/3, Black ${this.g.checksGiven("b")}/3`)));
     body.push(h("p.note", VX_INFO[this.variant].rules));
     const foot = [];
@@ -422,6 +477,13 @@ export class VxPlay {
     }
     this.app.panel({ title: this.title(), back: `#/variant/${this.variant}`, body, foot });
     this.renderStrips();
+  }
+
+  _searching() {
+    return h("div.card", h("h3", this.phase === "failed" ? "No opponent found" : `Looking for a ${this.rules.name} opponent`),
+      h("p.note", this.phase === "failed" ? (this.failNote || "Try again in a moment.") : `${tcLabel(this.cfg.tcKey || "3+0")}, rated. You'll be paired with the next player looking for the same game.`),
+      h("div.btn-row", h("button.btn", { onclick: () => this.app.go(`#/variant/${this.variant}`) }, this.phase === "failed" ? "Back" : "Cancel"),
+        this.phase === "failed" ? h("button.btn.primary", { onclick: () => this.app.setController(() => new VxPlay(this.app, this.cfg)) }, "Try again") : null));
   }
 
   _lobby() {
@@ -457,7 +519,7 @@ export class VxSetup {
     const s = this.s, rules = VX_VARIANTS[this.variant];
     const body = [
       h("p", { style: { color: "var(--ink-2)" } }, VX_INFO[this.variant].rules),
-      h("div.field", h("div.lbl", "Opponent"), segmented([{ value: "bot", label: "Computer" }, { value: "local", label: "Pass and play" }, { value: "online", label: "A friend online" }], s.mode, (v) => { s.mode = v; this.render(); })),
+      h("div.field", h("div.lbl", "Opponent"), segmented([{ value: "pool", label: "Random opponent" }, { value: "online", label: "A friend" }, { value: "bot", label: "Computer" }, { value: "local", label: "Pass and play" }], s.mode, (v) => { s.mode = v; this.render(); })),
     ];
     if (s.mode === "bot" && STOCKFISH_BOTS[this.variant]) {
       body.push(h("p.note", `${rules.name} bots are in Play bots, with all 16 personalities. Play opens there with ${rules.name} chosen.`));
@@ -470,11 +532,15 @@ export class VxSetup {
       body.push(h("div.field", h("div.lbl", "Play as"), segmented(colors, s.color, (v) => { s.color = v; })));
     }
     if (s.mode === "local" && rules.fog) body.push(h("p.note", "Between turns the board is hidden, so each player only sees their own side."));
-    if (s.mode === "online") body.push(h("div.field", h("div.lbl", "Time control"), tcPicker(s.tc, (v) => { s.tc = v; }, { allowCustom: true })));
+    if (s.mode === "online" || s.mode === "pool") body.push(h("div.field", h("div.lbl", "Time control"), tcPicker(s.tc, (v) => { s.tc = v; }, { allowCustom: s.mode === "online", allowUnlimited: s.mode === "online" })));
+    if (s.mode === "pool") {
+      const slot = getProfile().variants[this.variant];
+      body.push(h("p.note", `Rated. Your ${rules.name} rating: ${variantRating(this.variant)}${slot ? ` after ${slot.n} game${slot.n === 1 ? "" : "s"}` : " (new)"}.`));
+    }
     this.app.strips(null, null);
     this.app.panel({
       title: rules.name, back: "#/variants", body,
-      foot: h("button.btn.primary.big.block", { onclick: () => this.start() }, s.mode === "online" ? "Create invite link" : "Play"),
+      foot: h("button.btn.primary.big.block", { onclick: () => this.start() }, s.mode === "online" ? "Create invite link" : s.mode === "pool" ? "Find an opponent" : "Play"),
     });
   }
   start() {
@@ -482,7 +548,9 @@ export class VxSetup {
     if (s.mode === "bot" && STOCKFISH_BOTS[this.variant]) { presetVariant(STOCKFISH_BOTS[this.variant]); this.app.go("#/bots"); return; }
     const color = s.color === "r" ? (Math.random() < 0.5 ? "w" : "b") : s.color;
     const start = this.variant === "chess960" ? Math.floor(Math.random() * 960) : undefined;
-    const cfg = s.mode === "online" ? { variant: this.variant, mode: "online", room: "vx-" + randomId(10), tcKey: s.tc, start } : { variant: this.variant, mode: s.mode, level: s.level, myColor: color, start };
+    const cfg = s.mode === "online" ? { variant: this.variant, mode: "online", room: "vx-" + randomId(10), tcKey: s.tc, start }
+      : s.mode === "pool" ? { variant: this.variant, mode: "pool", tcKey: s.tc === "inf" ? "3+0" : s.tc, start }
+        : { variant: this.variant, mode: s.mode, level: s.level, myColor: color, start };
     this.app.launch(() => new VxPlay(this.app, cfg), `#/variant/${this.variant}/${s.mode === "online" ? "online" : "play"}`);
   }
 }

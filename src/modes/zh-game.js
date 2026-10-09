@@ -9,8 +9,8 @@ import { Crazyhouse, POCKET_ORDER, textToMove, moveToText, VALUES } from "../cor
 import { ZH_LEVELS } from "../core/zh-engine.js";
 import { VX_VARIANTS } from "../core/vx.js";
 import { VX_INFO } from "./vx-game.js";
-import { RoomClient, makePlayerId, parsePlayerId, peekRoom, live } from "../net/room.js";
-import { getProfile, getSettings } from "../store.js";
+import { RoomClient, makePlayerId, parsePlayerId, peekRoom, live, findMatch } from "../net/room.js";
+import { getProfile, getSettings, variantRating, applyVariantRating, saveVariantGame, newGameId } from "../store.js";
 import { SFX } from "../audio.js";
 import * as Social from "../net/social.js";
 
@@ -58,19 +58,23 @@ function miniBoard(fen, flip) {
 }
 
 export class ZhGame {
-  // cfg: { mode: "bot"|"local"|"online"|"bughouse", level, myColor, room, tcKey, link, board }
+  // cfg: { mode: "bot"|"local"|"online"|"pool"|"bughouse", level, myColor, room, tcKey, link, board }
+  // ("online" is a friend's invite, "pool" a rated game against a random opponent)
   constructor(app, cfg) {
     this.app = app;
     this.cfg = cfg;
     this.mode = cfg.mode;
     this.z = new Crazyhouse();
     this.sans = [];
+    this.moveTexts = [];      // bot and pass-and-play games, for the archive
+    this.snaps = [];          // Bughouse: each position as it happened (pieces also arrive from the partner)
+    this.id = newGameId();
     this.last = null;
     this.result = null;
     this.myColor = cfg.myColor || "w";
     this.level = ZH_LEVELS.find((l) => l.id === cfg.level) || ZH_LEVELS[1];
     this.dropPick = null;
-    this.phase = this.mode === "online" || this.mode === "bughouse" ? "connecting" : "playing";
+    this.phase = this.net ? "connecting" : "playing";
     this.clock = null;
     this.input = new MoveInput(app, {
       getChess: () => (this.canInput() ? this.z.chess() : null),
@@ -80,6 +84,7 @@ export class ZhGame {
     });
   }
 
+  get net() { return this.mode === "online" || this.mode === "pool" || this.mode === "bughouse"; }
   title() { return this.mode === "bughouse" ? "Bughouse" : "Crazyhouse"; }
   canInput() { return !this.result && this.phase === "playing"; }
   canMove(c) {
@@ -90,7 +95,7 @@ export class ZhGame {
 
   mount() {
     this.app.setInGame(true);
-    live.busy = this.mode !== "online" && this.mode !== "bughouse";
+    live.busy = !this.net;
     this.app.bindBoard({
       onSquareTap: (sq) => this.tap(sq),
       canDrag: (sq) => this.input.canDrag(sq),
@@ -102,7 +107,7 @@ export class ZhGame {
     this.render();
     this.tick = setInterval(() => this._clockTick(), 200);
     if (this.mode === "bot" && this.myColor === "b") this.botMove();
-    if (this.mode === "online" || this.mode === "bughouse") this.connect();
+    if (this.net) this.connect();
     this.app.leaveGuard = async () => {
       if (this.result || this.phase !== "playing" || this.mode === "local" || this.mode === "bot") return true;
       const ok = await confirmModal({ title: "Leave and resign?", sub: "Leaving a live game counts as a loss.", yes: "Resign and leave", danger: true });
@@ -115,6 +120,7 @@ export class ZhGame {
     live.busy = false;
     if (live.room === this.room) live.room = null;
     clearInterval(this.tick); clearInterval(this.peekT);
+    if (this.search) this.search.cancel();
     this.input.clear();
     if (this.client) this.client.close();
     if (this.partner) this.partner.close();
@@ -150,6 +156,7 @@ export class ZhGame {
     const before = this.z.state();
     const d = this.z.move(m);
     if (!d) return null;
+    if (!this.net) this.moveTexts.push(moveToText(m));
     this.dropPick = null;
     this.sans.push(d.san);
     this.last = d;
@@ -161,7 +168,7 @@ export class ZhGame {
     if (this.mode === "local") setTimeout(() => !this.dead && b.viewSide(this.z.turn()), 350);
     this.redraw(false);
     // online: the server is the referee; we sent the move and its state will confirm it
-    if ((this.mode === "online" || this.mode === "bughouse") && !remote) {
+    if ((this.net) && !remote) {
       this.client.action({ t: "move", move: moveToText(m) });
       this.pending = before;
     }
@@ -189,6 +196,7 @@ export class ZhGame {
   finish(o) {
     if (this.result) return;
     this.result = o;
+    const extra = this.record(o);
     live.busy = false;
     if (live.room === this.room) live.room = null;
     if (this.clock) this.clock.active = null;
@@ -198,18 +206,61 @@ export class ZhGame {
     setTimeout(() => {
       if (this.dead) return;
       const m = openModal({
-        title, sub: reasonText(o.reason),
+        title, sub: reasonText(o.reason) + (extra.delta != null ? `. Crazyhouse rating ${extra.rating} (${extra.delta >= 0 ? "+" : ""}${extra.delta})` : ""),
         body: h("div.btn-row",
           h("button.btn", { onclick: () => { m.close(); this.app.go(this.mode === "bughouse" ? "#/bughouse" : "#/crazyhouse"); } }, "New game"),
+          this.mode === "pool" ? h("button.btn.primary", { onclick: () => { m.close(); this.app.setController(() => new ZhGame(this.app, this.cfg)); } }, "New opponent") : null,
           this.mode === "bot" || this.mode === "local" ? h("button.btn.primary", { onclick: () => { m.close(); this.app.setController(() => new ZhGame(this.app, { ...this.cfg, myColor: this.mode === "bot" ? other(this.myColor) : "w" })); } }, "Rematch") : null),
       });
     }, 500);
   }
 
-  // ---- online (Crazyhouse with a friend, or one board of a Bughouse match) ----
+  // the game for the archive, and the rating after a game against a random opponent
+  record(o) {
+    if (o.reason === "aborted") return {};
+    const v = this.lastState && this.lastState.view;
+    let plies = this.snaps;
+    if (this.mode !== "bughouse") {
+      const texts = this.net ? (v ? v.moves : []) : this.moveTexts;
+      const z = new Crazyhouse();
+      plies = [];
+      for (const t of texts) { const d = z.move(textToMove(t)); if (!d) break; plies.push({ fen: z.fen, pockets: z.state().pockets, san: d.san }); }
+    }
+    if (!plies.length) return {};
+    const my = this.mode === "local" ? null : this.myColor;
+    const myResult = !my ? null : !o.winner ? "draw" : o.winner === my ? "win" : "loss";
+    let delta = null, rating = null;
+    if (this.mode === "pool" && my) {
+      delta = applyVariantRating("crazyhouse", (this.oppInfo && this.oppInfo.rating) || 1500, myResult === "win" ? 1 : myResult === "loss" ? 0 : 0.5);
+      rating = variantRating("crazyhouse");
+    }
+    const who = (c) => { const p = this.player(c); return { name: p.name, rating: p.rating || null }; };
+    saveVariantGame({
+      id: this.id, date: Date.now(), variant: this.mode === "bughouse" ? "bughouse" : "crazyhouse", mode: this.mode, tc: this.cfg.tcKey || null, rated: this.mode === "pool",
+      white: who("w"), black: who("b"), myColor: my, myResult, result: !o.winner ? "1/2-1/2" : o.winner === "w" ? "1-0" : "0-1", reason: o.reason, delta,
+      start: null, plies,
+    });
+    return { delta, rating };
+  }
+
+  // ---- online (Crazyhouse with a friend or a random opponent, or one board of a Bughouse match) ----
   connect() {
-    this.room = this.cfg.room;
     const me = getProfile();
+    if (this.mode === "pool") {
+      this.playerId = makePlayerId(me.name, variantRating("crazyhouse"), Social.myCode());
+      this.phase = "searching";
+      this.search = findMatch(this.cfg.tcKey || "3+0", this.playerId, () => this.render(), { prefix: "zpcrazyhouse" });
+      this.search.promise.then(({ room, client }) => {
+        if (this.dead) { client.close(); return; }
+        this.search = null;
+        this.room = room;
+        this.client = client;
+        SFX.notify();
+        client.rebind(this._handlers());
+      }).catch((e) => { this.search = null; if (!this.dead) { this.phase = "failed"; this.failNote = e.message; this.render(); } });
+      return;
+    }
+    this.room = this.cfg.room;
     this.playerId = sessionStorage.getItem("mp-pid-" + this.room) || makePlayerId(me.name, me.ratings.blitz.r, Social.myCode());
     sessionStorage.setItem("mp-pid-" + this.room, this.playerId);
     if (this.mode === "online") {
@@ -218,16 +269,20 @@ export class ZhGame {
       params.set("tc", this.cfg.tcKey || "3+0");
       history.replaceState(null, "", location.pathname + "?" + params + "#/crazyhouse/online");
     }
-    this.client = new RoomClient(this.room, this.playerId, {
-      onState: (s) => this._state(s),
-      onError: (err) => { if (!/not your turn|already/.test(err)) toast(err); this._resync(); },
-      onStatus: (st) => { this.netNote = st === "disconnected" ? "Connection lost. Reconnecting…" : null; this.render(); },
-    });
+    this.client = new RoomClient(this.room, this.playerId, this._handlers());
     if (this.mode === "bughouse") {
       // the partner board, watched read-only once both of its seats are taken
       this.peekT = setInterval(() => this._watchPartner(), 2000);
       this._watchPartner();
     }
+  }
+
+  _handlers() {
+    return {
+      onState: (s) => this._state(s),
+      onError: (err) => { if (!/not your turn|already/.test(err)) toast(err); this._resync(); },
+      onStatus: (st) => { this.netNote = st === "disconnected" ? "Connection lost. Reconnecting…" : null; this.render(); },
+    };
   }
 
   async _watchPartner() {
@@ -274,6 +329,7 @@ export class ZhGame {
       if (fresh) { const san = this.sans[this.sans.length - 1]; if (/#$/.test(san)) SFX.end(); else if (/\+$/.test(san)) SFX.check(); else SFX.moveOpp(); }
       const lastMv = v.moves[v.moves.length - 1];
       this.last = lastMv ? textToMove(lastMv) : null;
+      if (this.mode === "bughouse" && this.sans.length > this.snaps.length) this.snaps.push({ fen: this.z.fen, pockets: this.z.state().pockets, san: this.sans[this.sans.length - 1] });
     }
     this.phase = s.status === "over" ? "over" : "playing";
     if (this.myColor && s.status === "playing") { live.room = this.room; live.busy = true; }
@@ -355,7 +411,7 @@ export class ZhGame {
     const myTurnToDrop = this.canMove(mover) ? mover : null;
     const body = [];
     if (this.phase === "unsupported") body.push(h("div.status-line.bad", h("span", "The game server hasn't been updated for Crazyhouse yet. Try again in a few minutes.")));
-    if (this.phase === "waiting" || this.phase === "connecting" || this.phase === "config") body.push(this._lobby());
+    if (this.phase === "waiting" || this.phase === "connecting" || this.phase === "config" || this.phase === "searching" || this.phase === "failed") body.push(this._lobby());
     if (this.netNote) body.push(h("div.status-line.bad", h("span", this.netNote)));
     const status = this.result ? (this.result.winner ? `${this.result.winner === "w" ? "White" : "Black"} won ${reasonText(this.result.reason)}` : `Draw ${reasonText(this.result.reason)}`)
       : this.phase !== "playing" ? null
@@ -398,6 +454,12 @@ export class ZhGame {
   }
 
   _lobby() {
+    if (this.mode === "pool") {
+      return h("div.card", h("h3", this.phase === "failed" ? "No opponent found" : "Looking for a Crazyhouse opponent"),
+        h("p.note", this.phase === "failed" ? (this.failNote || "Try again in a moment.") : `${tcLabel(this.cfg.tcKey || "3+0")}, rated. You'll be paired with the next player looking for the same game.`),
+        h("div.btn-row", h("button.btn", { onclick: () => this.app.go("#/crazyhouse") }, this.phase === "failed" ? "Back" : "Cancel"),
+          this.phase === "failed" ? h("button.btn.primary", { onclick: () => this.app.setController(() => new ZhGame(this.app, this.cfg)) }, "Try again") : null));
+    }
     if (this.mode === "bughouse") {
       return h("div.card", h("h3", "Getting the boards ready"),
         h("p.note", this.phase === "waiting" ? "Waiting for your opponent on this board." : this.partnerSeats < 2 ? "Waiting for both players on the other board." : "Starting…"));
@@ -445,7 +507,7 @@ export class ZhSetup {
   render() {
     const body = [
       h("p", { style: { color: "var(--ink-2)" } }, "Captured pieces join your pocket, and on your turn you can drop one onto any empty square instead of moving. Games swing fast."),
-      h("div.field", h("div.lbl", "Opponent"), segmented([{ value: "bot", label: "Computer" }, { value: "local", label: "Pass and play" }, { value: "online", label: "A friend online" }], setup.mode, (v) => { setup.mode = v; this.render(); })),
+      h("div.field", h("div.lbl", "Opponent"), segmented([{ value: "pool", label: "Random opponent" }, { value: "online", label: "A friend" }, { value: "bot", label: "Computer" }, { value: "local", label: "Pass and play" }], setup.mode, (v) => { setup.mode = v; this.render(); })),
     ];
     if (setup.mode === "bot") {
       body.push(h("div.bot-grid.zh-bots", ...ZH_LEVELS.map((l) => h(`button.bot-chip${l.id === setup.level ? ".on" : ""}`, { onclick: () => { setup.level = l.id; this.render(); }, "aria-label": `${l.name}, ${l.elo}` },
@@ -454,17 +516,20 @@ export class ZhSetup {
       body.push(h("p.note", `${lv.name}: ${lv.elo.toLowerCase()} strength.`));
       body.push(h("div.field", h("div.lbl", "Play as"), segmented([{ value: "w", label: "White" }, { value: "b", label: "Black" }, { value: "r", label: "Random" }], setup.color, (v) => { setup.color = v; })));
     }
-    if (setup.mode === "online") body.push(h("div.field", h("div.lbl", "Time control"), tcPicker(setup.tc, (v) => { setup.tc = v; }, { allowCustom: true })));
+    if (setup.mode === "online" || setup.mode === "pool") body.push(h("div.field", h("div.lbl", "Time control"), tcPicker(setup.tc, (v) => { setup.tc = v; }, { allowCustom: setup.mode === "online", allowUnlimited: setup.mode === "online" })));
+    if (setup.mode === "pool") body.push(h("p.note", `Rated. Your Crazyhouse rating: ${variantRating("crazyhouse")}.`));
     body.push(h("button.row", { onclick: () => this.app.go("#/bughouse") }, h("span.ri", icon("users", 20)), h("span.rt", h("b", "Bughouse"), h("small", "Two boards, two teams of two: your captures go to your partner")), h("span.rv", icon("chevron", 18))));
     this.app.strips(null, null);
     this.app.panel({
       title: "Crazyhouse", back: "#/variants", body,
-      foot: h("button.btn.primary.big.block", { onclick: () => this.start() }, setup.mode === "online" ? "Create invite link" : "Play"),
+      foot: h("button.btn.primary.big.block", { onclick: () => this.start() }, setup.mode === "online" ? "Create invite link" : setup.mode === "pool" ? "Find an opponent" : "Play"),
     });
   }
   start() {
     const color = setup.color === "r" ? (Math.random() < 0.5 ? "w" : "b") : setup.color;
-    const cfg = setup.mode === "online" ? { mode: "online", room: "zh-" + randomId(10), tcKey: setup.tc } : { mode: setup.mode, level: setup.level, myColor: color };
+    const cfg = setup.mode === "online" ? { mode: "online", room: "zh-" + randomId(10), tcKey: setup.tc }
+      : setup.mode === "pool" ? { mode: "pool", tcKey: setup.tc === "inf" ? "3+0" : setup.tc }
+        : { mode: setup.mode, level: setup.level, myColor: color };
     this.app.launch(() => new ZhGame(this.app, cfg), setup.mode === "online" ? "#/crazyhouse/online" : "#/crazyhouse/play");
   }
 }

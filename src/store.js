@@ -1,5 +1,5 @@
 // Persistent settings, profile, ratings, and game archive (localStorage, all reads guarded).
-const KEY = { settings: "chess3d.settings", profile: "chess3d.profile", games: "chess3d.games", reviews: "chess3d.reviews", resume: "chess3d.resume", daily: "chess3d.daily", social: "chess3d.social" };
+const KEY = { settings: "chess3d.settings", profile: "chess3d.profile", games: "chess3d.games", reviews: "chess3d.reviews", resume: "chess3d.resume", daily: "chess3d.daily", social: "chess3d.social", vgames: "chess3d.vgames" };
 const MAX_GAMES = 300;
 const MAX_REVIEWS = 12;
 
@@ -70,6 +70,7 @@ const DEFAULT_PROFILE = () => ({
   botsBeaten: {},         // botId -> true
   achievements: {},       // id -> timestamp
   stats: { games: 0, wins: 0, losses: 0, draws: 0 },
+  variants: {},           // variant -> { r, n, hist }: rated games against random opponents
 });
 
 let profile = null;
@@ -112,6 +113,39 @@ export function applyRating(cat, opp, score) {
   if (slot.hist.length > 200) slot.hist.shift();
   saveProfile();
   return d;
+}
+
+// Variant ratings start at 1500, like chess.com's
+export const VARIANT_START = 1500;
+export function variantRating(variant) {
+  const v = getProfile().variants[variant];
+  return v ? v.r : VARIANT_START;
+}
+export function applyVariantRating(variant, opp, score) {
+  const p = getProfile();
+  const slot = p.variants[variant] || (p.variants[variant] = { r: VARIANT_START, n: 0, hist: [] });
+  const d = eloDelta(slot.r, opp, score, slot.n);
+  slot.r = Math.max(100, slot.r + d);
+  slot.n++;
+  slot.hist.push([Date.now(), slot.r]);
+  if (slot.hist.length > 200) slot.hist.shift();
+  saveProfile();
+  return d;
+}
+
+// Variant games are kept apart from the main archive (which reviews and analyses with standard
+// rules): each record keeps the position after every move, so it replays with any rules.
+const MAX_VARIANT_GAMES = 40;
+export function getVariantGames() { return read(KEY.vgames, []); }
+export function saveVariantGame(rec) {
+  const list = getVariantGames().filter((g) => g.id !== rec.id);
+  list.unshift(rec);
+  if (list.length > MAX_VARIANT_GAMES) list.length = MAX_VARIANT_GAMES;
+  while (!write(KEY.vgames, list) && list.length > 1) list.length = Math.floor(list.length * 0.8);
+  const p = getProfile();
+  p.stats.games++;
+  if (rec.myResult === "win") p.stats.wins++; else if (rec.myResult === "loss") p.stats.losses++; else if (rec.myResult === "draw") p.stats.draws++;
+  saveProfile();
 }
 
 export function timeClass(tcKey) {
@@ -221,7 +255,7 @@ export function unlock(id) {
 
 // ---------- export / import ----------
 export function exportAll() {
-  return JSON.stringify({ v: 1, settings, profile: getProfile(), games: getGames(), social: getSocialId() });
+  return JSON.stringify({ v: 1, settings, profile: getProfile(), games: getGames(), vgames: getVariantGames(), social: getSocialId() });
 }
 export function importAll(json) {
   const data = JSON.parse(json);
@@ -229,6 +263,7 @@ export function importAll(json) {
   if (data.settings) { settings = { ...DEFAULT_SETTINGS, ...data.settings }; write(KEY.settings, settings); notifyAllSettings(); }
   if (data.profile) { profile = deepMerge(DEFAULT_PROFILE(), data.profile); saveProfile(); }
   if (Array.isArray(data.games)) write(KEY.games, data.games.slice(0, MAX_GAMES));
+  if (Array.isArray(data.vgames)) write(KEY.vgames, data.vgames.slice(0, MAX_VARIANT_GAMES));
   if (data.social && data.social.id && data.social.secret) setSocialId(data.social);
 }
 export function resetAll() {

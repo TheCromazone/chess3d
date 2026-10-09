@@ -1,7 +1,8 @@
 // Full-page screens: profile (ratings, stats, archive, achievements) and settings.
 import { h, icon, timeAgo, downloadText } from "../ui/dom.js";
 import { sparkline, switchRow, segmented, toast, confirmModal, openModal, tcLabel } from "../ui/components.js";
-import { getProfile, updateProfile, getGames, ACHIEVEMENTS, getSettings, setSettings, exportAll, importAll, resetAll, getDailyGames } from "../store.js";
+import { getProfile, updateProfile, getGames, ACHIEVEMENTS, getSettings, setSettings, exportAll, importAll, resetAll, getDailyGames, getVariantGames } from "../store.js";
+import { VARIANT_NAMES } from "../modes/variant-replay.js";
 import { BOTS } from "../bots.js";
 import { BOARD_THEMES as B3, PIECE_THEMES as P3 } from "../board3d.js";
 import { BOARD_THEMES as B2, PIECE_THEMES as P2 } from "../board2d.js";
@@ -9,6 +10,9 @@ import { MoveTree } from "../core/tree.js";
 import { createChess } from "../core/chess960.js";
 import { registered as socialOn, leave as leaveSocial, api as socialApi } from "../net/social.js";
 import { accountSection } from "./account.js";
+
+const FOUR_COLORS = ["r", "b", "y", "g"];
+const FOUR_WINNER = { r: "Red won", b: "Blue won", y: "Yellow won", g: "Green won", ry: "Red and Yellow won", bg: "Blue and Green won" };
 
 const EMOJIS = ["♞", "♛", "♜", "♝", "♚", "♟", "🦁", "🦊", "🐺", "🦉", "🐉", "🐙", "🦅", "🐢", "🎩", "👑", "⚡", "🔥", "🌙", "🍀"];
 const BGS = ["#2f6b4f", "#6b4a2f", "#3b4f7a", "#7a3b4f", "#5a4f2a", "#2a5a5a", "#5a2a6b", "#6b2a2a"];
@@ -34,6 +38,32 @@ export class ProfilePage {
       stat("bolt", "Bullet", R.bullet), stat("fire", "Blitz", R.blitz), stat("clock", "Rapid", R.rapid),
       stat("robot", "Vs bots", R.bots), stat("puzzle", "Puzzles", R.puzzle),
       h("div.stat", h("div.lbl", icon("bolt", 16), "Puzzle Rush"), h("div.val", String(Math.max(p.rush["3"], p.rush["5"], p.rush.survival))), h("div.note", `3 min ${p.rush["3"]} · 5 min ${p.rush["5"]} · Survival ${p.rush.survival}`)))));
+    // variants: ratings from games against random opponents, and recent games of every variant
+    const vgames = getVariantGames();
+    const vr = Object.entries(p.variants || {}).filter(([, v]) => v.n > 0).sort((a, b) => b[1].n - a[1].n);
+    if (vr.length || vgames.length) {
+      const sec = h("section", h("h2", "Variants"));
+      if (vr.length) sec.append(h("div.stat-grid", ...vr.map(([k, v]) => h("div.stat", h("div.lbl", VARIANT_NAMES[k] || k), h("div.val", String(v.r)), h("div.note", plural(v.n, "rated game")), sparkline(v.hist)))));
+      if (vgames.length) {
+        const row = (g) => {
+          const res = g.myResult || "draw";
+          const sym = res === "win" ? "+" : res === "loss" ? "−" : "½";
+          const players = g.variant === "fourplayer" ? FOUR_COLORS.map((c) => g.players[c]).join(", ") : `${g.white.name} vs ${g.black.name}`;
+          const outcome = g.variant === "fourplayer" ? (g.place ? `${["", "1st", "2nd", "3rd", "4th"][g.place]} place` : g.winner ? FOUR_WINNER[g.winner] || "" : "Drawn") : g.result.replace("1/2-1/2", "½–½");
+          return h("tr.click", { onclick: () => this.app.go(`#/vgame/${g.id}`) },
+            h("td", g.myResult ? h(`span.res.${res}`, sym) : null),
+            h("td", h("b", VARIANT_NAMES[g.variant === "fourplayer" && g.rules === "teams" ? "fourteams" : g.variant] || g.variant), g.rated ? h("small.muted", " rated") : null),
+            h("td", players),
+            h("td", h("div", outcome), g.delta != null ? h("small.muted", `${g.delta >= 0 ? "+" : ""}${g.delta}`) : null),
+            h("td", timeAgo(g.date)));
+        };
+        sec.append(h("div", { style: { overflowX: "auto", marginTop: "10px" } }, h("table.table",
+          h("thead", h("tr", h("th", ""), h("th", "Variant"), h("th", "Players"), h("th", "Result"), h("th", "Date"))),
+          h("tbody", ...vgames.slice(0, 20).map(row)))));
+      }
+      page.append(sec);
+    }
+
     const s = p.stats;
     const winRate = s.games ? Math.round((s.wins / s.games) * 100) : 0;
     page.append(h("section", h("h2", "Stats"), h("div.stat-grid",

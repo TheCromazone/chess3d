@@ -6,8 +6,8 @@ import { openModal, toast, confirmModal, tcLabel, tcPicker, segmented, promotion
 import { FourPlayer, FP_COLORS, FP_NAMES, fpTextToMove, fpMoveToText } from "../core/fp.js";
 import { FP_LEVELS } from "../core/fp-engine.js";
 import { think } from "./zh-game.js";
-import { RoomClient, makePlayerId, parsePlayerId, live } from "../net/room.js";
-import { getProfile, getSettings } from "../store.js";
+import { RoomClient, makePlayerId, parsePlayerId, live, findMatch } from "../net/room.js";
+import { getProfile, getSettings, variantRating, applyVariantRating, saveVariantGame, newGameId } from "../store.js";
 import { SFX } from "../audio.js";
 import * as Social from "../net/social.js";
 
@@ -23,7 +23,7 @@ const REASONS = {
 // pieces: the board's own 2D set, recoloured for each army (built once from the white pieces)
 const pieceArt = {};
 let artReady = null;
-function loadArt() {
+export function loadArt() {
   if (!artReady) {
     artReady = Promise.all(["K", "Q", "R", "B", "N", "P"].map(async (t) => {
       const svg = await (await fetch(`./assets/pieces/cburnett/w${t}.svg`)).text();
@@ -42,7 +42,7 @@ function cellSquare(row, col, bottom) {
 }
 
 // the board: { sel, last, targets: Map(sq -> move), onTap } are optional (the setup shows a still board)
-function drawBoard(g, view, { sel = null, last = null, targets = new Map(), onTap = null } = {}) {
+export function drawBoard(g, view, { sel = null, last = null, targets = new Map(), onTap = null } = {}) {
   const pieces = new Map(g.pieces().map((p) => [p.sq, p]));
   const checked = new Set(FP_COLORS.filter((c) => g.status()[FP_COLORS.indexOf(c)] !== "out" && g.inCheck(c)).map((c) => g.kingSquare(c)));
   const cells = [];
@@ -70,7 +70,8 @@ function drawBoard(g, view, { sel = null, last = null, targets = new Map(), onTa
 }
 
 export class FourPlayerGame {
-  // cfg: { mode: "bot"|"local"|"online", rules: "ffa"|"teams", level, myColor, room, tcKey }
+  // cfg: { mode: "bot"|"local"|"online"|"pool", rules: "ffa"|"teams", level, myColor, room, tcKey }
+  // ("online": friends with a link; "pool": rated, with whoever is looking for the same game)
   constructor(app, cfg) {
     this.app = app;
     this.cfg = cfg;
@@ -81,18 +82,20 @@ export class FourPlayerGame {
     this.level = FP_LEVELS.find((l) => l.id === cfg.level) || FP_LEVELS[1];
     this.sel = null;
     this.last = null;
-    this.phase = this.mode === "online" ? "connecting" : "playing";
+    this.phase = this.net ? "connecting" : "playing";
+    this.id = newGameId();
+    this.ratingKey = (cfg.rules || "ffa") === "teams" ? "fourteams" : "fourplayer";
   }
 
   mount() {
     this.app.setInGame(true);
-    live.busy = this.mode !== "online";
+    live.busy = !this.net;
     this.root = h("div.fp-page");
     this.app.pageMode(this.root);
     loadArt().then(() => !this.dead && this.render());
     this.render();
     this.tick = setInterval(() => this._clockTick(), 250);
-    if (this.mode === "online") this.connect();
+    if (this.net) this.connect();
     else this.maybeBot();
     this.app.leaveGuard = async () => {
       if (this.g.result || this.phase !== "playing" || this.mode === "local") return true;
@@ -107,12 +110,14 @@ export class FourPlayerGame {
     live.busy = false;
     if (live.room === this.room) live.room = null;
     clearInterval(this.tick);
+    if (this.search) this.search.cancel();
     if (this.client) this.client.close();
     const params = new URLSearchParams(location.search);
     if (params.has("room")) { params.delete("room"); params.delete("tc"); params.delete("rules"); history.replaceState(null, "", location.pathname + (params.size ? "?" + params : "") + location.hash); }
   }
 
-  isHuman(color) { return this.mode === "local" || (this.mode === "online" ? color === this.myColor : color === this.myColor); }
+  get net() { return this.mode === "online" || this.mode === "pool"; }
+  isHuman(color) { return this.mode === "local" || (this.net ? color === this.myColor : color === this.myColor); }
   canMove() { return !this.g.result && this.phase === "playing" && !this.waiting && this.isHuman(this.g.turn()) && !this.thinking; }
 
   // ---- input: tap a piece, then where it goes ----
@@ -142,7 +147,7 @@ export class FourPlayerGame {
     if (!events) return;
     this.last = { from: m.from, to: m.to };
     this.sound(events, remote);
-    if (this.mode === "online" && !remote) { this.client.action({ t: "move", move: fpMoveToText(m) }); this.waiting = true; }
+    if (this.net && !remote) { this.client.action({ t: "move", move: fpMoveToText(m) }); this.waiting = true; }
     this.afterTurn(events, before);
   }
 
@@ -186,7 +191,7 @@ export class FourPlayerGame {
   }
 
   resign() {
-    if (this.mode === "online") { this.client.action({ t: "resign" }); return; }
+    if (this.net) { this.client.action({ t: "resign" }); return; }
     if (this.mode === "local") {
       const events = this.g.resign(this.g.turn());
       this.afterTurn(events, null);
@@ -217,6 +222,8 @@ export class FourPlayerGame {
       sub = REASONS[r.reason] || "";
     }
     const order = this.g.teams ? FP_COLORS : (r && r.ranking) || [...FP_COLORS].sort((a, b) => pts[FP_COLORS.indexOf(b)] - pts[FP_COLORS.indexOf(a)]);
+    const extra = this.record(order);
+    if (extra.delta != null) sub += `${sub ? ". " : ""}4-Player ${this.g.teams ? "Teams" : "Chess"} rating ${extra.rating} (${extra.delta >= 0 ? "+" : ""}${extra.delta})`;
     setTimeout(() => {
       if (this.dead) return;
       const m = openModal({
@@ -225,16 +232,70 @@ export class FourPlayerGame {
           this.g.teams ? null : h("div.fp-standings", ...order.map((c, i) => h("div.fp-stand", h("b", `${i + 1}.`), h(`span.fp-chip.${c}`), h("span", FP_NAMES[c]), h("span.grow"), h("b", `${pts[FP_COLORS.indexOf(c)]}`)))),
           h("div.btn-row",
             h("button.btn", { onclick: () => { m.close(); this.app.go("#/fourplayer"); } }, "New game"),
-            this.mode !== "online" ? h("button.btn.primary", { onclick: () => { m.close(); this.app.setController(() => new FourPlayerGame(this.app, this.cfg)); } }, "Play again") : null),
+            this.mode === "online" ? null : h("button.btn.primary", { onclick: () => { m.close(); this.app.setController(() => new FourPlayerGame(this.app, this.cfg)); } }, this.mode === "pool" ? "New game" : "Play again")),
         ],
       });
     }, 500);
   }
 
+  // the game for the archive; in rated games, the rating moves by where you finished
+  record(order) {
+    if (this.g.log.length < 4) return {};
+    const my = this.mode === "local" ? null : this.myColor;
+    const r = this.g.result;
+    const pts = this.g.points();
+    let score = null;
+    if (my && r) {
+      if (this.g.teams) score = !r.winner ? 0.5 : r.winner.includes(my) ? 1 : 0;
+      else {
+        // against each other player: 1 for finishing above them, half for level points
+        const mine = pts[FP_COLORS.indexOf(my)];
+        score = FP_COLORS.filter((c) => c !== my).reduce((t, c) => t + (mine > pts[FP_COLORS.indexOf(c)] ? 1 : mine === pts[FP_COLORS.indexOf(c)] ? 0.5 : 0), 0) / 3;
+      }
+    }
+    let delta = null, rating = null;
+    if (this.mode === "pool" && my && score !== null && !this.gaveUp) {
+      const v = this.lastState && this.lastState.view;
+      const foes = FP_COLORS.filter((c) => c !== my && !(this.g.teams && c === FP_COLORS[(FP_COLORS.indexOf(my) + 2) % 4]));
+      const ratings = foes.map((c) => (v && v.fourSeats[c] ? parsePlayerId(v.fourSeats[c]).rating : 0) || 1500);
+      delta = applyVariantRating(this.ratingKey, ratings.reduce((a, b) => a + b, 0) / ratings.length, score);
+      rating = variantRating(this.ratingKey);
+    }
+    const place = order.indexOf(my) + 1;
+    saveVariantGame({
+      id: this.id, date: Date.now(), variant: "fourplayer", rules: this.g.mode, mode: this.mode, tc: this.cfg.tcKey || null, rated: this.mode === "pool",
+      players: Object.fromEntries(FP_COLORS.map((c) => [c, this.playerName(c)])), myColor: my,
+      myResult: !my || score === null ? null : score > 0.5 ? "win" : score < 0.5 ? "loss" : "draw",
+      place: my && !this.g.teams ? place : null, points: pts, reason: r ? r.reason : "resignation", winner: r ? r.winner : null, delta,
+      state: this.g.state(),
+    });
+    return { delta, rating };
+  }
+
   // ---- online ----
   connect() {
-    this.room = this.cfg.room;
     const me = getProfile();
+    const handlers = {
+      onState: (s) => this._state(s),
+      onError: (err) => { if (!/not your turn/.test(err)) toast(err); this.waiting = false; if (this.lastState) this._state(this.lastState); },
+      onStatus: (st) => { this.netNote = st === "disconnected" ? "Connection lost. Reconnecting…" : null; this.render(); },
+    };
+    if (this.mode === "pool") {
+      // rooms named fp-... seat four; the pool is per game type and time control
+      this.playerId = makePlayerId(me.name, variantRating(this.ratingKey), Social.myCode());
+      this.phase = "searching";
+      this.search = findMatch(this.cfg.tcKey || "5+0", this.playerId, (p) => { if (p.room) this.searchRoom = p.room; this.render(); }, { prefix: `fp-p${this.cfg.rules || "ffa"}`, seats: 4 });
+      this.search.promise.then(({ room, client }) => {
+        if (this.dead) { client.close(); return; }
+        this.search = null;
+        this.room = room;
+        this.client = client;
+        SFX.notify();
+        client.rebind(handlers);
+      }).catch((e) => { this.search = null; if (!this.dead) { this.phase = "failed"; this.failNote = e.message; this.render(); } });
+      return;
+    }
+    this.room = this.cfg.room;
     this.playerId = sessionStorage.getItem("mp-pid-" + this.room) || makePlayerId(me.name, me.ratings.blitz.r, Social.myCode());
     sessionStorage.setItem("mp-pid-" + this.room, this.playerId);
     const params = new URLSearchParams(location.search);
@@ -242,11 +303,7 @@ export class FourPlayerGame {
     params.set("tc", this.cfg.tcKey || "5+0");
     params.set("rules", this.cfg.rules || "ffa");
     history.replaceState(null, "", location.pathname + "?" + params + "#/fourplayer/online");
-    this.client = new RoomClient(this.room, this.playerId, {
-      onState: (s) => this._state(s),
-      onError: (err) => { if (!/not your turn/.test(err)) toast(err); this.waiting = false; if (this.lastState) this._state(this.lastState); },
-      onStatus: (st) => { this.netNote = st === "disconnected" ? "Connection lost. Reconnecting…" : null; this.render(); },
-    });
+    this.client = new RoomClient(this.room, this.playerId, handlers);
   }
 
   _state(s) {
@@ -326,7 +383,7 @@ export class FourPlayerGame {
     const order = FP_COLORS;
     const body = [];
     if (this.phase === "unsupported") body.push(h("div.status-line.bad", h("span", "The game server hasn't been updated for 4-Player Chess yet. Try again in a few minutes.")));
-    if (this.phase === "waiting" || this.phase === "connecting" || this.phase === "config") body.push(this._lobby());
+    if (["waiting", "connecting", "config", "searching", "failed"].includes(this.phase)) body.push(this._lobby());
     if (this.netNote) body.push(h("div.status-line.bad", h("span", this.netNote)));
     body.push(h("div.fp-players", ...order.map(playerCard)));
     if (!g.result && this.phase === "playing") {
@@ -372,7 +429,7 @@ export class FourPlayerGame {
   }
 
   claim() {
-    if (this.mode === "online") { this.client.action({ t: "claim" }); return; }
+    if (this.net) { this.client.action({ t: "claim" }); return; }
     this.g.claim(this.myColor);
     this.finish();
     this.render();
@@ -389,6 +446,12 @@ export class FourPlayerGame {
   }
 
   _lobby() {
+    if (this.mode === "pool") {
+      return h("div.card", h("h3", this.phase === "failed" ? "No game found" : "Looking for three opponents"),
+        h("p.note", this.phase === "failed" ? (this.failNote || "Try again in a moment.") : `${this.cfg.rules === "teams" ? "Teams" : "Free-for-all"}, ${tcLabel(this.cfg.tcKey || "5+0")}, rated. The game starts when four players are looking for the same game.`),
+        h("div.btn-row", h("button.btn", { onclick: () => this.app.go("#/fourplayer") }, this.phase === "failed" ? "Back" : "Cancel"),
+          this.phase === "failed" ? h("button.btn.primary", { onclick: () => this.app.setController(() => new FourPlayerGame(this.app, this.cfg)) }, "Try again") : null));
+    }
     const link = location.origin + location.pathname + `?room=${this.room}&tc=${encodeURIComponent(this.cfg.tcKey || "5+0")}&rules=${this.cfg.rules || "ffa"}#/fourplayer/online`;
     const n = (this.seats || []).length;
     return h("div.card", h("h3", "Invite three friends"),
@@ -417,26 +480,28 @@ export class FourPlayerSetup {
     const body = [
       h("p", { style: { color: "var(--ink-2)" } }, "Four armies on one cross-shaped board, moving in turn: Red, Blue, Yellow, Green. Play everyone for points, or in teams with the player across from you."),
       field("Game", segmented([{ value: "ffa", label: "Free-for-all" }, { value: "teams", label: "Teams" }], setup.rules, (v) => { setup.rules = v; this.render(); })),
-      field("Players", segmented([{ value: "bot", label: "You and 3 bots" }, { value: "local", label: "Pass and play" }, { value: "online", label: "Friends online" }], setup.mode, (v) => { setup.mode = v; this.render(); })),
+      field("Players", segmented([{ value: "pool", label: "Random players" }, { value: "online", label: "Friends" }, { value: "bot", label: "You and 3 bots" }, { value: "local", label: "Pass and play" }], setup.mode, (v) => { setup.mode = v; this.render(); })),
     ];
     if (setup.mode === "bot") {
       body.push(field("Bots", segmented(FP_LEVELS.map((l) => ({ value: l.id, label: l.name })), setup.level, (v) => { setup.level = v; })));
       body.push(field("Play as", segmented(FP_COLORS.map((c) => ({ value: c, label: FP_NAMES[c] })), setup.color, (v) => { setup.color = v; this.render(); })));
     }
-    if (setup.mode === "online") body.push(field("Time control", tcPicker(setup.tc, (v) => { setup.tc = v; }, { allowUnlimited: false, allowCustom: true })));
+    if (setup.mode === "online" || setup.mode === "pool") body.push(field("Time control", tcPicker(setup.tc, (v) => { setup.tc = v; }, { allowUnlimited: false, allowCustom: setup.mode === "online" })));
+    if (setup.mode === "pool") body.push(h("p.note", `Rated. Your 4-Player ${setup.rules === "teams" ? "Teams" : "Chess"} rating: ${variantRating(setup.rules === "teams" ? "fourteams" : "fourplayer")}.`));
     body.push(h("p.note", setup.rules === "teams"
       ? "Teams: Red and Yellow against Blue and Green. Checkmate either opponent to win."
       : "Free-for-all: points for captures, checkmates and multi-checks. The game ends when three players are out."));
     const side = h("div.fp-side",
       h("div.fp-head", h("button.back", { "aria-label": "Back", onclick: () => this.app.go("#/variants") }, icon("back", 22)), h("h2", "4-Player Chess")),
       ...body,
-      h("button.btn.primary.big.block", { onclick: () => this.start() }, setup.mode === "online" ? "Create invite link" : "Play"));
+      h("button.btn.primary.big.block", { onclick: () => this.start() }, setup.mode === "online" ? "Create invite link" : setup.mode === "pool" ? "Find a game" : "Play"));
     const view = setup.mode === "bot" ? setup.color : "r";
     this.root.replaceChildren(h("div.fp-layout", h("div.fp-board-wrap", drawBoard(new FourPlayer(setup.rules), view)), side));
   }
   start() {
     const cfg = setup.mode === "online"
       ? { mode: "online", rules: setup.rules, room: "fp-" + randomId(10), tcKey: setup.tc }
+      : setup.mode === "pool" ? { mode: "pool", rules: setup.rules, tcKey: setup.tc }
       : { mode: setup.mode, rules: setup.rules, level: setup.level, myColor: setup.mode === "bot" ? setup.color : "r" };
     this.app.launch(() => new FourPlayerGame(this.app, cfg), `#/fourplayer/${setup.mode === "online" ? "online" : "play"}`);
   }
