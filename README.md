@@ -21,7 +21,7 @@ lessons, Stockfish game review, and analysis. There's no sign-up: your device ho
 - **Game Review:** every move classified (brilliant, great, best, excellent, good, book, inaccuracy, mistake, miss, blunder), accuracy, an estimated game rating, an evaluation graph, key moments, coach explanations, and "retry" for your mistakes.
 - **Analysis board:** move tree with variations, live multi-line Stockfish evaluation, eval bar, best-move arrows, opening explorer, PGN/FEN import and export, a board editor, and "play a bot from here".
 - **Share:** a link that opens the game in analysis, an animated GIF, or a PNG of any position.
-- **Puzzles:** 17,000+ rated puzzles (with your own puzzle rating, theme and difficulty filters), a daily puzzle with streaks, Puzzle Rush (3 min, 5 min, survival), and Puzzle Battle against a bot.
+- **Puzzles:** 17,000+ rated puzzles (with your own puzzle rating, theme and difficulty filters), a daily puzzle with streaks, Puzzle Rush (3 min, 5 min, survival), and Puzzle Battle against another player or a bot.
 - **Learn:** interactive lessons, endgame drills against Stockfish, and an opening trainer.
 - **Watch:** 40 famous games replayed move by move, plus Bot TV.
 

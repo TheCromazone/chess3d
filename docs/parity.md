@@ -15,8 +15,9 @@ Rules v2 (chat, takebacks, abort, custom time controls) is deployed to the room 
 the social layer without sign-in: each device registers for a private key and a shareable friend
 code, and the game server (Cloudflare Worker + D1) holds friends with online status, direct messages
 and challenges, clubs with their own chat, and a global leaderboard of self-reported ratings.
-Loop 6 added live arenas against real players, daily games with a deadline per move (rules v3),
-adding your opponent as a friend after a game, a friends leaderboard, and club moderation.
+Loop 6 added live arenas and Puzzle Battles against real players, daily games with a deadline per
+move (rules v3) and "your move" notices, adding your opponent as a friend after a game, a friends
+leaderboard, and club moderation.
 Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don't have (alternative noted)
 
 ## Play
@@ -75,7 +76,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Daily puzzle | ✅ | with day streak |
 | Puzzles by theme | ✅ | 73 themes |
 | Hints / show solution | ✅ | |
-| Puzzle Battle | ✅ | race a bot through the same puzzles (human battles would need a server) |
+| Puzzle Battle | ✅ | against real players (matched by the server, same puzzles, live scores) or a bot |
 | Puzzle difficulty | ✅ | easiest → hardest |
 
 ## Learn
