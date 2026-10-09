@@ -113,7 +113,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Events (top tournaments live) | ✅ | the main over-the-board events running now (Lichess broadcasts): rounds, every game on a small board, and any game on the main board with clocks, following each new move |
 | Spectate a live game | ✅ | Watch button on friends who are in a live game, or open any game link |
 | Live streamers | ✅ | who's streaming chess right now (Chess.com and Lichess streamer lists), linking to the stream |
-| Chess videos | ✅ | latest videos from GothamChess, Chess.com, Saint Louis Chess Club, Daniel Naroditsky and Hanging Pawns, played on the page |
+| Chess videos | ✅ | latest videos from GothamChess, Chess.com, Saint Louis Chess Club, agadmator and Hanging Pawns, played on the page |
 | News | ✅ | latest headlines from FIDE, Lichess and Chess.com, refreshed every 15 minutes by the game server |
 
 ## Profile & social
