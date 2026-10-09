@@ -7,7 +7,8 @@ import { BOARD_THEMES as B3, PIECE_THEMES as P3 } from "../board3d.js";
 import { BOARD_THEMES as B2, PIECE_THEMES as P2 } from "../board2d.js";
 import { MoveTree } from "../core/tree.js";
 import { createChess } from "../core/chess960.js";
-import { registered as socialOn, myCode, fmtCode, leave as leaveSocial } from "../net/social.js";
+import { registered as socialOn, leave as leaveSocial } from "../net/social.js";
+import { accountSection } from "./account.js";
 
 const EMOJIS = ["♞", "♛", "♜", "♝", "♚", "♟", "🦁", "🦊", "🐺", "🦉", "🐉", "🐙", "🦅", "🐢", "🎩", "👑", "⚡", "🔥", "🌙", "🍀"];
 const BGS = ["#2f6b4f", "#6b4a2f", "#3b4f7a", "#7a3b4f", "#5a4f2a", "#2a5a5a", "#5a2a6b", "#6b2a2a"];
@@ -220,19 +221,9 @@ export class SettingsPage {
         h("div.field", h("div.lbl", "Move notation"), segmented([{ value: "figurine", label: "Figurine ♘f3" }, { value: "san", label: "Letters Nf3" }], s.notation, (v) => setSettings({ notation: v })))),
       h("section.settings-sec", h("h2", "Sound"),
         switchRow("Sound effects", null, s.sound, (v) => setSettings({ sound: v }))),
-      h("section.settings-sec", h("h2", "Social"),
-        socialOn()
-          ? [h("p.note", `Social is on. Your friend code is ${fmtCode(myCode())}. Your name, avatar, ratings, recent games and online status are visible to other players.`),
-            h("button.btn.danger", {
-              onclick: async () => {
-                if (!(await confirmModal({ title: "Delete your social profile?", sub: "Your friends, messages and club memberships are deleted from the server, and you leave the leaderboard. Games and ratings on this device stay.", yes: "Delete", danger: true }))) return;
-                try { await leaveSocial(); toast("Social profile deleted"); this.render(); } catch (e) { toast(e.message); }
-              },
-            }, icon("trash", 18), "Delete social profile")]
-          : [h("p.note", "Friends, messages, clubs and the global leaderboard are off. Nothing about you is shared until you turn them on."),
-            h("button.btn", { onclick: () => this.app.go("#/social") }, icon("users", 18), "Open Social")]),
+      accountSection(this),
       h("section.settings-sec", h("h2", "Your data"),
-        h("p.note", "Your profile, ratings and games live in this browser. Export a backup to move them (and your social key) to another device."),
+        h("p.note", "Your profile, ratings and games live in this browser (and in your cloud backup once you have a profile). You can also keep a backup file: it includes your profile key."),
         h("div.btn-row",
           h("button.btn", { onclick: () => downloadText("chess3d-backup.json", exportAll(), "application/json") }, icon("download", 18), "Export"),
           h("button.btn", { onclick: () => this.importFile() }, icon("upload", 18), "Import"),

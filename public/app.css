@@ -443,6 +443,9 @@ textarea.input.prose { font-family: var(--font); font-size: 14.5px; min-height: 
 .join-list li { display: flex; gap: 10px; align-items: center; color: var(--ink-2); }
 .join-list .ic { color: var(--accent); }
 .join-card .btn { align-self: flex-start; }
+.join-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.link-code { display: grid; place-items: center; padding: 14px 0 6px; }
+.recovery-key { display: block; padding: 12px 14px; border-radius: 8px; background: var(--bg-2); border: 1px solid var(--line-2); font-family: ui-monospace, Menlo, monospace; font-size: 14px; line-height: 1.6; word-break: break-all; user-select: all; margin-bottom: 10px; }
 
 .code-card { display: grid; grid-template-columns: auto 1fr; gap: 28px; align-items: end; padding: 18px 20px; }
 .code-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }

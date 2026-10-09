@@ -77,7 +77,15 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS social_battles_open ON social_battles (b_uid, a_seen)`,
   `CREATE TABLE IF NOT EXISTS social_games (id TEXT PRIMARY KEY, uid TEXT NOT NULL, created INTEGER NOT NULL, data TEXT NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS social_games_uid ON social_games (uid, created)`,
+  // more devices on the same profile: each linked device has its own key
+  `CREATE TABLE IF NOT EXISTS social_keys (hash TEXT PRIMARY KEY, uid TEXT NOT NULL, created INTEGER NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS social_keys_uid ON social_keys (uid)`,
+  `CREATE TABLE IF NOT EXISTS social_links (code TEXT PRIMARY KEY, uid TEXT NOT NULL, expires INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS social_backups (uid TEXT PRIMARY KEY, data TEXT NOT NULL, updated INTEGER NOT NULL)`,
 ];
+
+const LINK_MS = 10 * 60_000;         // a device link code works for 10 minutes, once
+const BACKUP_MAX = 1_800_000;        // characters; D1 rows top out at 2 MB
 
 const GAMES_KEPT = 30;              // recent games shown on a profile
 const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
@@ -179,9 +187,9 @@ function publicUser(u: UserRow, now: number) {
   };
 }
 
-async function body(request: Request): Promise<Record<string, unknown>> {
+async function body(request: Request, max = 8 * 1024): Promise<Record<string, unknown>> {
   const text = await request.text();
-  if (text.length > 8 * 1024) throw new HttpError(413, "request too large");
+  if (text.length > max) throw new HttpError(413, "request too large");
   if (!text) return {};
   try {
     const v = JSON.parse(text);
@@ -221,7 +229,9 @@ export class Social {
     const h = request.headers.get("Authorization") || "";
     const m = /^Bearer ([0-9a-f]{64})$/.exec(h);
     if (!m || !m[1]) throw new HttpError(401, "missing or bad credentials");
-    const u = await this.q("SELECT * FROM social_users WHERE secret_hash = ?", await sha256(m[1])).first<UserRow>();
+    const hash = await sha256(m[1]);
+    // the profile's own key, or one of its linked devices' keys
+    const u = await this.q("SELECT * FROM social_users WHERE secret_hash = ? OR id = (SELECT uid FROM social_keys WHERE hash = ?)", hash, hash).first<UserRow>();
     if (!u) throw new HttpError(401, "unknown device; register again");
     return u;
   }
@@ -273,7 +283,64 @@ export class Social {
       return { id, secret, code, name };
     }
 
+    // POST /link/claim {code}: sign this device in to a profile with a code made on another device
+    if (method === "POST" && path === "/link/claim") {
+      const b = await body(request);
+      const code = str(b["code"], 8).toUpperCase();
+      const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+      const [recent] = await this.many(
+        this.q("SELECT COUNT(*) AS n FROM social_reg_log WHERE ip = ? AND at > ?", ip, now - 3_600_000),
+        this.q("INSERT INTO social_reg_log (ip, at) VALUES (?, ?)", ip, now));
+      if (Number(recent?.[0]?.["n"] ?? 0) >= 20) throw new HttpError(429, "too many attempts; slow down");
+      const link = await this.q("SELECT uid FROM social_links WHERE code = ? AND expires > ?", code, now).first<{ uid: string }>();
+      if (!link) throw new HttpError(404, "that code is wrong or has expired");
+      const u = await this.user(link.uid);
+      if (!u) throw new HttpError(404, "that profile no longer exists");
+      const secret = randomSecret();
+      await this.many(
+        this.q("DELETE FROM social_links WHERE code = ?", code),
+        this.q("INSERT INTO social_keys (hash, uid, created) VALUES (?, ?, ?)", await sha256(secret), u.id, now));
+      return { id: u.id, secret, code: u.code, name: u.name };
+    }
+
     const me = await this.auth(request);
+
+    // ---- account: devices and cloud backup ----
+    // POST /link/create: a one-time code to sign in on another device
+    if (method === "POST" && path === "/link/create") {
+      const code = randomString(8);
+      await this.many(
+        this.q("DELETE FROM social_links WHERE uid = ? OR expires < ?", me.id, now),
+        this.q("INSERT INTO social_links (code, uid, expires) VALUES (?, ?, ?)", code, me.id, now + LINK_MS));
+      return { code, expires: now + LINK_MS };
+    }
+    // GET /devices: how many devices are signed in to this profile
+    if (method === "GET" && path === "/devices") {
+      const r = await this.q("SELECT COUNT(*) AS n FROM social_keys WHERE uid = ?", me.id).first<{ n: number }>();
+      return { devices: 1 + (r ? r.n : 0) };
+    }
+    // POST /devices/reset: sign out every other device; this one gets a fresh key (and recovery key)
+    if (method === "POST" && path === "/devices/reset") {
+      const secret = randomSecret();
+      await this.many(
+        this.q("UPDATE social_users SET secret_hash = ? WHERE id = ?", await sha256(secret), me.id),
+        this.q("DELETE FROM social_keys WHERE uid = ?", me.id),
+        this.q("DELETE FROM social_links WHERE uid = ?", me.id));
+      return { secret };
+    }
+    // GET /backup and POST /backup {data}: your profile, ratings, settings and games, kept in the cloud
+    if (method === "GET" && path === "/backup") {
+      const r = await this.q("SELECT data, updated FROM social_backups WHERE uid = ?", me.id).first<{ data: string; updated: number }>();
+      return r ? { data: r.data, updated: r.updated } : { data: null, updated: null };
+    }
+    if (method === "POST" && path === "/backup") {
+      const b = await body(request, BACKUP_MAX + 1024);
+      const data = typeof b["data"] === "string" ? b["data"] : "";
+      if (!data || data.length > BACKUP_MAX) throw new HttpError(400, "backup missing or too large");
+      try { const v = JSON.parse(data); if (!v || v.v !== 1) throw new Error("bad"); } catch { throw new HttpError(400, "that isn't a Chess 3D backup"); }
+      await this.q("INSERT OR REPLACE INTO social_backups (uid, data, updated) VALUES (?, ?, ?)", me.id, data, now).run();
+      return { ok: true, updated: now };
+    }
 
     // POST /heartbeat {status, name, avatar, ratings, games} -> {me, unread, requests}
     if (method === "POST" && path === "/heartbeat") {
@@ -587,6 +654,9 @@ export class Social {
         this.q("DELETE FROM social_club_bans WHERE member = ?", me.id),
         this.q("DELETE FROM social_arena_players WHERE uid = ?", me.id),
         this.q("DELETE FROM social_games WHERE uid = ?", me.id),
+        this.q("DELETE FROM social_keys WHERE uid = ?", me.id),
+        this.q("DELETE FROM social_links WHERE uid = ?", me.id),
+        this.q("DELETE FROM social_backups WHERE uid = ?", me.id),
         this.q("DELETE FROM social_battles WHERE a_uid = ? AND b_uid IS NULL", me.id),
         this.q("DELETE FROM social_users WHERE id = ?", me.id));
       for (const c of clubs ?? []) {

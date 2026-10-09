@@ -7,6 +7,7 @@ import { getProfile } from "../store.js";
 import { OnlineGame } from "../modes/online-game.js";
 import { DAILY_PACES } from "../modes/daily.js";
 import { gamePgn } from "./pages.js";
+import { signInModal } from "./account.js";
 import { SFX } from "../audio.js";
 import * as S from "../net/social.js";
 
@@ -191,8 +192,8 @@ export class SocialScreen {
         h("li", icon("chat", 18), h("span", "Message friends and challenge them to live or daily games")),
         h("li", icon("star", 18), h("span", "Create or join clubs, each with its own chat")),
         h("li", icon("trophy", 18), h("span", "See where you rank on the global leaderboard"))),
-      h("p.note", `Other players will see your name (${S.socialName(p.name)}), avatar, ratings, your recent online and bot games, and whether you're online. There's no email or password: a key saved in this browser identifies you. To use it on another device, export a backup in Settings and import it there.`),
-      btn);
+      h("p.note", `Other players will see your name (${S.socialName(p.name)}), avatar, ratings, your recent online and bot games, and whether you're online. There's no email or password: a key saved in this browser is your account, your games and ratings are backed up to it, and you can sign in on other devices from Settings.`),
+      h("div.join-actions", btn, h("button.btn.ghost", { onclick: () => signInModal() }, icon("key", 18), "I already have a profile")));
   }
 
   async _addByCode(text) {

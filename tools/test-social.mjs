@@ -192,6 +192,28 @@ ok(v.outcome === "void" && row("Cid").games === 1 && row("Dee").state === "idle"
 const notYet = (await call("POST", `/arenas/${later.id}/pair`, { secret: ann.secret, body: { pid: pidA } }));
 ok(notYet.status === 403 || notYet.data.running === false, "an arena that hasn't started doesn't pair");
 
+// accounts without passwords: link another device, cloud backup, sign out other devices
+const link = (await call("POST", "/link/create", { secret: ann.secret })).data;
+ok(link.code && link.code.length === 8 && link.expires > clock, "a device link code is issued");
+const dev2 = (await call("POST", "/link/claim", { body: { code: link.code }, ip: "3.3.3.3" })).data;
+ok(dev2.id === ann.id && dev2.secret !== ann.secret, "another device signs in to the same profile with its own key");
+ok((await call("GET", "/me", { secret: dev2.secret })).data.me.name === "Ann", "the linked device acts as that player");
+ok((await call("POST", "/link/claim", { body: { code: link.code }, ip: "3.3.3.3" })).status === 404, "a link code works once");
+ok((await call("GET", "/devices", { secret: ann.secret })).data.devices === 2, "the profile counts its devices");
+const backup = JSON.stringify({ v: 1, profile: { name: "Ann" }, games: [{ id: "x" }] });
+ok((await call("POST", "/backup", { secret: dev2.secret, body: { data: backup } })).data.ok, "a backup can be stored");
+ok((await call("POST", "/backup", { secret: dev2.secret, body: { data: "{\"nope\":1}" } })).status === 400, "only Chess 3D backups are accepted");
+ok((await call("GET", "/backup", { secret: ann.secret })).data.data === backup, "and read back from any of the profile's devices");
+const reset = (await call("POST", "/devices/reset", { secret: dev2.secret })).data;
+ok((await call("GET", "/me", { secret: ann.secret })).status === 401 && (await call("GET", "/me", { secret: reset.secret })).status === 200,
+  "signing out other devices leaves only this one, with a new key");
+ann.secret = reset.secret;
+clock += LINK_WAIT();
+const stale = (await call("POST", "/link/create", { secret: ann.secret })).data;
+clock += 11 * 60_000;
+ok((await call("POST", "/link/claim", { body: { code: stale.code }, ip: "3.3.3.4" })).status === 404, "link codes expire after 10 minutes");
+function LINK_WAIT() { return 1000; }
+
 // finding players by name
 const found = (await call("GET", "/search", { secret: ann.secret, query: "?q=ci" })).data.players;
 ok(found.length === 1 && found[0].name === "Cid", "players can be found by the start of their name");
