@@ -306,7 +306,9 @@ export class OnlineGame extends BaseGame {
       let res;
       if (r.draw) res = { winner: null, reason: r.reason };
       else res = { winner: r.winner === v.white ? "w" : "b", reason: r.reason };
-      if (res.reason === "resignation" && this.plyCount() < 2) res = { winner: null, reason: "aborted" };
+      // rules v1 had no abort, so "Abort" resigned: an early resignation there means aborted. From v2 on a
+      // resignation is one (tournaments and leagues score it as the server does)
+      if (res.reason === "resignation" && this.plyCount() < 2 && !this.v2) res = { winner: null, reason: "aborted" };
       this.phase = "over";
       this.finish(res);
       return;
