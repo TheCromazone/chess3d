@@ -1646,9 +1646,6 @@ export class Social {
     };
   }
 
-  // POST /puzzles/attempt {id, rating, moves, solved}: rate a puzzle attempt, once per puzzle. The puzzle's own
-  // rating comes from the published data (the app's `rating` only says which file it's in); "solved" has to
-  // follow the stored line (any final move is fine in a mate puzzle, where another mate also ends it)
   // a puzzle from the published data (`rating` says which file it's in), and whether `moves` solve it: they
   // follow the stored line, and in a mate puzzle any final move does (another mate ends it too)
   private async puzzleCheck(id: string, rating: number, moves: string[]): Promise<{ row: PuzzleRow; follows: boolean }> {
@@ -1679,6 +1676,8 @@ export class Social {
     return { row, follows: moves.length === line.length && moves.every((m, i) => m === line[i] || (mate && i === line.length - 1)) };
   }
 
+  // POST /puzzles/attempt {id, rating, moves, solved}: rate a puzzle attempt, once per puzzle, from the puzzle's
+  // published rating; "solved" has to follow its line
   private async puzzleAttempt(me: UserRow, b: Record<string, unknown>, now: number): Promise<unknown> {
     const id = str(b["id"], 16);
     const moves = Array.isArray(b["moves"]) ? (b["moves"] as unknown[]).map((m) => String(m)).slice(0, 40) : [];
