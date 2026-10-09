@@ -33,8 +33,13 @@ await build({
     target: ["es2022"], write: false,
   });
   const libCode = lib.outputFiles[0].text;
+  // the Crazyhouse rules go in inline too (no imports may survive), minus their own exports
+  const zhCode = readFileSync(join(root, "src/core/zh.js"), "utf8")
+    .replace(/^import\s.*chess\.js.*$/m, "")
+    .replace(/^export (const|class|function) /gm, "$1 ");
   const srcCode = readFileSync(join(root, "src/logic-src.js"), "utf8")
-    .replace(/^import\s.*chess\.js.*$/m, "const { Chess } = __ChessLib;");
+    .replace(/^import\s.*chess\.js.*$/m, "const { Chess } = __ChessLib;")
+    .replace(/^import\s.*zh\.js.*$/m, zhCode);
   writeFileSync(join(dist, "logic.js"), libCode + "\n" + srcCode);
   console.log("logic.js assembled (inline exports)");
 }

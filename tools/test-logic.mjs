@@ -138,5 +138,40 @@ s9 = { ...s9, clock: { ...s9.clock, lastAt: Date.now() - 86400000 - 1000 } };
 s9 = L.applyAction(s9, P1, { t: "move", from: "e2", to: "e4" });
 ok(s9.flagged === "w" && s9.moves.length === 0, "a move after your deadline is a loss, not a move");
 
+// v4: Crazyhouse
+let z = L.setup([P1, P2]);
+ok(z.v >= 4, "state advertises v4");
+ok(!L.validateAction(z, P1, { t: "config", tc: "3+0", variant: "atomic" }).ok, "unknown variants are refused");
+z = L.applyAction(z, P1, { t: "config", tc: "3+0", variant: "crazyhouse" });
+const zplay = (pid, mv) => { const v = L.validateAction(z, pid, { t: "move", move: mv }); if (!v.ok) { ok(false, mv + ": " + v.error); return; } z = L.applyAction(z, pid, { t: "move", move: mv }); };
+for (const [pid, mv] of [[P1, "e2e4"], [P2, "d7d5"], [P1, "e4d5"], [P2, "d8d5"]]) zplay(pid, mv);
+ok(z.zh.pockets.w.p === 1 && z.zh.pockets.b.p === 1, "captures fill the pockets");
+ok(L.validateAction(z, P1, { t: "move", move: "P@e4" }).ok && !L.validateAction(z, P1, { t: "move", move: "Q@e4" }).ok, "you can only drop what you hold");
+zplay(P1, "P@e4");
+ok(z.san[z.san.length - 1] === "@e4" && z.zh.pockets.w.p === 0, "a drop is recorded and leaves the pocket");
+ok(!L.validateAction(z, P1, { t: "takeback-offer" }).ok, "no takebacks in Crazyhouse");
+let zm = L.applyAction(L.setup([P1, P2]), P1, { t: "config", tc: "inf", variant: "crazyhouse" });
+zm = { ...zm, zh: { fen: "6k1/5ppp/8/8/8/8/8/K7 w - - 0 1", pockets: { w: { q: 0, r: 1, b: 0, n: 0, p: 0 }, b: { q: 0, r: 0, b: 0, n: 0, p: 0 } }, promoted: [], keys: [] } };
+zm = L.applyAction(zm, P1, { t: "move", move: "R@d8" });
+r = L.isGameOver(zm);
+ok(r.over && r.winner === P1 && r.reason === "checkmate", "a drop can mate");
+
+// v4: Bughouse. Board A (P1 White, P2 Black) and board B (P3 White, P4 Black); teams P1+P4 v P2+P3.
+const P3 = "p-carol", P4 = "p-dave";
+let A = L.applyAction(L.setup([P1, P2]), P1, { t: "config", tc: "3+0", variant: "bughouse", link: "bh-b" });
+let Bd = L.applyAction(L.setup([P3, P4]), P3, { t: "config", tc: "3+0", variant: "bughouse", link: "bh-a" });
+ok(!L.validateAction(L.setup([P1, P2]), P1, { t: "config", tc: "3+0", variant: "bughouse" }).ok, "a bughouse board needs its partner");
+for (const [pid, mv] of [[P1, "e2e4"], [P2, "d7d5"], [P1, "e4d5"]]) A = L.applyAction(A, pid, { t: "move", move: mv });
+ok(A.zh.pockets.w.p === 0 && A.outbox.length === 1 && A.outbox[0].t === "give" && A.outbox[0].color === "b" && A.outbox[0].type === "p", "a capture goes to the partner, not the capturer");
+ok(!L.validateAction(Bd, P4, { t: "give", color: "b", type: "q" }).ok, "players can't give themselves pieces");
+Bd = L.applyAction(Bd, "__link", A.outbox[0]);
+ok(Bd.zh.pockets.b.p === 1, "the partner board receives the piece");
+A = L.applyAction(A, P2, { t: "resign" });
+const end = A.outbox.find((m) => m.t === "partner-end");
+ok(L.isGameOver(A).over && end && end.winner === "b", "when board A ends, a result goes to board B (A's White won, so B's Black wins)");
+Bd = L.applyAction(Bd, "__link", end);
+r = L.isGameOver(Bd);
+ok(r.over && r.winner === P4 && /^partner-/.test(r.reason), "board B ends with the same team winning (P1 and P4)");
+
 console.log(failures === 0 ? "\nALL TESTS PASSED" : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

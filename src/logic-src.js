@@ -1,11 +1,22 @@
 // Online chess rules module — bundled with chess.js into a self-contained logic.js
 // (six-export contract; no imports or timers survive in the bundle output).
 import { Chess } from "chess.js";
+import { Crazyhouse, textToMove } from "./core/zh.js";
 
 export const meta = { game: "Chess 3D", minPlayers: 2, maxPlayers: 2 };
 
 const TIME_CONTROLS = { "1+0": [60, 0], "3+2": [180, 2], "5+0": [300, 0], "10+0": [600, 0], "15+10": [900, 10], "inf": null };
-const VERSION = 3;           // v2: chat / takebacks / abort / custom clocks; v3: daily deadlines
+const VERSION = 4;           // v2: chat / takebacks / abort / custom clocks; v3: daily deadlines; v4: crazyhouse, bughouse
+const ROOM_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const otherColor = (c) => (c === "w" ? "b" : "w");
+
+// Crazyhouse and Bughouse rooms keep their position in state.zh. In Bughouse a capture goes to
+// the partner (the other colour on the linked board): it's queued in state.outbox, and the room
+// relays it to the linked room, which applies it as an internal "give" action.
+function zhOf(state) {
+  if (state.variant !== "bughouse") return new Crazyhouse(state.zh);
+  return new Crazyhouse(state.zh, { feed: (color, type) => { state.outbox = [...(state.outbox || []), { t: "give", color: otherColor(color), type }]; } });
+}
 const DAILY_DAYS = [1, 2, 3, 5, 7, 14];
 
 // "7+2", "0.5+0" ... -> [seconds, increment] (custom controls), or a preset key.
@@ -71,11 +82,21 @@ export function validateAction(state, playerId, action) {
     if (state.phase !== "config") return { ok: false, error: "the game already started" };
     if (color !== "w") return { ok: false, error: "White chooses the time control" };
     if (!parseTc(action.tc).ok) return { ok: false, error: "unknown time control" };
+    if (action.variant !== undefined && !["standard", "crazyhouse", "bughouse"].includes(action.variant)) return { ok: false, error: "unknown variant" };
+    if (action.variant === "bughouse" && !(typeof action.link === "string" && ROOM_RE.test(action.link))) return { ok: false, error: "a bughouse board needs its partner board" };
     return { ok: true };
   }
   if (state.phase === "config") return { ok: false, error: "waiting for White to choose the time control" };
   if (finished) return { ok: false, error: "the game is over" };
 
+  if (action.t === "move" && state.variant) {
+    const z = new Crazyhouse(state.zh);
+    if (z.outcome().over) return { ok: false, error: "the game is over" };
+    if (z.turn() !== color) return { ok: false, error: "not your turn" };
+    const m = textToMove(action.move);
+    if (!m || !z.isLegal(m)) return { ok: false, error: "illegal move" };
+    return { ok: true };
+  }
   if (action.t === "move") {
     const game = rebuild(state);
     if (game.isGameOver()) return { ok: false, error: "the game is over" };
@@ -91,6 +112,7 @@ export function validateAction(state, playerId, action) {
     return { ok: true };
   }
   if (action.t === "takeback-offer") {
+    if (state.variant) return { ok: false, error: "no takebacks in this variant" };
     if (!state.moves.length) return { ok: false, error: "no move to take back" };
     if (state.takebackOffer) return { ok: false, error: "a takeback request is already pending" };
     return { ok: true };
@@ -109,11 +131,19 @@ export function validateAction(state, playerId, action) {
   }
   if (action.t === "flag") {
     if (!state.tc) return { ok: false, error: "no clock in this game" };
-    const game = rebuild(state);
-    if (game.isGameOver()) return { ok: false, error: "the game is over" };
     const opp = color === "w" ? "b" : "w";
+    let turn;
+    if (state.variant) {
+      const z = new Crazyhouse(state.zh);
+      if (z.outcome().over) return { ok: false, error: "the game is over" };
+      turn = z.turn();
+    } else {
+      const game = rebuild(state);
+      if (game.isGameOver()) return { ok: false, error: "the game is over" };
+      turn = game.turn();
+    }
     let remaining = state.clock[opp];
-    if (game.turn() === opp && state.clock.lastAt !== null) remaining -= Date.now() - state.clock.lastAt;
+    if (turn === opp && state.clock.lastAt !== null) remaining -= Date.now() - state.clock.lastAt;
     if (remaining > 0) return { ok: false, error: "opponent still has time" };
     return { ok: true };
   }
@@ -124,6 +154,21 @@ export function applyAction(state, playerId, action) {
   const color = colorOf(state, playerId);
   const now = Date.now();
 
+  // internal actions from the linked Bughouse board (the room calls these directly; clients can't,
+  // because validateAction rejects them)
+  if (playerId === "__link") {
+    if (state.variant !== "bughouse" || !state.zh) return state;
+    if (action.t === "give" && ["w", "b"].includes(action.color) && ["p", "n", "b", "r", "q"].includes(action.type)) {
+      const zh = { ...state.zh, pockets: JSON.parse(JSON.stringify(state.zh.pockets)) };
+      zh.pockets[action.color][action.type]++;
+      return { ...state, zh };
+    }
+    if (action.t === "partner-end" && !state.partnerEnd) {
+      return { ...state, partnerEnd: { winner: ["w", "b"].includes(action.winner) ? action.winner : null, reason: String(action.reason || "partner").slice(0, 20) }, clock: { ...state.clock, lastAt: null } };
+    }
+    return state;
+  }
+
   if (action.t === "chat") {
     const msg = { c: color, text: action.text.trim().slice(0, 200), at: now };
     return { ...state, chat: [...(state.chat || []), msg].slice(-60) };
@@ -131,10 +176,15 @@ export function applyAction(state, playerId, action) {
 
   if (action.t === "config") {
     const { tc, perMove } = parseTc(action.tc);
+    const variant = action.variant === "crazyhouse" || action.variant === "bughouse" ? action.variant : null;
     return {
       ...state,
       phase: "playing",
       tcKey: action.tc,
+      variant,
+      zh: variant ? new Crazyhouse().state() : undefined,
+      link: variant === "bughouse" ? action.link : undefined,
+      outbox: [],
       tc: tc ? { initial: tc[0], inc: tc[1], perMove: !!perMove } : null,
       clock: tc ? { w: tc[0] * 1000, b: tc[0] * 1000, lastAt: now } : { w: 0, b: 0, lastAt: null },
     };
@@ -149,10 +199,20 @@ export function applyAction(state, playerId, action) {
       if (remaining <= 0) {
         flagged = color;
         clock = { ...clock, [color]: 0, lastAt: null };
-        return { ...state, clock, flagged };
+        return withPartnerEnd({ ...state, clock, flagged });
       }
       // daily games: the mover gets their full allowance back for their next turn
       clock = { ...clock, [color]: state.tc.perMove ? state.tc.initial * 1000 : remaining + state.tc.inc * 1000, lastAt: now };
+    }
+    if (state.variant) {
+      const next = { ...state, clock, drawOffer: null };
+      const z = zhOf(next);
+      const desc = z.move(textToMove(action.move));
+      next.zh = z.state();
+      next.fen = z.fen;
+      next.moves = [...state.moves, action.move];
+      next.san = [...state.san, desc.san];
+      return withPartnerEnd(next);
     }
     const game = rebuild(state);
     const mv = game.move({ from: action.from, to: action.to, promotion: action.promotion || undefined });
@@ -167,7 +227,7 @@ export function applyAction(state, playerId, action) {
     };
   }
 
-  if (action.t === "abort") return { ...state, aborted: true, clock: { ...state.clock, lastAt: null } };
+  if (action.t === "abort") return withPartnerEnd({ ...state, aborted: true, clock: { ...state.clock, lastAt: null } });
   if (action.t === "takeback-offer") return { ...state, takebackOffer: color };
   if (action.t === "takeback-decline") return { ...state, takebackOffer: null };
   if (action.t === "takeback-accept") {
@@ -183,9 +243,9 @@ export function applyAction(state, playerId, action) {
     return { ...state, moves, san: state.san.slice(0, keep), fen: g2.fen(), takebackOffer: null, drawOffer: null, clock };
   }
 
-  if (action.t === "resign") return { ...state, resigned: color };
+  if (action.t === "resign") return withPartnerEnd({ ...state, resigned: color });
   if (action.t === "draw-offer") return { ...state, drawOffer: color };
-  if (action.t === "draw-accept") return { ...state, agreedDraw: true, drawOffer: null };
+  if (action.t === "draw-accept") return withPartnerEnd({ ...state, agreedDraw: true, drawOffer: null });
   if (action.t === "draw-decline") return { ...state, drawOffer: null };
 
   if (action.t === "flag") {
@@ -194,14 +254,29 @@ export function applyAction(state, playerId, action) {
     const game = rebuild(state);
     const board = game.board().flat().filter(Boolean);
     const claimerHasMaterial = board.some(p => p.color === color && p.type !== "k");
-    if (!claimerHasMaterial) return { ...state, timeoutDraw: true, clock: { ...state.clock, [opp]: 0, lastAt: null } };
-    return { ...state, flagged: opp, clock: { ...state.clock, [opp]: 0, lastAt: null } };
+    // (in the drop variants material in hand counts, so a flag always wins there)
+    if (!claimerHasMaterial && !state.variant) return { ...state, timeoutDraw: true, clock: { ...state.clock, [opp]: 0, lastAt: null } };
+    return withPartnerEnd({ ...state, flagged: opp, clock: { ...state.clock, [opp]: 0, lastAt: null } });
   }
   return state;
 }
 
+// Bughouse: when this board ends, the linked board ends too, with the result for the same teams
+// (this board's White partners the other board's Black)
+function withPartnerEnd(state) {
+  if (state.variant !== "bughouse" || state.partnerEnd || state.endSent) return state;
+  const r = isGameOver(state);
+  if (!r.over) return state;
+  const winnerColor = r.winner === state.white ? "w" : r.winner === state.black ? "b" : null;
+  return { ...state, endSent: true, outbox: [...(state.outbox || []), { t: "partner-end", winner: winnerColor ? otherColor(winnerColor) : null, reason: r.reason }] };
+}
+
 export function isGameOver(state) {
   if (state.phase === "config") return { over: false };
+  if (state.partnerEnd) {
+    const w = state.partnerEnd.winner;
+    return w ? { over: true, winner: w === "w" ? state.white : state.black, reason: "partner-" + state.partnerEnd.reason } : { over: true, draw: true, reason: "partner-" + state.partnerEnd.reason };
+  }
   if (state.resigned) {
     const winner = state.resigned === "w" ? state.black : state.white;
     return { over: true, winner, reason: "resignation" };
@@ -213,6 +288,11 @@ export function isGameOver(state) {
   if (state.timeoutDraw) return { over: true, draw: true, reason: "timeout-draw" };
   if (state.aborted) return { over: true, draw: true, reason: "aborted" };
   if (state.agreedDraw) return { over: true, draw: true, reason: "agreement" };
+  if (state.variant) {
+    const o = new Crazyhouse(state.zh).outcome();
+    if (!o.over) return { over: false };
+    return o.winner ? { over: true, winner: o.winner === "w" ? state.white : state.black, reason: o.reason } : { over: true, draw: true, reason: o.reason };
+  }
 
   const game = rebuild(state);
   if (game.isCheckmate()) {
