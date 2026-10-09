@@ -111,6 +111,17 @@ const SCHEMA = [
      id TEXT PRIMARY KEY, a_club TEXT NOT NULL, b_club TEXT NOT NULL, room TEXT NOT NULL DEFAULT '', a_pid TEXT NOT NULL DEFAULT '',
      b_pid TEXT NOT NULL DEFAULT '', tc TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'challenge', created INTEGER NOT NULL,
      deadline INTEGER NOT NULL DEFAULT 0, ply INTEGER NOT NULL DEFAULT 0, result TEXT, token TEXT)`,
+  // daily tournaments: rounds of groups, each a double round robin of daily games; group winners go through
+  `CREATE TABLE IF NOT EXISTS social_dtours (
+     id TEXT PRIMARY KEY, name TEXT NOT NULL, owner TEXT NOT NULL, tc TEXT NOT NULL, size INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'signup',
+     round INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL, starts INTEGER NOT NULL, winner TEXT, token TEXT)`,
+  `CREATE TABLE IF NOT EXISTS social_dtour_players (
+     tid TEXT NOT NULL, uid TEXT NOT NULL, pid TEXT NOT NULL, joined INTEGER NOT NULL, out_round INTEGER, PRIMARY KEY (tid, uid))`,
+  `CREATE TABLE IF NOT EXISTS social_dtour_seats (tid TEXT NOT NULL, round INTEGER NOT NULL, uid TEXT NOT NULL, grp INTEGER NOT NULL, PRIMARY KEY (tid, round, uid))`,
+  `CREATE TABLE IF NOT EXISTS social_dtour_games (
+     room TEXT PRIMARY KEY, tid TEXT NOT NULL, round INTEGER NOT NULL, grp INTEGER NOT NULL, w_uid TEXT NOT NULL, w_pid TEXT NOT NULL,
+     b_uid TEXT NOT NULL, b_pid TEXT NOT NULL, created INTEGER NOT NULL, outcome TEXT)`,
+  `CREATE INDEX IF NOT EXISTS social_dtour_games_round ON social_dtour_games (tid, round)`,
   // Leagues: a permanent tier per player, weekly divisions of up to 50, entries with trophies, and each scored game once
   `CREATE TABLE IF NOT EXISTS social_league (uid TEXT PRIMARY KEY, tier INTEGER NOT NULL DEFAULT 0, best INTEGER NOT NULL DEFAULT 0)`,
   `CREATE TABLE IF NOT EXISTS social_league_divs (
@@ -317,6 +328,26 @@ export function swissPairings(players: SwissEntrant[]): { pairs: [string, string
 // club matches: sign-ups close a day after the challenge is accepted (or when an owner starts it)
 const MATCH_SIGNUP_MS = 24 * 60 * 60_000;
 const MATCH_TCS = ["1d", "2d", "3d", "5d", "7d"];
+
+// daily tournaments: sign-ups close two days after one is created (or when its creator starts it)
+const DTOUR_SIGNUP_MS = 2 * 86_400_000;
+const DTOUR_MAX = 100;
+// score each player in a round's group: 1 a win (forfeits too), ½ a draw; Sonneborn-Berger breaks ties
+export function dtourGroupTable(uids: string[], games: { w_uid: string; b_uid: string; outcome: string | null }[]) {
+  const pts = new Map(uids.map((u) => [u, 0]));
+  const gain = (g: { outcome: string | null }, side: "w" | "b") =>
+    !g.outcome ? 0 : g.outcome === "draw" ? 0.5 : g.outcome === side || g.outcome === `${side}-forfeit` ? 1 : 0;
+  for (const g of games) {
+    pts.set(g.w_uid, (pts.get(g.w_uid) ?? 0) + gain(g, "w"));
+    pts.set(g.b_uid, (pts.get(g.b_uid) ?? 0) + gain(g, "b"));
+  }
+  const sb = new Map(uids.map((u) => [u, 0]));
+  for (const g of games) {
+    sb.set(g.w_uid, (sb.get(g.w_uid) ?? 0) + gain(g, "w") * (pts.get(g.b_uid) ?? 0));
+    sb.set(g.b_uid, (sb.get(g.b_uid) ?? 0) + gain(g, "b") * (pts.get(g.w_uid) ?? 0));
+  }
+  return uids.map((uid) => ({ uid, points: pts.get(uid) ?? 0, sb: sb.get(uid) ?? 0 })).sort((x, y) => y.points - x.points || y.sb - x.sb);
+}
 
 // Leagues (like chess.com's): eight tiers; each week players are grouped in divisions of up to 50 of the same
 // tier, earn trophies from rated games against random opponents and from arenas, and the top of each division
@@ -576,6 +607,22 @@ export class Social {
 
   private async user(id: string): Promise<UserRow | null> {
     return this.q("SELECT * FROM social_users WHERE id = ?", id).first<UserRow>();
+  }
+
+  // a two-player game's result from its room: "w", "b" or "draw" (aborted counts as a draw) once it's over;
+  // "w-forfeit", "b-forfeit" or "double-forfeit" when it hasn't started noShowMs after it was paired (whoever
+  // came wins); null while it's on
+  private async roomOutcome(room: string, wPid: string, bPid: string, created: number, noShowMs: number, now: number): Promise<string | null> {
+    const st = this.hooks.roomState ? await this.hooks.roomState(room) : null;
+    if (st && st.status === "over" && st.result) {
+      const r = st.result;
+      return r.reason === "aborted" || r.draw ? "draw" : r.winner === wPid ? "w" : r.winner === bPid ? "b" : "draw";
+    }
+    if ((!st || st.status === "waiting") && now - created > noShowMs) {
+      const seated = st ? st.seats : [];
+      return seated.includes(wPid) ? "w-forfeit" : seated.includes(bPid) ? "b-forfeit" : "double-forfeit";
+    }
+    return null;
   }
 
   private async blockedEitherWay(a: string, b: string): Promise<boolean> {
@@ -952,6 +999,7 @@ export class Social {
     // club team matches (before the club routes, which would take /clubs/:id/matches)
     if (seg0 === "matches" || (seg0 === "clubs" && seg2 === "matches")) return this.clubMatches(request, me, seg, now);
     if (seg0 === "league") return this.league(request, me, seg, now);
+    if (seg0 === "dailytours") return this.dailyTours(request, me, seg, now);
     if (seg0 === "votechess" || (seg0 === "clubs" && seg2 === "votechess")) return this.voteChess(request, me, seg, now);
     if (seg0 === "clubs" && seg1 && !["create", "join", "leave"].includes(seg1)) {
       const id = seg1;
@@ -1124,6 +1172,7 @@ export class Social {
         this.q("DELETE FROM social_friends WHERE a = ? OR b = ?", me.id, me.id),
         this.q("DELETE FROM social_blocks WHERE uid = ? OR blocked = ?", me.id, me.id),
         this.q("DELETE FROM social_league WHERE uid = ?", me.id),
+        this.q("DELETE FROM social_dtour_players WHERE uid = ? AND tid IN (SELECT id FROM social_dtours WHERE status = 'signup')", me.id),
         this.q("DELETE FROM social_league_entries WHERE uid = ?", me.id),
         this.q("DELETE FROM social_league_games WHERE uid = ?", me.id),
         this.q("DELETE FROM social_messages WHERE sender = ? OR recipient = ?", me.id, me.id),
@@ -1312,6 +1361,182 @@ export class Social {
       return { outcome: final?.outcome ?? outcome, you: game.a_uid === me.id ? "a" : "b" };
     }
     throw new HttpError(404, "not found");
+  }
+
+  // ---- daily tournaments ----
+  // Like chess.com's: players sign up; each round splits the players still in into groups (snake-seeded by
+  // rating) that play a double round robin of daily games, one with each colour against everyone in the
+  // group. Group winners go through until one group is left; its winner wins the tournament.
+  // GET /dailytours: open, running and recent ones; POST /dailytours {name, tc, size, pid}: create one (and join it)
+  // GET /dailytours/:id: groups, standings and games (also moves it along)
+  // POST /dailytours/:id/join {pid} | leave | start (its creator, with at least 3 players)
+  private async dailyTours(request: Request, me: UserRow, seg: string[], now: number): Promise<unknown> {
+    const method = request.method;
+    if (seg.length === 1 && method === "GET") {
+      const r = await this.q(`SELECT t.id, t.name, t.tc, t.size, t.status, t.round, t.starts, t.created, t.winner, w.name AS winner_name,
+          (SELECT COUNT(*) FROM social_dtour_players p WHERE p.tid = t.id) AS players,
+          EXISTS (SELECT 1 FROM social_dtour_players p WHERE p.tid = t.id AND p.uid = ?) AS joined
+          FROM social_dtours t LEFT JOIN social_users w ON w.id = t.winner
+          WHERE t.status IN ('signup', 'running') OR t.created > ?
+          ORDER BY CASE t.status WHEN 'signup' THEN 0 WHEN 'running' THEN 1 ELSE 2 END, t.created DESC LIMIT 40`, me.id, now - 30 * 86_400_000).all();
+      return { tournaments: r.results, now };
+    }
+    if (seg.length === 1 && method === "POST") {
+      const b = await body(request);
+      const name = cleanText(b["name"], 60).trim();
+      if (name.length < 3) throw new HttpError(400, "give the tournament a name");
+      const tc = MATCH_TCS.includes(String(b["tc"])) ? String(b["tc"]) : "3d";
+      const size = Math.max(3, Math.min(10, Math.round(Number(b["size"]) || 6)));
+      const pid = str(b["pid"], 64);
+      if (!PID_RE.test(pid)) throw new HttpError(400, "bad player id");
+      await this.rateLimit("SELECT COUNT(*) AS n FROM social_dtours WHERE owner = ? AND created > ?", [me.id, now - 86_400_000], 3, "new tournaments today");
+      const id = "dt_" + randomString(10).toLowerCase();
+      await this.many(
+        this.q("INSERT INTO social_dtours (id, name, owner, tc, size, created, starts) VALUES (?, ?, ?, ?, ?, ?, ?)", id, name, me.id, tc, size, now, now + DTOUR_SIGNUP_MS),
+        this.q("INSERT INTO social_dtour_players (tid, uid, pid, joined) VALUES (?, ?, ?, ?)", id, me.id, pid, now));
+      return { id };
+    }
+    const id = str(seg[1], 32);
+    type T = { id: string; owner: string; tc: string; size: number; status: string; round: number; starts: number };
+    const t = await this.q("SELECT * FROM social_dtours WHERE id = ?", id).first<T>();
+    if (!t) throw new HttpError(404, "no such tournament");
+    const action = seg[2] ?? "";
+    const count = async () => (await this.q("SELECT COUNT(*) AS n FROM social_dtour_players WHERE tid = ?", id).first<{ n: number }>())?.n ?? 0;
+    if (method === "POST" && action === "join") {
+      if (t.status !== "signup") throw new HttpError(409, "sign-ups are closed");
+      const pid = str((await body(request))["pid"], 64);
+      if (!PID_RE.test(pid)) throw new HttpError(400, "bad player id");
+      if ((await count()) >= DTOUR_MAX) throw new HttpError(409, "the tournament is full");
+      await this.q("INSERT OR REPLACE INTO social_dtour_players (tid, uid, pid, joined) VALUES (?, ?, ?, ?)", id, me.id, pid, now).run();
+    } else if (method === "POST" && action === "leave") {
+      if (t.status !== "signup") throw new HttpError(409, "the tournament has started");
+      await this.q("DELETE FROM social_dtour_players WHERE tid = ? AND uid = ?", id, me.id).run();
+    } else if (method === "POST" && action === "start") {
+      if (t.owner !== me.id) throw new HttpError(403, "only the tournament's creator can start it early");
+      if (t.status !== "signup") throw new HttpError(409, "it has already started");
+      if ((await count()) < 3) throw new HttpError(409, "a tournament needs at least 3 players");
+      await this.dtourRound(t, 1, now);
+    } else if (!(method === "GET" && seg.length === 2)) throw new HttpError(404, "not found");
+    await this.dtourTick(id, now);
+    return this.dtourView(id, me, now);
+  }
+
+  // start round n: the players still in, snake-seeded by rating into groups of at most `size`
+  private async dtourRound(t: { id: string; size: number }, n: number, now: number) {
+    const token = randomString(12);
+    await this.q("UPDATE social_dtours SET status = 'running', round = ?, token = ? WHERE id = ? AND round = ? AND status IN ('signup', 'running')", n, token, t.id, n - 1).run();
+    const mine = await this.q("SELECT token FROM social_dtours WHERE id = ?", t.id).first<{ token: string }>();
+    if (!mine || mine.token !== token) return;
+    const players = (await this.q(`SELECT p.uid, p.pid FROM social_dtour_players p JOIN social_users u ON u.id = p.uid
+        WHERE p.tid = ? AND p.out_round IS NULL ORDER BY u.r_rapid DESC, p.joined`, t.id).all<{ uid: string; pid: string }>()).results;
+    if (players.length < 2) {
+      await this.q("UPDATE social_dtours SET status = 'done', winner = ? WHERE id = ?", players[0]?.uid ?? null, t.id).run();
+      return;
+    }
+    const groups = Math.ceil(players.length / t.size);
+    const seats = players.map((p, i) => {
+      const lap = Math.floor(i / groups), pos = i % groups;
+      return { ...p, grp: lap % 2 === 0 ? pos : groups - 1 - pos };
+    });
+    const stmts = seats.map((s) => this.q("INSERT OR REPLACE INTO social_dtour_seats (tid, round, uid, grp) VALUES (?, ?, ?, ?)", t.id, n, s.uid, s.grp));
+    for (let g = 0; g < groups; g++) {
+      const mem = seats.filter((s) => s.grp === g);
+      for (let i = 0; i < mem.length; i++) for (let j = i + 1; j < mem.length; j++) {
+        for (const [w, b] of [[mem[i]!, mem[j]!], [mem[j]!, mem[i]!]] as const) {
+          stmts.push(this.q("INSERT INTO social_dtour_games (room, tid, round, grp, w_uid, w_pid, b_uid, b_pid, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "dt" + randomString(10).toLowerCase(), t.id, n, g, w.uid, w.pid, b.uid, b.pid, now));
+        }
+      }
+    }
+    for (let k = 0; k < stmts.length; k += 50) await this.many(...stmts.slice(k, k + 50));
+  }
+
+  // start when sign-ups close; score games from their rooms; when a round's games are all done, the group
+  // winners go through (or, with one group, its winner wins)
+  private async dtourTick(id: string, now: number) {
+    const t = await this.q("SELECT * FROM social_dtours WHERE id = ?", id).first<{ id: string; tc: string; size: number; status: string; round: number; starts: number }>();
+    if (!t) return;
+    if (t.status === "signup") {
+      if (now < t.starts) return;
+      const n = (await this.q("SELECT COUNT(*) AS n FROM social_dtour_players WHERE tid = ?", id).first<{ n: number }>())?.n ?? 0;
+      if (n >= 3) await this.dtourRound(t, 1, now);
+      else await this.q("UPDATE social_dtours SET status = 'cancelled' WHERE id = ? AND status = 'signup'", id).run();
+      return;
+    }
+    if (t.status !== "running") return;
+    const days = Number(t.tc.replace("d", "")) || 3;
+    const open = (await this.q("SELECT room, w_pid, b_pid, created FROM social_dtour_games WHERE tid = ? AND round = ? AND outcome IS NULL LIMIT 12", id, t.round)
+      .all<{ room: string; w_pid: string; b_pid: string; created: number }>()).results;
+    for (const g of open) {
+      const outcome = await this.roomOutcome(g.room, g.w_pid, g.b_pid, g.created, days * 86_400_000, now);
+      if (outcome) await this.q("UPDATE social_dtour_games SET outcome = ? WHERE room = ? AND outcome IS NULL", outcome, g.room).run();
+    }
+    const left = await this.q("SELECT COUNT(*) AS n FROM social_dtour_games WHERE tid = ? AND round = ? AND outcome IS NULL", id, t.round).first<{ n: number }>();
+    if (!left || left.n > 0) return;
+    const tables = await this.dtourTables(id, t.round);
+    const winners = tables.map((g) => g.rows[0]!.uid);
+    if (tables.length === 1) {
+      await this.many(
+        this.q("UPDATE social_dtour_players SET out_round = ? WHERE tid = ? AND out_round IS NULL AND uid <> ?", t.round, id, winners[0]),
+        this.q("UPDATE social_dtours SET status = 'done', winner = ? WHERE id = ? AND status = 'running' AND round = ?", winners[0], id, t.round));
+      return;
+    }
+    await this.q(`UPDATE social_dtour_players SET out_round = ? WHERE tid = ? AND out_round IS NULL AND uid NOT IN (${winners.map(() => "?").join(",")})`,
+      t.round, id, ...winners).run();
+    await this.dtourRound(t, t.round + 1, now);
+  }
+
+  // each group of a round: its players with points and tie-break, best first
+  private async dtourTables(id: string, round: number) {
+    const [seats, games] = await this.many(
+      this.q("SELECT uid, grp FROM social_dtour_seats WHERE tid = ? AND round = ?", id, round),
+      this.q("SELECT grp, w_uid, b_uid, outcome FROM social_dtour_games WHERE tid = ? AND round = ?", id, round));
+    const groups = [...new Set((seats ?? []).map((s) => Number(s["grp"])))].sort((a, b) => a - b);
+    return groups.map((grp) => ({
+      grp,
+      rows: dtourGroupTable((seats ?? []).filter((s) => Number(s["grp"]) === grp).map((s) => String(s["uid"])),
+        (games ?? []).filter((g) => Number(g["grp"]) === grp) as unknown as { w_uid: string; b_uid: string; outcome: string | null }[]),
+    }));
+  }
+
+  private async dtourView(id: string, me: UserRow, now: number) {
+    const [tr, players, mine] = await this.many(
+      this.q(`SELECT t.*, o.name AS owner_name, w.name AS winner_name FROM social_dtours t LEFT JOIN social_users o ON o.id = t.owner
+          LEFT JOIN social_users w ON w.id = t.winner WHERE t.id = ?`, id),
+      this.q(`SELECT p.uid, p.out_round, u.name, u.avatar, u.r_rapid AS rating FROM social_dtour_players p LEFT JOIN social_users u ON u.id = p.uid
+          WHERE p.tid = ? ORDER BY u.r_rapid DESC`, id),
+      this.q("SELECT pid, out_round FROM social_dtour_players WHERE tid = ? AND uid = ?", id, me.id));
+    const t = tr?.[0] as Record<string, unknown> | undefined;
+    if (!t) throw new HttpError(404, "no such tournament");
+    const people = new Map(((players ?? []) as Record<string, unknown>[]).map((p) => {
+      let avatar: unknown = null;
+      try { avatar = p["avatar"] ? JSON.parse(String(p["avatar"])) : null; } catch { avatar = null; }
+      return [String(p["uid"]), { uid: p["uid"], name: p["name"] ?? "Deleted player", avatar, rating: p["rating"], out: p["out_round"] ?? null }];
+    }));
+    const round = Number(t["round"]);
+    let groups: unknown[] = [];
+    let games: unknown[] = [];
+    if (round > 0) {
+      const tables = await this.dtourTables(id, round);
+      const myGroup = tables.find((g) => g.rows.some((r) => r.uid === me.id))?.grp;
+      groups = tables.map((g) => ({ grp: g.grp, mine: g.grp === myGroup, rows: g.rows.map((r) => ({ ...people.get(r.uid), points: r.points, sb: r.sb })) }));
+      // the games of your group (or, watching, of every group while that's a short list)
+      const rows = (await this.q(`SELECT room, grp, w_uid, w_pid, b_uid, b_pid, outcome FROM social_dtour_games WHERE tid = ? AND round = ?
+          AND (grp = ? OR (SELECT COUNT(*) FROM social_dtour_games x WHERE x.tid = ? AND x.round = ?) <= 60) ORDER BY grp, created`,
+        id, round, myGroup ?? -1, id, round).all()).results;
+      games = rows.map((g) => ({
+        room: g["room"], grp: g["grp"], outcome: g["outcome"] ?? null,
+        white: people.get(String(g["w_uid"])) ?? { name: "Deleted player" }, black: people.get(String(g["b_uid"])) ?? { name: "Deleted player" },
+        mine: g["w_uid"] === me.id ? { color: "w", pid: g["w_pid"] } : g["b_uid"] === me.id ? { color: "b", pid: g["b_pid"] } : null,
+      }));
+    }
+    const { token: _t, ...tour } = t;
+    void _t;
+    const my = mine?.[0];
+    return {
+      tournament: tour, now, players: [...people.values()], groups, games,
+      me: { joined: !!my, out: my ? my["out_round"] ?? null : null, owner: t["owner"] === me.id },
+    };
   }
 
   // ---- Leagues ----
@@ -1531,16 +1756,8 @@ export class Social {
     const days = Number(m.tc.replace("d", "")) || 3;
     const open = (await this.q("SELECT * FROM social_club_match_games WHERE mid = ? AND outcome IS NULL", mid).all<{ room: string; w_pid: string; b_pid: string; w_side: string; created: number }>()).results;
     for (const g of open.slice(0, 8)) {
-      let outcome: string | null = null;
-      const st = this.hooks.roomState ? await this.hooks.roomState(g.room) : null;
-      if (st && st.status === "over" && st.result) {
-        const r = st.result;
-        outcome = r.reason === "aborted" ? "draw" : r.draw ? "draw" : r.winner === g.w_pid ? "w" : r.winner === g.b_pid ? "b" : "draw";
-      } else if ((!st || st.status === "waiting") && now - g.created > days * 86_400_000) {
-        // nobody (or only one player) came within a move's allowance
-        const seated = st ? st.seats : [];
-        outcome = seated.includes(g.w_pid) ? "w-forfeit" : seated.includes(g.b_pid) ? "b-forfeit" : "double-forfeit";
-      }
+      // nobody (or only one player) came within a move's allowance: a forfeit
+      const outcome = await this.roomOutcome(g.room, g.w_pid, g.b_pid, g.created, days * 86_400_000, now);
       if (!outcome) continue;
       const token = randomString(12);
       const wPts = outcome.startsWith("w") ? 2 : outcome === "draw" ? 1 : 0, bPts = outcome.startsWith("b") ? 2 : outcome === "draw" ? 1 : 0;
@@ -1767,16 +1984,9 @@ export class Social {
     if (t.status !== "running") return;
     const open = (await this.q("SELECT * FROM social_swiss_games WHERE sid = ? AND round = ? AND outcome IS NULL", t.id, t.round).all<{ room: string; w_uid: string; w_pid: string; b_uid: string; b_pid: string; created: number }>()).results;
     for (const g of open.slice(0, 8)) {
-      let outcome: string | null = null;
-      const st = this.hooks.roomState ? await this.hooks.roomState(g.room) : null;
-      if (st && st.status === "over" && st.result) {
-        const r = st.result;
-        outcome = r.reason === "aborted" ? "draw" : r.draw ? "draw" : r.winner === g.w_pid ? "w" : r.winner === g.b_pid ? "b" : "draw";
-      } else if ((!st || st.status === "waiting") && now - g.created > SWISS_NO_SHOW_MS) {
-        // a no-show: whoever came wins; nobody came, nobody scores
-        const seated = st ? st.seats : [];
-        outcome = seated.includes(g.w_pid) ? "w-forfeit" : seated.includes(g.b_pid) ? "b-forfeit" : "double-forfeit";
-      } else if (now - g.created > swissRoundCap(t.tc)) outcome = "draw";
+      // a no-show: whoever came wins; nobody came, nobody scores. A game still going past the round's cap is a draw
+      let outcome = await this.roomOutcome(g.room, g.w_pid, g.b_pid, g.created, SWISS_NO_SHOW_MS, now);
+      if (!outcome && now - g.created > swissRoundCap(t.tc)) outcome = "draw";
       if (!outcome) continue;
       const token = randomString(12);
       const w = outcome.startsWith("w") ? 2 : outcome === "draw" ? 1 : 0, b = outcome.startsWith("b") ? 2 : outcome === "draw" ? 1 : 0;

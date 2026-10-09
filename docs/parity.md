@@ -27,7 +27,8 @@ Loop 9 took Chess960, King of the Hill and Three-check online, gave every varian
 against random opponents with its own rating, leaderboard and replayable history, and added live
 events (top tournaments relayed move by move), video lessons, blogs and a coach directory. Loop
 10 added Swiss tournaments, club team matches, Vote Chess, the Vision trainer and Solo Chess. Loop 11
-added Leagues, blocking players, and for daily games vacations and conditional moves (rules v8).
+added Leagues, daily tournaments, blocking players, and for daily games vacations and conditional
+moves (rules v8).
 Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don't have (alternative noted)
 
 ## Play
@@ -67,6 +68,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Daily: vacation | ✅ | one button adds 1 to 14 days to your clock in every timed daily game, so you don't lose on time while away; your opponents see you're on vacation; up to 14 days per game |
 | Leagues | ✅ | eight tiers, Wood to Legend; weekly divisions of up to 50; trophies from rated games against random opponents (rapid 15, blitz 9, bullet 3 a win) and double in arenas, read by the server from the game room; the top of each division moves up every Sunday, nobody moves down |
 | Tournaments / arenas | ✅ | live arenas against real players every 30 minutes (blitz on the hour, bullet on the half hour): instant re-pairing, streak bonuses, live standings, results read by the server from the game room; Bot Arena for practice |
+| Daily tournaments | ✅ | any player creates one (days per move, group size); each round splits the players into groups that play everyone in the group twice, once with each colour; group winners go through to a final group; results read by the server from the rooms, forfeits for games nobody starts, Sonneborn–Berger tie-break |
 | Swiss tournaments | ✅ | every two hours (Blitz 3+2 over 5 rounds, Rapid 10+0 over 4): pairing by score without rematches, balanced colours, byes, forfeits for no-shows, Buchholz tie-break; checked live with three players |
 
 ## Analysis

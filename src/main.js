@@ -22,6 +22,7 @@ import { BattleScreen } from "./modes/battle.js";
 import { SocialScreen, startSocial } from "./screens/social.js";
 import { ArenasScreen, ArenaLobby } from "./screens/arenas.js";
 import { LeagueScreen } from "./screens/league.js";
+import { DailyTourScreen } from "./screens/daily-tour.js";
 import { ZhGame, ZhSetup, BughouseLobby, VariantsScreen } from "./modes/zh-game.js";
 import { VxPlay, VxSetup } from "./modes/vx-game.js";
 import { FourPlayerGame, FourPlayerSetup } from "./modes/fp-game.js";
@@ -61,6 +62,7 @@ const routes = [
   { pattern: /^#\/arena$/, nav: "play", make: (app) => new ArenaScreen(app) },
   { pattern: /^#\/arenas$/, nav: "play", make: (app) => new ArenasScreen(app) },
   { pattern: /^#\/league$/, nav: "play", make: (app) => new LeagueScreen(app) },
+  { pattern: /^#\/dailytour\/(dt_[a-z0-9]+)$/, nav: "play", make: (app, m) => new DailyTourScreen(app, m[1]) },
   { pattern: /^#\/swiss\/(sw-\d+)$/, nav: "play", make: (app, m) => new SwissLobby(app, m[1]) },
   { pattern: /^#\/variants$/, nav: "play", make: (app) => new VariantsScreen(app) },
   { pattern: /^#\/crazyhouse(?:\/play)?$/, nav: "play", make: (app) => new ZhSetup(app) },

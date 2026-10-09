@@ -12,6 +12,7 @@ import { makePlayerId } from "../net/room.js";
 import { SFX } from "../audio.js";
 import * as S from "../net/social.js";
 import { swissStatus } from "./swiss.js";
+import { dailyTourStatus, createDailyTour } from "./daily-tour.js";
 
 const PAIR_MS = 2500;
 const autoPair = new Set();      // arenas to pair in again straight away (back from a game)
@@ -68,14 +69,14 @@ export class ArenasScreen {
   async load() {
     if (!S.registered()) return;
     try {
-      const [d, sw] = await Promise.all([S.api("GET", "/arenas"), S.api("GET", "/swiss").catch(() => null)]);
-      if (!this.dead) this.render({ ...d, swiss: sw ? sw.tournaments : [] });
+      const [d, sw, dt] = await Promise.all([S.api("GET", "/arenas"), S.api("GET", "/swiss").catch(() => null), S.api("GET", "/dailytours").catch(() => null)]);
+      if (!this.dead) this.render({ ...d, swiss: sw ? sw.tournaments : [], daily: dt ? dt.tournaments : null });
     }
     catch (e) { if (!this.dead) this.render(null, e); }
   }
 
   render(d, err) {
-    const body = [h("p", { style: { color: "var(--ink-2)" } }, "Tournaments against real players. Arenas run on the clock: you're paired again as soon as a game ends (a win scores 2, a draw 1, and after two wins in a row each win scores 4). Swiss tournaments have fixed rounds, each paired by score.")];
+    const body = [h("p", { style: { color: "var(--ink-2)" } }, "Tournaments against real players. Arenas run on the clock: you're paired again as soon as a game ends (a win scores 2, a draw 1, and after two wins in a row each win scores 4). Swiss tournaments have fixed rounds, each paired by score. Daily tournaments are played in groups of daily games, and group winners go through.")];
     if (!S.registered()) body.push(needsSocial(this.app));
     else if (err) body.push(h("div.status-line.bad", icon("close", 16), h("span", err.message)));
     else if (!d) body.push(h("p.note", "Loading arenas…"));
@@ -97,6 +98,14 @@ export class ArenasScreen {
           h("span.rt", h("b", `${s.name}, ${tcLabel(s.tc)}`), h("small", `${swissStatus(s, t)}. ${s.rounds} rounds, ${s.players} player${s.players === 1 ? "" : "s"}`)),
           s.joined ? h("span.badge", "Joined") : h("span.rv", icon("chevron", 18))))));
       }
+    }
+    if (d && d.daily) {
+      body.push(h("div.lbl.note", { style: { marginTop: "6px" } }, "Daily"));
+      body.push(h("div.rows", ...d.daily.filter((t) => t.status !== "cancelled").map((t) => h("button.row", { onclick: () => this.app.go(`#/dailytour/${t.id}`) },
+        h(`span.ri${t.status === "running" ? ".live" : ""}`, icon("calendar", 20)),
+        h("span.rt", h("b", t.name), h("small", `${dailyTourStatus(t)}. ${t.tc.replace("d", "")} day${t.tc === "1d" ? "" : "s"} per move, ${t.players} player${t.players === 1 ? "" : "s"}`)),
+        t.joined ? h("span.badge", "Joined") : h("span.rv", icon("chevron", 18)))),
+        h("button.btn.ghost.small", { onclick: () => createDailyTour(this.app), style: { justifySelf: "start" } }, icon("plus", 16), "New daily tournament")));
     }
     body.push(h("div.lbl.note", { style: { marginTop: "6px" } }, "Practice"));
     body.push(h("button.row", { onclick: () => this.app.go("#/arena") },

@@ -668,5 +668,61 @@ ok(again && again.id !== o1.id && !again.opponent, "after a battle ends, searchi
   clock = saved;
 }
 
+// daily tournaments
+{
+  const saved = clock;
+  const ps = [];
+  for (let i = 0; i < 7; i++) ps.push((await call("POST", "/register", { body: { name: "Dt" + i }, ip: `10.3.3.${i + 1}` })).data);
+  const pidOf = (u) => `p-dt${u.name.toLowerCase()}.${u.name}.1200.${u.code}`;
+  const [o] = ps;
+  ok((await call("POST", "/dailytours", { secret: o.secret, body: { name: "x", pid: pidOf(o) } })).status === 400, "a tournament needs a name");
+  const tid = (await call("POST", "/dailytours", { secret: o.secret, body: { name: "Autumn Daily", tc: "1d", size: 3, pid: pidOf(o) } })).data.id;
+  ok(tid && tid.startsWith("dt_"), "a player creates a daily tournament (and is in it)");
+  for (const u of ps.slice(1)) await call("POST", `/dailytours/${tid}/join`, { secret: u.secret, body: { pid: pidOf(u) } });
+  let list = (await call("GET", "/dailytours", { secret: ps[3].secret })).data.tournaments;
+  ok(list.some((t) => t.id === tid && t.players === 7 && t.joined && t.status === "signup"), "the list shows it open, with its players");
+  ok((await call("POST", `/dailytours/${tid}/start`, { secret: ps[2].secret })).status === 403, "only its creator starts it early");
+  let v = (await call("POST", `/dailytours/${tid}/start`, { secret: o.secret })).data;
+  const sizes = v.groups.map((g) => g.rows.length).sort().join();
+  ok(v.tournament.status === "running" && v.tournament.round === 1 && sizes === "2,2,3", "seven players in groups of at most three: 3, 2 and 2");
+  ok(sqlite.prepare("SELECT COUNT(*) AS n FROM social_dtour_games WHERE tid = ?").get(tid).n === 10, "each group plays a double round robin (6 + 2 + 2 games)");
+  const mine = v.games.filter((g) => g.mine);
+  const myGroup = v.groups.find((g) => g.mine);
+  ok(mine.length === 2 * (myGroup.rows.length - 1) && mine.some((g) => g.mine.color === "w") && mine.some((g) => g.mine.color === "b"), "you play everyone in your group with each colour");
+  ok((await call("POST", `/dailytours/${tid}/join`, { secret: o.secret, body: { pid: pidOf(o) } })).status === 409, "no joining once it's started");
+  // round 1: in each group, the player listed first in the group wins every game; other games go to White
+  const settle = (round, champs) => {
+    for (const g of sqlite.prepare("SELECT room, w_uid, w_pid, b_uid, b_pid FROM social_dtour_games WHERE tid = ? AND round = ?").all(tid, round)) {
+      const winner = champs.includes(g.w_uid) ? g.w_pid : champs.includes(g.b_uid) ? g.b_pid : g.w_pid;
+      rooms.set(g.room, { status: "over", seats: [g.w_pid, g.b_pid], result: { winner, reason: "checkmate" } });
+    }
+  };
+  const seats1 = sqlite.prepare("SELECT uid, grp FROM social_dtour_seats WHERE tid = ? AND round = 1 ORDER BY grp, uid").all(tid);
+  const champs1 = [...new Set(seats1.map((x) => x.grp))].map((g) => seats1.find((x) => x.grp === g).uid);
+  settle(1, champs1);
+  for (let k = 0; k < 3; k++) v = (await call("GET", `/dailytours/${tid}`, { secret: o.secret })).data;
+  ok(v.tournament.round === 2 && v.groups.length === 1 && v.groups[0].rows.map((r) => r.uid).sort().join() === champs1.slice().sort().join(), "each group's winner goes through to a final group");
+  ok(v.players.filter((p) => p.out === 1).length === 4, "everyone else is out after round 1");
+  // the final: champs1[1] wins everything except one game nobody turns up for
+  settle(2, [champs1[1]]);
+  const skip = sqlite.prepare("SELECT room FROM social_dtour_games WHERE tid = ? AND round = 2 AND w_uid <> ? AND b_uid <> ? LIMIT 1").get(tid, champs1[1], champs1[1]);
+  rooms.delete(skip.room);
+  v = (await call("GET", `/dailytours/${tid}`, { secret: o.secret })).data;
+  ok(v.tournament.status === "running", "a game nobody has started holds the round open");
+  clock += 86_400_000 + 1000;
+  v = (await call("GET", `/dailytours/${tid}`, { secret: o.secret })).data;
+  ok(v.games.find((g) => g.room === skip.room).outcome === "double-forfeit", "until a move's time passes: then it's a double forfeit");
+  ok(v.tournament.status === "done" && v.tournament.winner === champs1[1] && v.groups[0].rows[0].points === 4, "the final group's winner wins the tournament");
+  // too few players by the time sign-ups close: cancelled
+  const t2 = (await call("POST", "/dailytours", { secret: ps[1].secret, body: { name: "Quiet one", pid: pidOf(ps[1]) } })).data.id;
+  await call("POST", `/dailytours/${t2}/join`, { secret: ps[2].secret, body: { pid: pidOf(ps[2]) } });
+  await call("POST", `/dailytours/${t2}/leave`, { secret: ps[2].secret });
+  ok((await call("GET", `/dailytours/${t2}`, { secret: ps[1].secret })).data.players.length === 1, "a player can leave before it starts");
+  clock += 3 * 86_400_000;
+  ok((await call("GET", `/dailytours/${t2}`, { secret: ps[1].secret })).data.tournament.status === "cancelled", "with fewer than 3 players when sign-ups close, it's cancelled");
+  for (const u of ps) await call("POST", "/delete", { secret: u.secret });
+  clock = saved;
+}
+
 console.log(failures === 0 ? "\nALL SOCIAL TESTS PASSED" : `\n${failures} FAILURES`);
 process.exit(failures ? 1 : 0);
