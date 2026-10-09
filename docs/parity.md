@@ -173,8 +173,9 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 
 ## Still different from chess.com
 
-Everything above is built, deployed, and checked against the live servers. What chess.com still
-has that this doesn't, and why:
+Everything above is built, deployed, and checked against the live servers. On 2026-10-09 the owner
+closed the gauntlet loop here: every remaining difference below is either the owner's decision or
+content that needs a staff of writers and coaches, not missing software.
 
 - **Paid membership tiers.** By the owner's choice, everything here is free: nothing is behind a
   paywall or limited, so there's nothing for a membership to unlock.
