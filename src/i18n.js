@@ -7,15 +7,18 @@ export const LANGUAGES = [
   { code: "en", name: "English" },
   { code: "id", name: "Bahasa Indonesia" },
   { code: "cs", name: "Čeština" },
+  { code: "da", name: "Dansk" },
   { code: "de", name: "Deutsch" },
   { code: "es", name: "Español" },
   { code: "fr", name: "Français" },
   { code: "it", name: "Italiano" },
   { code: "hu", name: "Magyar" },
   { code: "nl", name: "Nederlands" },
+  { code: "nb", name: "Norsk bokmål" },
   { code: "pl", name: "Polski" },
   { code: "pt", name: "Português" },
   { code: "ro", name: "Română" },
+  { code: "fi", name: "Suomi" },
   { code: "sv", name: "Svenska" },
   { code: "vi", name: "Tiếng Việt" },
   { code: "tr", name: "Türkçe" },
@@ -26,6 +29,7 @@ export const LANGUAGES = [
   { code: "ar", name: "العربية" },
   { code: "fa", name: "فارسی" },
   { code: "hi", name: "हिन्दी" },
+  { code: "th", name: "ไทย" },
   { code: "ja", name: "日本語" },
   { code: "ko", name: "한국어" },
   { code: "zh", name: "中文（简体）" },
@@ -46,9 +50,10 @@ export function currentLanguage() {
   let saved = null;
   try { saved = localStorage.getItem(KEY); } catch { /* private mode */ }
   if (saved && LANGUAGES.some((l) => l.code === saved)) return saved;
-  // Taiwan, Hong Kong and Macau, or any "Hant" tag, read Traditional Chinese; otherwise the first two letters decide
+  // Taiwan, Hong Kong and Macau, or any "Hant" tag, read Traditional Chinese; any Norwegian reads Bokmål;
+  // otherwise the first two letters decide
   const nav = (navigator.languages || [navigator.language || "en"]).map((x) => String(x).toLowerCase())
-    .map((x) => (/^zh-(tw|hk|mo|hant)/.test(x) ? "zh-TW" : x.slice(0, 2)));
+    .map((x) => (/^zh-(tw|hk|mo|hant)/.test(x) ? "zh-TW" : /^(no|nn)\b/.test(x) ? "nb" : x.slice(0, 2)));
   return nav.find((c) => LANGUAGES.some((l) => l.code === c)) || "en";
 }
 export function setLanguage(code) {

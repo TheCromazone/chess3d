@@ -1,0 +1,202 @@
+[
+ [
+  "^you're on vacation until (.+)$",
+  "du holder ferie indtil $1"
+ ],
+ [
+  "^they're on vacation until (.+)$",
+  "på ferie indtil $1"
+ ],
+ [
+  "^(\\d+) days left$",
+  "$1 dage tilbage"
+ ],
+ [
+  "^(\\d+) h left$",
+  "$1 t tilbage"
+ ],
+ [
+  "^(\\d+) min left$",
+  "$1 min tilbage"
+ ],
+ [
+  "^out of time$",
+  "tiden er udløbet"
+ ],
+ [
+  "^(\\d+) moves?$",
+  "$1 træk"
+ ],
+ [
+  "^last (.+)$",
+  "senest $1"
+ ],
+ [
+  "^(\\d+) days? per move$",
+  "$1 dage pr. træk"
+ ],
+ [
+  "^(.+), (\\d+ (?:min|h|d) ago|just now)$",
+  "$1, $2"
+ ],
+ [
+  "^(\\d+) min ago$",
+  "for $1 min siden"
+ ],
+ [
+  "^(\\d+) h ago$",
+  "for $1 t siden"
+ ],
+ [
+  "^(\\d+) d ago$",
+  "for $1 d. siden"
+ ],
+ [
+  "^Updated (.+)$",
+  "Opdateret $1"
+ ],
+ [
+  "^(\\d+) games? in progress$",
+  "$1 partier i gang"
+ ],
+ [
+  "^Your move in (\\d+) games?$",
+  "Din tur i $1 partier"
+ ],
+ [
+  "^(.+), rated (\\d+)$",
+  "$1, rating $2"
+ ],
+ [
+  "^vs (.+)$",
+  "mod $1"
+ ],
+ [
+  "^(1-0|0-1|½-½|1/2-1/2) (.+)$",
+  "$1 $2"
+ ],
+ [
+  "^([A-E]\\d\\d) · as White$",
+  "$1 · som Hvid"
+ ],
+ [
+  "^([A-E]\\d\\d) · as Black$",
+  "$1 · som Sort"
+ ],
+ [
+  "^(Basics|Tactics|Strategy|Endgames) (\\d+)/(\\d+)$",
+  "$1 $2/$3"
+ ],
+ [
+  "^(\\d+) steps$",
+  "$1 trin"
+ ],
+ [
+  "^(.+), (\\d+) videos$",
+  "$1, $2 videoer"
+ ],
+ [
+  "^(\\d+) puzzles?$",
+  "$1 opgaver"
+ ],
+ [
+  "^(\\d+) games?$",
+  "$1 partier"
+ ],
+ [
+  "^(\\d+) rated games?$",
+  "$1 ratede partier"
+ ],
+ [
+  "^(\\d+) reviewed games?$",
+  "$1 gennemgåede partier"
+ ],
+ [
+  "^(.+) \\((\\d+)\\)$",
+  "$1 ($2)"
+ ],
+ [
+  "^White to move\\. Find the best move\\.$",
+  "Hvid i trækket. Find det bedste træk."
+ ],
+ [
+  "^Black to move\\. Find the best move\\.$",
+  "Sort i trækket. Find det bedste træk."
+ ],
+ [
+  "^(.+) is thinking…$",
+  "$1 tænker…"
+ ],
+ [
+  "^(\\d+) pieces left$",
+  "$1 brikker tilbage"
+ ],
+ [
+  "^Solved at this level: (\\d+)\\.$",
+  "Løst på dette niveau: $1."
+ ],
+ [
+  "^(\\d+) of (\\d+)$",
+  "$1 af $2"
+ ],
+ [
+  "^Best from White's side: (\\d+)\\. From Black's side: (\\d+)\\.$",
+  "Bedste fra Hvids side: $1. Fra Sorts side: $2."
+ ],
+ [
+  "^(.+) vs (.+)\\. Live now\\.$",
+  "$1 mod $2. Live nu."
+ ],
+ [
+  "^Joined (.+)\\. (\\d+) games? played\\.$",
+  "Medlem siden $1. $2 partier spillet."
+ ],
+ [
+  "^Score from (\\d+) games?$",
+  "Resultat fra $1 partier"
+ ],
+ [
+  "^Bot ladder: you're #(\\d+) of (\\d+)$",
+  "Botrangliste: du er nr. $1 af $2"
+ ],
+ [
+  "^Achievements \\((\\d+)/(\\d+)\\)$",
+  "Præstationer ($1/$2)"
+ ],
+ [
+  "^(\\d+)% win rate$",
+  "$1 % sejrsrate"
+ ],
+ [
+  "^Best streak (\\d+)$",
+  "Bedste serie: $1"
+ ],
+ [
+  "^(\\d+) won, (\\d+) drawn, (\\d+) lost\\. Last played (.+)$",
+  "$1 vundet, $2 remis, $3 tabt. Senest spillet $4"
+ ],
+ [
+  "^Depth (\\d+)$",
+  "Dybde $1"
+ ],
+ [
+  "^3 min (\\d+) · 5 min (\\d+) · Survival (\\d+)$",
+  "3 min $1 · 5 min $2 · Overlevelse $3"
+ ],
+ [
+  "^Other players will see your name \\((.+)\\), avatar, ratings, your recent online and bot games, and whether you're online\\. There's no email or password: a key saved in this browser is your account, your games and ratings are backed up to it, and you can sign in on other devices from Settings\\.$",
+  "Andre spillere kan se dit navn ($1), din avatar, dine ratings, dine seneste online- og botpartier, og om du er online. Der er ingen e-mail eller adgangskode: en nøgle gemt i denne browser er din konto, dine partier og ratings sikkerhedskopieres til den, og du kan logge ind på andre enheder fra Indstillinger."
+ ],
+ [
+  "^Looking for an opponent at (.+)$",
+  "Leder efter en modstander til $1"
+ ],
+ [
+  "^Searching… (\\d+:\\d+)$",
+  "Søger… $1"
+ ],
+ [
+  "^(\\d+) min read$",
+  "$1 min. læsetid"
+ ]
+]
