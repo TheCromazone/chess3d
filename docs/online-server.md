@@ -64,5 +64,21 @@ Limits: 20 registrations per IP per hour, 30 messages per minute, 40 friend requ
 5 clubs per owner, 500-character messages. Each request batches its queries into one D1 round trip
 after the key lookup. `npm run test:social` runs the API against SQLite through a D1-shaped shim.
 
+### Live arenas
+
+`/arenas` runs a fixed schedule: a Blitz Arena (3+0) on the hour and a Bullet Arena (1+0) on the
+half hour, each 27 minutes long; rows are created as the schedule reaches them.
+
+- `POST /arenas/:id/join`, then `POST /arenas/:id/pair {pid}` every couple of seconds. Pairing is
+  one D1 batch (a transaction): you become `waiting`, and if another player has waited longer and
+  asked within the last 8 seconds, both rows switch to `paired` with a fresh room id (`ar…`) and
+  a game row records both player ids. The client then plays that room like a friend game.
+- `POST /arenas/:id/result {room}`: the Worker reads the room's own state through the Durable
+  Object's internal `/__state` path (not reachable from outside; public traffic only arrives as
+  `/ws/<room>` upgrades), maps the winning player id to a user, and scores both players once
+  (win 2, draw 1, 4 for a win after two wins in a row). Aborted games and no-shows (the room still
+  waiting 45 seconds after pairing) don't count.
+- `GET /arenas/:id` returns standings; `POST /arenas/:id/pause` stops pairing.
+
 To update it: copy `server/social.ts` to `app/src/social.ts` (check the SHA-256 on both sides),
 commit, push and deploy.

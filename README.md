@@ -10,11 +10,11 @@ lessons, Stockfish game review, and analysis. There's no sign-up: your device ho
 
 **Play**
 - **Online:** quick pairing with a random opponent (bullet, blitz, rapid), or a private invite link for a friend. Moves, clocks, draw offers, resignation, rematch, and spectators are refereed by the room server.
-- **Daily chess:** correspondence games with friends; no clock, come back whenever, with a "your move" list.
+- **Daily chess:** correspondence games with friends, with 1, 3 or 7 days per move (or no limit) and a "your move" list.
 - **Bots:** 16 personalities from 250 to 3200, backed by Stockfish 18, with hints, takebacks, resumable games, and a rating vs bots.
 - **Pass and play:** two players on one screen, with optional auto-flip.
 - **Variants:** Chess960, King of the Hill, and Three-check, against bots or a friend on one screen.
-- **Arena:** a timed tournament against the bots nearest your rating, with live standings and win-streak bonuses.
+- **Arenas:** live tournaments against real players every 30 minutes (blitz and bullet), with instant re-pairing, live standings and win-streak bonuses; or a Bot Arena against the bots nearest your rating.
 - Clocks with increment and custom time controls, premoves, drag-and-drop or click-to-move, auto-queen, keyboard move entry, move-list navigation (← → keys), material count, and opening names.
 
 **Improve**

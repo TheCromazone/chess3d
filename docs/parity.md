@@ -15,6 +15,8 @@ Rules v2 (chat, takebacks, abort, custom time controls) is deployed to the room 
 the social layer without sign-in: each device registers for a private key and a shareable friend
 code, and the game server (Cloudflare Worker + D1) holds friends with online status, direct messages
 and challenges, clubs with their own chat, and a global leaderboard of self-reported ratings.
+Loop 6 added live arenas against real players, daily games with a deadline per move (rules v3),
+adding your opponent as a friend after a game, a friends leaderboard, and club moderation.
 Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don't have (alternative noted)
 
 ## Play
@@ -45,7 +47,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | In-game chat (online) | ✅ | rules v2 live on the room server; quick phrases + free text |
 | Variants (Chess960, 3-check, KOTH) | ✅ | vs bots and pass and play; Chess960 castling verified against Stockfish perft |
 | Daily / correspondence chess | ✅ | 1, 3 or 7 days per move (or no limit), lose on time when a deadline passes (rules v3); persistent rooms, "your move" list with time left, daily challenges to friends |
-| Tournaments / arenas | ✅ | Bot Arena: timed arena vs the bots near your rating, live standings, streak bonuses (human arenas would need a server) |
+| Tournaments / arenas | ✅ | live arenas against real players every 30 minutes (blitz on the hour, bullet on the half hour): instant re-pairing, streak bonuses, live standings, results read by the server from the game room; Bot Arena for practice |
 
 ## Analysis
 
