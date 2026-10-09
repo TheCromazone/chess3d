@@ -30,8 +30,9 @@ events (top tournaments relayed move by move), video lessons, blogs and a coach 
 added Leagues, daily tournaments, blocking players, top live games, and for daily games vacations and
 conditional moves (rules v8). Loop 12 moved ratings to the server (every online game is rated from its
 room, puzzle attempts are checked against the puzzle data, Puzzle Rush runs are timed and checked),
-let students message coaches without being friends, translated the interface into ten languages,
-and added a weekly report of the site's own results to the Watch page.
+let students message coaches without being friends, translated the interface into eighteen
+languages, added a weekly report of the site's own results to the Watch page, and published
+original articles on the Learn page.
 Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don't have (alternative noted)
 
 ## Play
@@ -114,6 +115,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Endgame practice vs engine | ✅ | 15 drills |
 | Opening trainer | ✅ | 32 openings |
 | Vision (coordinates trainer) | ✅ | tap the named square, 30 seconds, from either side; best scores kept |
+| Articles | ✅ | 14 original articles (openings, strategy, endgames, tactics, improvement, history) with diagrams in your board colours that open on the analysis board; every diagram is replayed and checked by the data tests |
 | Video lessons | ✅ | 23 whole series from chess teachers (Hanging Pawns, IM John Bartholomew, GM Daniel Naroditsky, Chess Talk, Chessbrah) by topic, played in the page |
 
 ## Watch
@@ -132,7 +134,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 
 | chess.com feature | Status | Notes |
 |---|---|---|
-| Profile with ratings per category | ✅ | bullet / blitz / rapid / daily / bots / puzzles / rush and each variant; with a profile, the server works out every online rating from the game room's own record (and puzzle ratings from each attempt), so a device can't set its own; bot ratings stay on the device |
+| Profile with ratings per category | ✅ | bullet / blitz / rapid / daily / bots / puzzles / rush and each variant; with a profile, the server works out every online rating from the game room's own record (and puzzle ratings from each attempt), so a device can't set its own; a rating against the bots is kept on the device too (chess.com doesn't rate bot games at all) |
 | Game archive, replay, review, PGN download | ✅ | |
 | Stats (W/L/D, rating trend, openings) | ✅ | |
 | Insights (accuracy trend, by phase, by colour / time control, mistakes per game) | ✅ | from your archive and reviews |
@@ -166,7 +168,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Light / dark site theme | ✅ | dark, light, or match device |
 | Keyboard shortcuts sheet | ✅ | press ? |
 | Mobile app | ✅ | installable PWA, works offline for bots / puzzles / analysis |
-| Languages | ✅ | English, Spanish, French, German, Italian, Polish, Portuguese, Turkish, Russian, Japanese and Chinese, chosen in Settings (the browser's language by default); players' own words are never translated |
+| Languages | ✅ | 19: English, Bahasa Indonesia, Czech, German, Spanish, French, Italian, Dutch, Polish, Portuguese, Swedish, Vietnamese, Turkish, Russian, Ukrainian, Japanese, Korean, and Simplified and Traditional Chinese, chosen in Settings (the browser's language by default); players' own words are never translated |
 | Accessibility | ✅ | labelled controls, focus rings, reduced motion, keyboard play on the 2D board, spoken moves for screen readers |
 
 ## Still different from chess.com
@@ -176,12 +178,12 @@ has that this doesn't, and why:
 
 - **Paid membership tiers.** By the owner's choice, everything here is free: nothing is behind a
   paywall or limited, so there's nothing for a membership to unlock.
-- **A newsroom and original video lessons.** chess.com employs editors and titled coaches. Here
-  the news, videos, streamers, lessons and live events come from outside sources (FIDE, Lichess,
-  Chess.com and YouTube feeds, Lichess broadcasts), credited and linked; the only original news is
-  the server's weekly write-up of results on the site itself.
+- **A newsroom and original video lessons.** chess.com employs journalists and titled coaches. Here
+  the original writing is the Learn page's articles and the server's weekly report of results on the
+  site; outside news, videos, streamers and live events (FIDE, Lichess, Chess.com and YouTube feeds,
+  Lichess broadcasts) are credited and linked. There's no reporting staff and no original video.
 - **A masters game database.** The opening explorer has statistics from about a million games
   between players rated 1800 and up; chess.com also has a masters database. The free masters
   explorer we could use needs a Lichess login token on the server, and the owner chose not to add one.
-- **Dozens of languages.** chess.com is translated into more languages than the eleven here.
-- **Bot ratings** stay on each device (chess.com's bot games aren't rated at all).
+- **Every language.** chess.com is translated into more languages than the nineteen here
+  (right-to-left scripts such as Arabic and Hebrew among them).

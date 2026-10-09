@@ -23,7 +23,7 @@ lessons, Stockfish game review, and analysis. There's no sign-up: your device ho
 - **Analysis board:** move tree with variations, live multi-line Stockfish evaluation, eval bar, best-move arrows, opening explorer, PGN/FEN import and export, a board editor, and "play a bot from here".
 - **Share:** a link that opens the game in analysis, an animated GIF, or a PNG of any position.
 - **Puzzles:** 17,000+ rated puzzles (with your own puzzle rating, theme and difficulty filters), a daily puzzle with streaks, Puzzle Rush (3 min, 5 min, survival), Puzzle Battle against another player or a bot, and Solo Chess.
-- **Learn:** interactive lessons, endgame drills against Stockfish, an opening trainer, the Vision coordinates trainer, and video lessons (whole series from chess teachers, played in the page).
+- **Learn:** interactive lessons, endgame drills against Stockfish, an opening trainer, the Vision coordinates trainer, original articles (openings, strategy, endgames, tactics, improvement, history) with diagrams that open on the analysis board, and video lessons (whole series from chess teachers, played in the page).
 - **Watch:** the best game being played right now in each speed (from Lichess TV), top tournaments live (games relayed by Lichess broadcasts), chess streamers live now, the latest videos and news, a weekly report of the site's own results (tournament winners, league promotions, best Puzzle Rush runs), 40 famous games replayed move by move, and Bot TV.
 
 **Social**
@@ -40,7 +40,7 @@ lessons, Stockfish game review, and analysis. There's no sign-up: your device ho
 
 **You**
 - Local profile with ratings per category and per variant, rating history, stats, Insights (accuracy by phase, colour and time control), a game archive (review or download any game as PGN), variant games to replay, and achievements. Export and import your data.
-- Settings: eleven languages (English, Spanish, French, German, Italian, Polish, Portuguese, Turkish, Russian, Japanese, Chinese); dark or light appearance, 3D or 2D board, board and piece themes, top-down 3D camera, coordinates, animation speed, legal-move hints, sound.
+- Settings: nineteen languages (English, Bahasa Indonesia, Czech, German, Spanish, French, Italian, Dutch, Polish, Portuguese, Swedish, Vietnamese, Turkish, Russian, Ukrainian, Japanese, Korean, Simplified and Traditional Chinese); dark or light appearance, 3D or 2D board, board and piece themes, top-down 3D camera, coordinates, animation speed, legal-move hints, sound.
 - Installable as an app (PWA); bots, puzzles, analysis and review work offline.
 - Right-click to draw arrows and circles (Shift, Alt, Ctrl change the color).
 
