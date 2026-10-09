@@ -9,12 +9,13 @@ lessons, Stockfish game review, and analysis. There's no sign-up: your device ho
 ## Features
 
 **Play**
-- **Online:** quick pairing with a random opponent (bullet, blitz, rapid), or a private invite link for a friend. Moves, clocks, draw offers, resignation, rematch, and spectators are refereed by the room server.
-- **Daily chess:** correspondence games with friends, with 1, 3 or 7 days per move (or no limit) and a "your move" list.
+- **Online:** quick pairing with a random opponent (bullet, blitz, rapid; rated or unrated, optionally within a rating range), or a private invite link for a friend. Moves, clocks, draw offers, resignation, rematch, and spectators are refereed by the room server.
+- **Leagues:** weekly divisions from Wood to Legend; earn trophies in rated games against random opponents and in arenas, and the top of each division moves up every Sunday.
+- **Daily chess:** correspondence games with friends, with 1, 3 or 7 days per move (or no limit), a daily rating, a "your move" list, conditional moves ("if they play this, I play that"), vacations, and private notes on each game.
 - **Bots:** 16 personalities from 250 to 3200, backed by Stockfish 18, with hints, takebacks, resumable games, and a rating vs bots.
 - **Pass and play:** two players on one screen, with optional auto-flip.
 - **Variants:** Crazyhouse, Bughouse, 4-Player Chess (free-for-all and teams), Duck Chess, Fog of War, Giveaway, Atomic, Horde, Chess960, King of the Hill and Three-check. Each has bots, pass and play, friend invites and rated games against random opponents (Bughouse: a four-player lobby), with a rating and leaderboard per variant.
-- **Tournaments:** live arenas every 30 minutes (blitz and bullet) with instant re-pairing, live standings and win-streak bonuses; Swiss tournaments every two hours; or a Bot Arena against the bots nearest your rating.
+- **Tournaments:** live arenas every 30 minutes (blitz and bullet) with instant re-pairing, live standings and win-streak bonuses; Swiss tournaments every two hours; daily tournaments anyone can create (groups of daily games, group winners going through); or a Bot Arena against the bots nearest your rating.
 - Clocks with increment and custom time controls, premoves, drag-and-drop or click-to-move, auto-queen, keyboard move entry, move-list navigation (← → keys), material count, and opening names.
 
 **Improve**
@@ -23,16 +24,17 @@ lessons, Stockfish game review, and analysis. There's no sign-up: your device ho
 - **Share:** a link that opens the game in analysis, an animated GIF, or a PNG of any position.
 - **Puzzles:** 17,000+ rated puzzles (with your own puzzle rating, theme and difficulty filters), a daily puzzle with streaks, Puzzle Rush (3 min, 5 min, survival), Puzzle Battle against another player or a bot, and Solo Chess.
 - **Learn:** interactive lessons, endgame drills against Stockfish, an opening trainer, the Vision coordinates trainer, and video lessons (whole series from chess teachers, played in the page).
-- **Watch:** top tournaments live (games relayed by Lichess broadcasts), chess streamers live now, the latest videos and news, 40 famous games replayed move by move, and Bot TV.
+- **Watch:** the best game being played right now in each speed (from Lichess TV), top tournaments live (games relayed by Lichess broadcasts), chess streamers live now, the latest videos and news, 40 famous games replayed move by move, and Bot TV.
 
 **Social**
-- **Friends:** share your friend code or an invite link, accept requests, and see who's online or playing.
+- **Friends:** share your friend code or an invite link, accept requests, and see who's online or playing. Block a player to stop them adding, messaging or challenging you and to hide their posts and chat.
 - **Challenges and messages:** challenge a friend to a live or daily game and they get a pop-up with Accept / Decline; message friends one to one.
 - **Clubs:** public or invite-only clubs with their own chat and member list, team matches against other clubs (daily games, two per board), and Vote Chess, where a club's moves are chosen by its members' votes.
 - **Forums and blogs:** topics and replies in five forums; players' blog posts with likes; both with reporting.
 - **Coaches:** players who teach list themselves with a description, languages, topics and rate; students add them as a friend to arrange lessons.
 - **Notifications:** pop-ups in the app, and optional browser notifications when it's closed (challenges, messages, friend requests, your move in daily games).
-- **Leaderboards:** global top 50 for blitz, bullet, rapid, puzzles, bots, Puzzle Rush and every variant, or just your friends (ratings are reported by each player's device).
+- **Profiles:** ratings, league, a country flag and a line about the player, and their recent games.
+- **Leaderboards:** global top 50 for blitz, bullet, rapid, daily, puzzles, bots, Puzzle Rush and every variant, or just your friends (ratings are reported by each player's device).
 - **Account, no password:** your profile key is the account. Sign in on your other devices with a one-time code or your recovery key; your profile, ratings, settings and games back up automatically and follow you. Sign out of a device, or of all the others, from Settings.
 - Social is off until you turn it on; you can delete your profile from Settings at any time.
 
