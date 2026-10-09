@@ -77,6 +77,13 @@ doesn't go through, and `GET /names?n=` checks one. Forums: `GET|POST /forums`, 
 /forums/:id`, `POST /forums/:id/delete`, `POST /forums/:id/posts/:pid/delete`, and `POST /report
 {kind, id}`; three reports from different players hide a topic or reply.
 
+Web push: the Worker makes a VAPID key pair once and keeps it in D1 (`social_config`); `GET
+/push/key` publishes the public half. `POST /push/subscribe {endpoint}` accepts only the browsers'
+push services (FCM, Mozilla, Apple, Windows). New messages, challenges, friend requests and
+`POST /nudge {code, room, san}` (sent after a move in a daily game) trigger an empty push signed
+with an ES256 JWT, finished with `ctx.waitUntil`; gone endpoints (404/410) are dropped. The
+service worker then reads `GET /notes` with the key the page cached for it and shows the newest item.
+
 Limits: 20 registrations per IP per hour, 30 messages per minute, 40 friend requests per hour,
 5 clubs per owner, 500-character messages. Each request batches its queries into one D1 round trip
 after the key lookup. `npm run test:social` runs the API against SQLite through a D1-shaped shim.

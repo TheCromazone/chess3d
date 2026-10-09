@@ -109,6 +109,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Forums | ✅ | five forums (general, openings, tactics, endgames, help): topics, replies, delete your own, anything three players report is hidden |
 | Challenges | ✅ | challenge a friend to a live game (any time control) or a daily game; pop-up notice with Accept / Decline wherever they are in the app; challenge friends from the invite lobby |
 | Direct messages | ✅ | threads with friends, unread counts on the nav, notices for new messages |
+| Notifications | ✅ | in-app notices while open; opt-in browser notifications when closed (web push) for challenges, messages, friend requests and daily moves |
 | Clubs | ✅ | create (public or invite-only), join by code or from the public list, club chat, member list with presence |
 | Leaderboards | ✅ | global top 50 per category (blitz, bullet, rapid, puzzles, bots, Puzzle Rush) with your rank, or just your friends; ratings are self-reported by devices and labelled so; bot ladder on the profile |
 | Accounts | ✅ | passwordless by the user's choice: your profile key is the account, with a unique name; sign in on other devices with a one-time code or your recovery key; profile, ratings, settings and games back up to the cloud and follow you; sign out of this or all other devices; delete the profile |
@@ -133,8 +134,10 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 Everything above is built, deployed and verified with two live players. What chess.com has that
 this doesn't, and why:
 
-- **Notifications when the site is closed.** Challenges, messages, friend requests and "your move"
-  in daily games pop up while the app is open (in any tab); there's no web push yet.
+- **Push delivery is verified up to the push service only.** Notifications when the site is closed
+  are built (opt-in web push for challenges, messages, friend requests and daily moves; signed with
+  a VAPID key and checked in tests), but the test browser here blocks notifications, so a delivered
+  notification hasn't been seen end to end yet.
 - **Editorial and paid content:** news, articles, video lessons, streamers, the coach marketplace
   and membership tiers. These are content and business features, not software ones.
 - **More variants:** Crazyhouse, Bughouse, 4-player and Duck chess. Stockfish doesn't play them, so
