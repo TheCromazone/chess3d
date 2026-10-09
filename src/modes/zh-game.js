@@ -542,11 +542,7 @@ export class VariantsScreen {
         row("cube", "Crazyhouse", "Captured pieces come back as drops. Bots, pass and play, or a friend", () => this.app.go("#/crazyhouse")),
         row("grid", "4-Player Chess", "Four armies on one board: free-for-all or teams", () => this.app.go("#/fourplayer")),
         row("users", "Bughouse", "Two boards, two teams: your captures feed your partner", () => this.app.go("#/bughouse")),
-        ...Object.entries(VX_INFO).map(([id, info]) => row(info.icon, VX_VARIANTS[id].name, info.short, () => this.app.go(`#/variant/${id}`))),
-        row("grid", "Chess960", "Shuffled back rank, against bots or on one screen", () => this.app.go("#/bots")),
-        row("star", "King of the Hill", "Also win by reaching the centre with your king", () => this.app.go("#/bots")),
-        row("bolt", "Three-check", "Also win by giving three checks", () => this.app.go("#/bots"))),
-      h("p.note", "Chess960, King of the Hill and Three-check are chosen in the bot and pass-and-play setup.")],
+        ...Object.entries(VX_INFO).map(([id, info]) => row(info.icon, VX_VARIANTS[id].name, info.short, () => this.app.go(`#/variant/${id}`))))],
     });
   }
 }

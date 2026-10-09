@@ -8,6 +8,7 @@ import { VX_LEVELS } from "../core/vx-engine.js";
 import { think } from "./zh-game.js";
 import { RoomClient, makePlayerId, parsePlayerId, live } from "../net/room.js";
 import { getProfile, getSettings } from "../store.js";
+import { presetVariant } from "../screens/play.js";
 import { SFX } from "../audio.js";
 import * as Social from "../net/social.js";
 
@@ -19,8 +20,11 @@ const REASONS = {
   king: "by taking the king", explosion: "by blowing up the king", checkmate: "by checkmate", "stalemate-win": "with no moves left",
   stalemate: "by stalemate", "no-pieces": "by losing every piece", horde: "by taking the whole horde", threefold: "by repetition",
   fifty: "by the 50-move rule", material: "with only the kings left", resignation: "by resignation", timeout: "on time",
-  agreement: "by agreement", aborted: "game aborted",
+  agreement: "by agreement", aborted: "game aborted", threecheck: "by three checks", hill: "by reaching the centre",
 };
+// these three have Stockfish bots in the main bot setup, so "Computer" goes there
+const STOCKFISH_BOTS = { chess960: "960", threecheck: "3check", koth: "koth" };
+const HILL_SQUARES = ["d4", "e4", "d5", "e5"];
 
 // what each variant is, in a sentence or two, for the setup screen and the game panel
 export const VX_INFO = {
@@ -29,6 +33,9 @@ export const VX_INFO = {
   giveaway: { icon: "gift", short: "Lose all your pieces to win. Captures are forced", rules: "Lose all your pieces, or get stuck with no move, to win. If you can capture you must, the king is an ordinary piece, and pawns may promote to a king." },
   atomic: { icon: "bolt", short: "Every capture explodes. Blow up the king", rules: "Every capture is an explosion: the capturing piece and every piece next to it, except pawns, are destroyed. Blow up the king (or checkmate it) to win. Kings can't capture, and touching kings can't be in check." },
   horde: { icon: "users", short: "36 pawns against a full army", rules: "White has 36 pawns and no king. Black wins by taking every white piece; White wins by checkmating Black. Pawns on the first rank may step two squares." },
+  chess960: { icon: "grid", short: "Shuffled back rank. Bots, pass and play, or a friend", rules: "The back-rank pieces start in one of 960 shuffled orders, the same for both sides. Castle by moving your king onto its rook; king and rook land where they would in normal chess." },
+  koth: { icon: "star", short: "Also win by reaching the centre with your king", rules: "Normal chess, but you also win by getting your king to one of the four centre squares (d4, e4, d5, e5)." },
+  threecheck: { icon: "bolt", short: "Also win by giving three checks", rules: "Normal chess, but you also win by checking the enemy king three times." },
 };
 
 function lostPieces(g, colour) {
@@ -50,7 +57,8 @@ export class VxPlay {
     this.variant = cfg.variant;
     this.rules = VX_VARIANTS[cfg.variant];
     this.mode = cfg.mode;
-    this.g = new VxGame(this.variant);
+    this.start = cfg.variant === "chess960" ? cfg.start ?? Math.floor(Math.random() * 960) : undefined;
+    this.g = new VxGame(this.variant, { start: this.start });
     this.sans = [];
     this.last = null;
     this.result = null;
@@ -171,7 +179,7 @@ export class VxPlay {
       const over = this.mode !== "online" && this.g.outcome().over;   // online, the server decides
       if (over) SFX.end(); else if (/\+$/.test(d.san)) SFX.check(); else if (d.captured) SFX.capture(); else if (remote) SFX.moveOpp(); else SFX.move();
     };
-    if (this.rules.fog || shown) { this.redraw(); sound(); }
+    if (this.rules.fog || shown || d.castle960) { this.redraw(); sound(); }
     else {
       b.animateMove({ ...d, flags: d.flags || "" }, {}, () => {
         if (this.dead) return;
@@ -268,7 +276,7 @@ export class VxPlay {
       this.phase = "config";
       if (v.white === this.playerId && !this.sentConfig) {
         this.sentConfig = true;
-        this.client.action({ t: "config", tc: this.cfg.tcKey || "3+0", variant: this.variant });
+        this.client.action({ t: "config", tc: this.cfg.tcKey || "3+0", variant: this.variant, start: this.start });
       }
       this.render();
       return;
@@ -344,6 +352,8 @@ export class VxPlay {
     const showLast = s.highlightLast && l && (!eyes || this.lastBy() === eyes);
     b.setLastMove(showLast ? l.from : null, showLast ? l.to : null);
     b.setCheck(this.rules.check && this.g.inCheck() ? this.g.kingSquare(this.g.turn()) : null);
+    // King of the Hill: the four goal squares stay lightly marked
+    if (this.rules.hill) b.setMarks(HILL_SQUARES.map((sq) => ({ sq, color: "rgba(217,180,90,.28)" })));
     this.renderStrips();
   }
   lastBy() { return this.sans.length % 2 === 1 ? "w" : "b"; }
@@ -388,6 +398,7 @@ export class VxPlay {
         h("button.btn.primary.block", { onclick: () => { this.curtain = false; this.app.board.viewSide(mover, false); this.redraw(); this.render(); } }, icon("eye", 18), `Show ${name(mover)}'s board`)));
     }
     body.push(h("div.zh-moves", ...this.sans.map((san, i) => h("span", i % 2 === 0 ? h("b.muted", `${i / 2 + 1}.`) : null, " ", this.viewer() && this.mode !== "online" && (i % 2 === 0 ? "w" : "b") !== this.viewer() ? "?" : san, " "))));
+    if (this.rules.threeCheck) body.push(h("div.status-line", h("span", `Checks given: White ${this.g.checksGiven("w")}/3, Black ${this.g.checksGiven("b")}/3`)));
     body.push(h("p.note", VX_INFO[this.variant].rules));
     const foot = [];
     if (!this.result && this.phase === "playing" && this.mode !== "local") {
@@ -448,7 +459,9 @@ export class VxSetup {
       h("p", { style: { color: "var(--ink-2)" } }, VX_INFO[this.variant].rules),
       h("div.field", h("div.lbl", "Opponent"), segmented([{ value: "bot", label: "Computer" }, { value: "local", label: "Pass and play" }, { value: "online", label: "A friend online" }], s.mode, (v) => { s.mode = v; this.render(); })),
     ];
-    if (s.mode === "bot") {
+    if (s.mode === "bot" && STOCKFISH_BOTS[this.variant]) {
+      body.push(h("p.note", `${rules.name} bots are in Play bots, with all 16 personalities. Play opens there with ${rules.name} chosen.`));
+    } else if (s.mode === "bot") {
       body.push(h("div.bot-grid.zh-bots", ...VX_LEVELS.map((l) => h(`button.bot-chip${l.id === s.level ? ".on" : ""}`, { onclick: () => { s.level = l.id; this.render(); }, "aria-label": `${l.name}, ${l.elo}` },
         h("div.avatar", { style: { background: l.avatar.bg } }, l.avatar.emoji), h("small", l.name)))));
       const lv = VX_LEVELS.find((l) => l.id === s.level);
@@ -466,8 +479,10 @@ export class VxSetup {
   }
   start() {
     const s = this.s;
+    if (s.mode === "bot" && STOCKFISH_BOTS[this.variant]) { presetVariant(STOCKFISH_BOTS[this.variant]); this.app.go("#/bots"); return; }
     const color = s.color === "r" ? (Math.random() < 0.5 ? "w" : "b") : s.color;
-    const cfg = s.mode === "online" ? { variant: this.variant, mode: "online", room: "vx-" + randomId(10), tcKey: s.tc } : { variant: this.variant, mode: s.mode, level: s.level, myColor: color };
+    const start = this.variant === "chess960" ? Math.floor(Math.random() * 960) : undefined;
+    const cfg = s.mode === "online" ? { variant: this.variant, mode: "online", room: "vx-" + randomId(10), tcKey: s.tc, start } : { variant: this.variant, mode: s.mode, level: s.level, myColor: color, start };
     this.app.launch(() => new VxPlay(this.app, cfg), `#/variant/${this.variant}/${s.mode === "online" ? "online" : "play"}`);
   }
 }

@@ -10,13 +10,36 @@ const STD = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 // forced: captures are compulsory (Giveaway), and losing every piece or having no move wins
 // atomic: captures explode the 8 squares around them (pawns survive); kings can't capture
 // horde: White has 36 pawns and no king; Black wins by taking them all
+// chess960 / threeCheck / hill: Chess960 (castling with the king onto its rook), Three-check and
+// King of the Hill, for online play (their bots use Stockfish elsewhere in the app)
 export const VX_VARIANTS = {
   duck: { name: "Duck Chess", start: STD, duck: true, kingCapture: true, stalemate: "win" },
   fog: { name: "Fog of War", start: STD, fog: true, kingCapture: true, stalemate: "draw" },
   giveaway: { name: "Giveaway", start: STD.replace("KQkq", "-"), forced: true, kingPromo: true, stalemate: "win" },
   atomic: { name: "Atomic", start: STD, check: true, atomic: true, stalemate: "draw" },
   horde: { name: "Horde", start: "rnbqkbnr/pppppppp/8/1PP2PP1/PPPPPPPP/PPPPPPPP/PPPPPPPP/PPPPPPPP w kq - 0 1", check: true, horde: true, stalemate: "draw" },
+  chess960: { name: "Chess960", start: STD, check: true, chess960: true, material: true, stalemate: "draw" },
+  threecheck: { name: "Three-check", start: STD, check: true, threeCheck: true, stalemate: "draw" },
+  koth: { name: "King of the Hill", start: STD, check: true, hill: true, stalemate: "draw" },
 };
+
+// Chess960 starting positions by Scharnagl number (518 is the normal setup)
+export function vxChess960Fen(n) {
+  const back = Array(8).fill(null);
+  const free = () => back.map((p, i) => (p ? -1 : i)).filter((i) => i >= 0);
+  let k = n;
+  back[(k % 4) * 2 + 1] = "b"; k = Math.floor(k / 4);
+  back[(k % 4) * 2] = "b"; k = Math.floor(k / 4);
+  back[free()[k % 6]] = "q"; k = Math.floor(k / 6);
+  const KN = [[0, 1], [0, 2], [0, 3], [0, 4], [1, 2], [1, 3], [1, 4], [2, 3], [2, 4], [3, 4]][k];
+  const f1 = free();
+  back[f1[KN[0]]] = "n"; back[f1[KN[1]]] = "n";
+  const rest = free();
+  back[rest[0]] = "r"; back[rest[1]] = "k"; back[rest[2]] = "r";
+  const row = back.join("");
+  return `${row}/pppppppp/8/8/8/8/PPPPPPPP/${row.toUpperCase()} w KQkq - 0 1`;
+}
+const HILL = [51, 52, 67, 68];   // d5 e5 d4 e4
 
 // pieces: type | colour, colour 0 = White, 8 = Black; the duck belongs to nobody
 export const PAWN = 1, KNIGHT = 2, BISHOP = 3, ROOK = 4, QUEEN = 5, KING = 6, DUCK = 7;
@@ -38,9 +61,10 @@ const colourName = (c) => (c ? "b" : "w");
 const isPiece = (p) => p !== 0 && p !== DUCK;
 
 // ---- positions ----
-// { b: Int8Array(128), turn: 0|8, castle: bits (1 K, 2 Q, 4 k, 8 q), ep: index|-1, half, full, duck: index|-1 }
+// { b: Int8Array(128), turn: 0|8, castle: [rook squares that may still castle], ep: index|-1, half, full,
+//   duck: index|-1, checks?: [given by White, given by Black] (Three-check, FEN field "+w+b") }
 export function parsePos(fen) {
-  const [rows, turn, castle, ep, half, full] = fen.trim().split(/\s+/);
+  const [rows, turn, castle, ep, half, full, checks] = fen.trim().split(/\s+/);
   const b = new Int8Array(128);
   let duck = -1;
   rows.split("/").forEach((row, r) => {
@@ -53,9 +77,23 @@ export function parsePos(fen) {
       if (t) b[i] = t | (ch === ch.toLowerCase() ? 8 : 0);
     }
   });
-  let c = 0;
-  for (const ch of castle || "-") c |= ch === "K" ? 1 : ch === "Q" ? 2 : ch === "k" ? 4 : ch === "q" ? 8 : 0;
-  return { b, turn: turn === "b" ? 8 : 0, castle: c, ep: ep && ep !== "-" ? vxIndex(ep) : -1, half: Number(half) || 0, full: Number(full) || 1, duck };
+  // K/Q (and k/q) mean the outermost rook on that side of the king; a-h name the rook's file (Chess960)
+  const rights = [];
+  for (const ch of castle || "-") {
+    if (!/[KQkqA-Ha-h]/.test(ch)) continue;
+    const white = ch === ch.toUpperCase(), row = white ? 7 : 0, rook = ROOK | (white ? 0 : 8);
+    const kf = [0, 1, 2, 3, 4, 5, 6, 7].find((f) => b[row * 16 + f] === (KING | (white ? 0 : 8)));
+    let file = -1;
+    if (ch === "K" || ch === "k") { for (let f = 7; f > (kf ?? 7); f--) if (b[row * 16 + f] === rook) { file = f; break; } }
+    else if (ch === "Q" || ch === "q") { for (let f = 0; f < (kf ?? 0); f++) if (b[row * 16 + f] === rook) { file = f; break; } }
+    else file = ch.toLowerCase().charCodeAt(0) - 97;
+    if (file >= 0 && b[row * 16 + file] === rook && !rights.includes(row * 16 + file)) rights.push(row * 16 + file);
+  }
+  const cm = /^\+(\d+)\+(\d+)$/.exec(checks || "");
+  return {
+    b, turn: turn === "b" ? 8 : 0, castle: rights.sort((x, y) => y - x), ep: ep && ep !== "-" ? vxIndex(ep) : -1,
+    half: Number(half) || 0, full: Number(full) || 1, duck, checks: cm ? [Number(cm[1]), Number(cm[2])] : undefined,
+  };
 }
 
 export function posFen(pos) {
@@ -70,9 +108,20 @@ export function posFen(pos) {
     }
     rows.push(row + (empty ? empty : ""));
   }
-  const c = pos.castle;
-  const castle = (c & 1 ? "K" : "") + (c & 2 ? "Q" : "") + (c & 4 ? "k" : "") + (c & 8 ? "q" : "") || "-";
-  return `${rows.join("/")} ${colourName(pos.turn)} ${castle} ${pos.ep >= 0 ? vxSquare(pos.ep) : "-"} ${pos.half} ${pos.full}`;
+  // the outermost rook on a side is written K/Q (as in standard FEN), any other rook by its file
+  const letter = (r) => {
+    const white = (r >> 4) === 7, row = r & 0x70, rook = ROOK | (white ? 0 : 8);
+    const kf = [0, 1, 2, 3, 4, 5, 6, 7].find((f) => pos.b[row + f] === (KING | (white ? 0 : 8))) ?? 4;
+    const f = r & 15, side = f > kf ? 1 : -1;
+    let outer = true;
+    for (let g = f + side; g >= 0 && g < 8; g += side) if (pos.b[row + g] === rook) outer = false;
+    const ch = outer ? (side > 0 ? "k" : "q") : "abcdefgh"[f];
+    return white ? ch.toUpperCase() : ch;
+  };
+  const order = (r) => ((r >> 4) === 7 ? 0 : 2) + ((r & 15) > 3 ? 0 : 1);
+  const castle = [...pos.castle].sort((x, y) => order(x) - order(y) || (y & 15) - (x & 15)).map(letter).join("") || "-";
+  const tail = pos.checks ? ` +${pos.checks[0]}+${pos.checks[1]}` : "";
+  return `${rows.join("/")} ${colourName(pos.turn)} ${castle} ${pos.ep >= 0 ? vxSquare(pos.ep) : "-"} ${pos.half} ${pos.full}${tail}`;
 }
 
 // what repeats for threefold: everything but the move counters
@@ -127,20 +176,30 @@ function pawnMoves(out, from, to, piece, cap, v, lastRow) {
 }
 
 function castleMoves(pos, v, k, out) {
-  const us = pos.turn, b = pos.b;
-  const home = us ? 4 : 116;
-  if (k !== home) return;
-  const rights = us ? pos.castle >> 2 : pos.castle & 3;
-  if (!rights) return;
-  const rook = ROOK | us;
+  const us = pos.turn, b = pos.b, row = us ? 0 : 0x70;
+  if ((k & 0x70) !== row) return;
+  const rooks = pos.castle.filter((r) => (r & 0x70) === row && b[r] === (ROOK | us));
+  if (!rooks.length) return;
   // only variants with check forbid castling out of or through an attack
-  const safe = (sq) => !v.check || !attacked(b, sq, us ^ 8, !v.atomic);
-  const ok = !v.check || !inCheck(pos, v, us);
-  if (rights & 1 && ok && b[home + 3] === rook && !b[home + 1] && !b[home + 2] && safe(home + 1) && safe(home + 2)) {
-    out.push({ from: home, to: home + 2, piece: KING | us, cap: 0, promo: 0, flags: OO });
-  }
-  if (rights & 2 && ok && b[home - 4] === rook && !b[home - 1] && !b[home - 2] && !b[home - 3] && safe(home - 1) && safe(home - 2)) {
-    out.push({ from: home, to: home - 2, piece: KING | us, cap: 0, promo: 0, flags: OOO });
+  if (v.check && inCheck(pos, v, us)) return;
+  for (const r of rooks) {
+    const short = (r & 15) > (k & 15);
+    const kingTo = row + (short ? 6 : 2), rookTo = row + (short ? 5 : 3);
+    // everything between, and both landing squares, must be empty apart from this king and rook
+    const lo = Math.min(k & 15, r & 15, kingTo & 15, rookTo & 15), hi = Math.max(k & 15, r & 15, kingTo & 15, rookTo & 15);
+    let clear = true;
+    for (let f = lo; f <= hi && clear; f++) { const sq = row + f; if (sq !== k && sq !== r && b[sq]) clear = false; }
+    if (!clear) continue;
+    if (v.check) {
+      const step = (kingTo & 15) > (k & 15) ? 1 : -1;
+      let safe = true;
+      for (let sq = k; safe; sq += step) {
+        if (sq !== k && attacked(b, sq, us ^ 8, !v.atomic)) safe = false;
+        if (sq === kingTo) break;
+      }
+      if (!safe) continue;
+    }
+    out.push({ from: k, to: v.chess960 ? r : kingTo, piece: KING | us, cap: 0, promo: 0, flags: short ? OO : OOO, rook: r, kingTo, rookTo });
   }
 }
 
@@ -194,31 +253,34 @@ export function makeMove(pos, m, v) {
   const us = pos.turn;
   b[m.from] = 0;
   if (m.flags & EP) b[m.to + (us ? -16 : 16)] = 0;
-  b[m.to] = m.promo ? m.promo | us : m.piece;
-  if (m.flags & OO) { b[m.to + 1] = 0; b[m.to - 1] = ROOK | us; }
-  if (m.flags & OOO) { b[m.to - 2] = 0; b[m.to + 1] = ROOK | us; }
+  if (m.flags & (OO | OOO)) { b[m.rook] = 0; b[m.kingTo] = KING | us; b[m.rookTo] = ROOK | us; }
+  else b[m.to] = m.promo ? m.promo | us : m.piece;
   if (v.atomic && m.cap) {
     // the capturing piece, the captured piece and every non-pawn next to them are destroyed
     b[m.to] = 0;
     for (const d of AROUND) { const s = m.to + d; if (!off(s) && isPiece(b[s]) && (b[s] & 7) !== PAWN) b[s] = 0; }
   }
-  let castle = pos.castle;
-  if (castle) {
-    if (b[116] !== KING) castle &= ~3;
-    if (b[119] !== ROOK) castle &= ~1;
-    if (b[112] !== ROOK) castle &= ~2;
-    if (b[4] !== (KING | 8)) castle &= ~12;
-    if (b[7] !== (ROOK | 8)) castle &= ~4;
-    if (b[0] !== (ROOK | 8)) castle &= ~8;
-  }
+  // a king that moves loses both rights; a rook that moves or is taken loses its own
+  // (and a king taken or blown up takes its rights with it)
+  const castle = pos.castle.length ? pos.castle.filter((r) => {
+    const side = (r >> 4) === 7 ? 0 : 8, row = r & 0x70;
+    if ((m.piece & 7) === KING && (m.piece & 8) === side) return false;
+    let king = false;
+    for (let f = 0; f < 8; f++) if (b[row + f] === (KING | side)) king = true;
+    return king && b[r] === (ROOK | side);
+  }) : pos.castle;
   const reset = (m.piece & 7) === PAWN || m.cap;
-  return {
+  const next = {
     b, turn: us ^ 8, castle,
     ep: m.flags & DOUBLE ? (m.from + m.to) >> 1 : -1,
     half: reset ? 0 : pos.half + 1,
     full: pos.full + (us ? 1 : 0),
     duck: pos.duck,
+    checks: pos.checks,
   };
+  // Three-check counts every check given
+  if (v.threeCheck && inCheck(next, v, us ^ 8)) next.checks = us ? [next.checks[0], next.checks[1] + 1] : [next.checks[0] + 1, next.checks[1]];
+  return next;
 }
 
 export function placeDuck(pos, sq) {
@@ -256,6 +318,8 @@ export function duckSquares(after) {
 // { over, winner: "w"|"b"|null, reason } for the side to move, given its legal moves
 export function vxOutcome(pos, v, legal, keys = []) {
   const us = pos.turn, them = us ^ 8;
+  if (v.threeCheck && pos.checks && pos.checks[them ? 1 : 0] >= 3) return { over: true, winner: colourName(them), reason: "threecheck" };
+  if (v.hill && HILL.includes(kingAt(pos.b, them))) return { over: true, winner: colourName(them), reason: "hill" };
   if ((v.kingCapture || v.atomic) && kingAt(pos.b, us) < 0) return { over: true, winner: colourName(them), reason: v.atomic ? "explosion" : "king" };
   if (v.horde && !hasPieces(pos.b, 0)) return { over: true, winner: "b", reason: "horde" };
   if (v.forced && !hasPieces(pos.b, us)) return { over: true, winner: colourName(us), reason: "no-pieces" };
@@ -263,6 +327,12 @@ export function vxOutcome(pos, v, legal, keys = []) {
     if (v.stalemate === "win") return { over: true, winner: colourName(us), reason: "stalemate-win" };
     if (inCheck(pos, v, us)) return { over: true, winner: colourName(them), reason: "checkmate" };
     return { over: true, winner: null, reason: "stalemate" };
+  }
+  if (v.material) {
+    // bare kings, or a lone knight or bishop, can't mate
+    const rest = [];
+    for (let i = 0; i < 120; i++) { if (off(i)) { i += 7; continue; } const p = pos.b[i]; if (isPiece(p) && (p & 7) !== KING) rest.push(p & 7); }
+    if (!rest.length || (rest.length === 1 && (rest[0] === KNIGHT || rest[0] === BISHOP))) return { over: true, winner: null, reason: "material" };
   }
   if (v.atomic) {
     let pieces = 0;
@@ -336,7 +406,8 @@ export class VxGame {
   constructor(variant, s = {}) {
     this.variant = variant;
     this.v = VX_VARIANTS[variant];
-    this.pos = parsePos(s.fen || this.v.start);
+    this.pos = parsePos(s.fen || (this.v.chess960 ? vxChess960Fen(s.start ?? 518) : this.v.start));
+    if (this.v.threeCheck && !this.pos.checks) this.pos.checks = [0, 0];
     this.keys = [...(s.keys || [])];
     if (!this.keys.length) this.keys.push(posKey(this.pos));
   }
@@ -370,7 +441,7 @@ export class VxGame {
     return this._legal().filter((m) => !square || vxSquare(m.from) === square).map((m) => this._public(m));
   }
   _public(m) {
-    return { from: vxSquare(m.from), to: vxSquare(m.to), promotion: m.promo ? LETTERS[m.promo] : undefined, captured: m.cap ? LETTERS[m.cap & 7] : undefined, piece: LETTERS[m.piece & 7], flags: (m.flags & EP ? "e" : "") + (m.flags & OO ? "k" : "") + (m.flags & OOO ? "q" : "") + (m.cap ? "c" : "") };
+    return { from: vxSquare(m.from), to: vxSquare(m.to), promotion: m.promo ? LETTERS[m.promo] : undefined, captured: m.cap ? LETTERS[m.cap & 7] : undefined, piece: LETTERS[m.piece & 7], flags: (m.flags & EP ? "e" : "") + (m.flags & OO ? "k" : "") + (m.flags & OOO ? "q" : "") + (m.cap ? "c" : ""), castle960: !!(this.v.chess960 && m.flags & (OO | OOO)) };
   }
   _find(m) {
     if (!m) return null;
@@ -378,6 +449,7 @@ export class VxGame {
   }
 
   inCheck() { return inCheck(this.pos, this.v, this.pos.turn); }
+  checksGiven(colour) { return this.pos.checks ? this.pos.checks[colour === "b" ? 1 : 0] : 0; }
   kingSquare(colour) { const k = kingAt(this.pos.b, colour === "b" ? 8 : 0); return k >= 0 ? vxSquare(k) : null; }
 
   // Duck Chess: after this move (piece part only), where may the duck go? [] when the move takes the king

@@ -208,6 +208,19 @@ ok(vs.fen.startsWith("8/8/8/8/8/8/8/8") && vs.moves.every((m) => m === null), "f
 fog = L.applyAction(fog, P2, { t: "resign" });
 ok(L.viewFor(fog, P1).moves[1] === "e7e5" && L.viewFor(fog, P1).fen.includes("pppp1ppp"), "fog: everything is revealed when the game ends");
 
+// online Chess960, Three-check, King of the Hill (rules v5 variants)
+ok(!L.validateAction(L.setup([P1, P2]), P1, { t: "config", tc: "3+0", variant: "chess960" }).ok, "Chess960 needs a starting position");
+let c9 = L.applyAction(L.setup([P1, P2]), P1, { t: "config", tc: "3+0", variant: "chess960", start: 0 });
+ok(c9.fen.startsWith("bbqnnrkr/pppppppp") && c9.vx.fen === c9.fen, "Chess960 position 0 is set up (bbqnnrkr)");
+let k3 = L.applyAction(L.setup([P1, P2]), P1, { t: "config", tc: "inf", variant: "threecheck" });
+k3 = vplay(k3, [P1, "e2e4"], [P2, "e7e5"], [P1, "f1c4"], [P2, "b8c6"], [P1, "c4f7"], [P2, "e8f7"], [P1, "d1h5"], [P2, "g7g6"], [P1, "h5f3"]);
+r = L.isGameOver(k3);
+ok(r.over && r.winner === P1 && r.reason === "threecheck", "Three-check: the third check wins on the server");
+let hill = L.applyAction(L.setup([P1, P2]), P1, { t: "config", tc: "inf", variant: "koth" });
+hill = vplay(hill, [P1, "e2e4"], [P2, "e7e5"], [P1, "e1e2"], [P2, "d7d6"], [P1, "e2d3"], [P2, "g8f6"], [P1, "d3c4"], [P2, "f6e4"], [P1, "c4d5"]);
+r = L.isGameOver(hill);
+ok(r.over && r.winner === P1 && r.reason === "hill", "King of the Hill: the king reaching the centre wins on the server");
+
 // v6: 4-Player Chess in a four-seat room
 {
   const [R, B, Y, G] = ["p-red", "p-blue", "p-yellow", "p-green"];

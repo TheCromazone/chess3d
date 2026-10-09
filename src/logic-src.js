@@ -102,6 +102,7 @@ export function validateAction(state, playerId, action) {
     if (!parseTc(action.tc).ok) return { ok: false, error: "unknown time control" };
     if (action.variant !== undefined && action.variant !== "standard" && !VARIANTS.includes(action.variant)) return { ok: false, error: "unknown variant" };
     if (action.variant === "bughouse" && !(typeof action.link === "string" && ROOM_RE.test(action.link))) return { ok: false, error: "a bughouse board needs its partner board" };
+    if (action.variant === "chess960" && !(Number.isInteger(action.start) && action.start >= 0 && action.start < 960)) return { ok: false, error: "which Chess960 position?" };
     return { ok: true };
   }
   if (state.phase === "config") return { ok: false, error: "waiting for White to choose the time control" };
@@ -195,7 +196,7 @@ export function applyAction(state, playerId, action) {
   if (action.t === "config") {
     const { tc, perMove } = parseTc(action.tc);
     const variant = VARIANTS.includes(action.variant) ? action.variant : null;
-    const vx = VX_VARIANTS[variant] ? new VxGame(variant) : null;
+    const vx = VX_VARIANTS[variant] ? new VxGame(variant, variant === "chess960" ? { start: action.start } : {}) : null;
     return {
       ...state,
       phase: "playing",

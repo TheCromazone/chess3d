@@ -9,6 +9,8 @@ import { OnlineGame } from "../modes/online-game.js";
 import { VARIANTS } from "../modes/base-game.js";
 
 let variant = "standard";
+// the Variants hub sends Chess960, King of the Hill and Three-check players here for the bots
+export function presetVariant(v) { variant = v; }
 function variantField() {
   const note = h("p.note", (VARIANTS.find(v => v.value === variant) || {}).desc || "");
   return h("div.field", h("div.lbl", "Variant"),

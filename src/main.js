@@ -59,9 +59,9 @@ const routes = [
       return q.get("room") ? new ZhGame(app, { mode: "online", room: q.get("room"), tcKey: q.get("tc") || "3+0" }) : new ZhSetup(app);
     },
   },
-  { pattern: /^#\/variant\/([a-z]+)(?:\/play)?$/, nav: "play", make: (app, m) => (VX_VARIANTS[m[1]] ? new VxSetup(app, m[1]) : new VariantsScreen(app)) },
+  { pattern: /^#\/variant\/([a-z0-9]+)(?:\/play)?$/, nav: "play", make: (app, m) => (VX_VARIANTS[m[1]] ? new VxSetup(app, m[1]) : new VariantsScreen(app)) },
   {
-    pattern: /^#\/variant\/([a-z]+)\/online$/, nav: "play", make: (app, m) => {
+    pattern: /^#\/variant\/([a-z0-9]+)\/online$/, nav: "play", make: (app, m) => {
       const q = new URLSearchParams(location.search);
       if (!VX_VARIANTS[m[1]]) return new VariantsScreen(app);
       return q.get("room") ? new VxPlay(app, { variant: m[1], mode: "online", room: q.get("room"), tcKey: q.get("tc") || "3+0" }) : new VxSetup(app, m[1]);

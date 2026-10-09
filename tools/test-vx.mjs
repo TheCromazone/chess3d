@@ -117,6 +117,49 @@ ok(!g.moves({ square: "e8" }).some((m) => m.to === "d7" || m.to === "f7"), "hord
 g = new VxGame("horde", { fen: "k7/2P5/1PP5/8/8/8/8/8 b - - 0 1" });
 ok(g.outcome().over && g.outcome().winner === null, "horde: stalemate is a draw");
 
+// ---- Chess960: the same move counts as the Chess960 adapter (itself checked against Stockfish) ----
+{
+  const { Chess960, chess960Fen } = await import("../src/core/chess960.js");
+  const v960 = VX_VARIANTS.chess960;
+  // (the adapter also lists king-to-destination aliases of castling, for drag and drop; not counted)
+  const perftA = (c, d) => { const ms = c.moves({ verbose: true }).filter((m) => !m.alias); if (d === 1) return ms.length; let n = 0; for (const m of ms) { c.move({ from: m.from, to: m.to, promotion: m.promotion }); n += perftA(c, d - 1); c.undo(); } return n; };
+  const perftB = (pos, d) => { const ms = legalMoves(pos, v960); if (d === 1) return ms.length; let n = 0; for (const m of ms) n += perftB(makeMove(pos, m, v960), d - 1); return n; };
+  let mismatch = null;
+  const fens = [0, 1, 105, 518, 959, 300, 707, 42].map((n) => chess960Fen(n)).concat([
+    "4k3/8/8/8/8/8/8/R4K1R w HA - 0 1", "4k3/8/8/8/8/8/8/6KR w H - 0 1", "r3k2r/8/8/8/8/8/8/RK5R w HAha - 0 1",
+    "1r2k1r1/8/8/8/8/8/8/1R2K1R1 w GBgb - 0 1", "4k3/8/8/8/8/8/5q2/R4K1R w HA - 0 1",
+  ]);
+  for (const fen of fens) {
+    // also a few random moves into each game, so castling happens mid-game
+    const c = new Chess960(fen);
+    for (let i = 0; i < 6; i++) { const ms = c.moves({ verbose: true }); if (!ms.length) break; const m = ms[Math.floor(Math.random() * ms.length)]; c.move({ from: m.from, to: m.to, promotion: m.promotion }); }
+    for (const f of [fen, c.fen()]) {
+      const a = perftA(new Chess960(f), 3), b = perftB(parsePos(f), 3);
+      if (a !== b) { mismatch = `${f}: ${a} vs ${b}`; break; }
+    }
+    if (mismatch) break;
+  }
+  ok(!mismatch, `Chess960 perft (depth 3) matches the adapter on ${fens.length * 2} positions${mismatch ? ": " + mismatch : ""}`);
+  const z = new VxGame("chess960", { fen: "4k3/8/8/8/8/8/8/R4K1R w HA - 0 1" });
+  ok(z.moves({ square: "f1" }).some((m) => m.to === "h1" && m.castle960), "Chess960: castling is the king onto its rook");
+  const d = z.move({ from: "f1", to: "h1" });
+  ok(d.san === "O-O" && z.fen.startsWith("4k3/8/8/8/8/8/8/R4RK1 b"), "and lands like normal castling");
+  ok(new VxGame("chess960", { start: 518 }).fen.startsWith("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq"), "Chess960 position 518 is the normal setup");
+  ok(new VxGame("chess960", { fen: "4k3/8/8/8/8/8/8/4KN2 w - - 0 1" }).outcome().reason === "material", "Chess960: king and knight can't win");
+}
+
+// ---- Three-check and King of the Hill ----
+g = new VxGame("threecheck");
+play(g, "e2e4", "e7e5", "f1c4", "b8c6", "c4f7");
+ok(g.checksGiven("w") === 1 && g.fen.endsWith("+1+0"), "Three-check: a check is counted (and kept in the FEN)");
+play(g, "e8f7", "d1h5", "g7g6");
+ok(g.checksGiven("w") === 2 && !g.outcome().over, "two checks isn't enough");
+play(g, "h5f3");
+ok(g.outcome().over && g.outcome().winner === "w" && g.outcome().reason === "threecheck", "the third check wins");
+g = new VxGame("koth");
+play(g, "e2e4", "e7e5", "e1e2", "d7d6", "e2d3", "g8f6", "d3c4", "f6e4", "c4d5");
+ok(g.outcome().over && g.outcome().winner === "w" && g.outcome().reason === "hill", "King of the Hill: reaching d5 wins");
+
 // text round trip, and every variant can start
 ok(vxMoveToText(vxTextToMove("e2e4,d5")) === "e2e4,d5" && vxMoveToText(vxTextToMove("e7e8k")) === "e7e8k", "moves round-trip through text");
 
