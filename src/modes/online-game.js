@@ -411,6 +411,8 @@ export class OnlineGame extends BaseGame {
     const early = this.plyCount() < 2;
     const list = [];
     if (this.v2) list.push({ label: "Request takeback", short: "Takeback", icon: "undo", onClick: () => { this.client.action({ t: "takeback-offer" }); toast("Takeback requested"); }, disabled: !live || !this.plies().some(n => n.move.color === this.myColor) });
+    // daily games: private notes, kept with the game on this device
+    if (this.kind === "daily" && this.myColor) list.push({ label: "Notes", short: "Notes", text: "✎", onClick: () => this._notesModal() });
     // daily games: plan replies while it's their move
     if (this.kind === "daily" && this.v8 && !this.cfg.variant) {
       list.push({ label: this.cond && this.cond.length ? `Planned replies (${this.cond.length})` : "Plan replies", short: "Plan", icon: "edit", onClick: () => this._conditionalModal(), disabled: !live || this.chess.turn() === this.myColor });
@@ -497,6 +499,16 @@ export class OnlineGame extends BaseGame {
     } catch (e) {
       if (tries < 4 && (e.status === 409 || e.status === 503 || e.status === 0)) setTimeout(() => this._reportLeague(tries + 1), 1500 * (tries + 1));
     }
+  }
+
+  _notesModal() {
+    const notes = h("textarea.input.prose", { rows: "6", maxlength: "2000", placeholder: "Plans, ideas, what to check next time…", "aria-label": "Notes on this game" });
+    notes.value = (getDaily(this.room) || {}).notes || "";
+    const m = openModal({
+      title: "Notes", sub: "Private notes on this game. They stay on this device; your opponent never sees them.",
+      body: [notes, h("button.btn.primary.block", { onclick: () => { upsertDaily({ room: this.room, notes: notes.value.slice(0, 2000) }); toast("Notes saved"); m.close(); } }, "Save notes")],
+    });
+    setTimeout(() => notes.focus(), 50);
   }
 
   // daily games: line up replies to the opponent's next move ("if they play Nf6, I play e5")

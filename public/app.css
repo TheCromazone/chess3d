@@ -796,3 +796,4 @@ a.row { color: inherit; text-decoration: none; }
 .league-how summary { cursor: pointer; font-weight: 700; color: var(--ink-2); }
 .league-how ul { margin: 8px 0 0; padding-left: 18px; color: var(--ink-2); display: grid; gap: 6px; }
 .profile-league:not(:empty) { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--ink-2); }
+.page-head p.about, .profile-about { color: var(--ink-2); margin: 2px 0 6px; overflow-wrap: anywhere; }

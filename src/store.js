@@ -53,6 +53,8 @@ const AVATAR_BGS = ["#2f6b4f", "#6b4a2f", "#3b4f7a", "#7a3b4f", "#5a4f2a", "#2a5
 const DEFAULT_PROFILE = () => ({
   name: "Guest" + Math.floor(1000 + Math.random() * 9000),
   avatar: { emoji: "♞", bg: AVATAR_BGS[Math.floor(Math.random() * AVATAR_BGS.length)] },
+  country: "",                 // ISO 3166 code, shown as a flag on your profile
+  about: "",                   // a line about yourself
   created: Date.now(),
   ratings: {
     bots: { r: 800, n: 0, hist: [] },

@@ -573,6 +573,18 @@ clock += 4 * 60_000;
 const again = (await call("POST", "/battles/find", { secret: ann.secret })).data.battle;
 ok(again && again.id !== o1.id && !again.opponent, "after a battle ends, searching opens a new one");
 
+// country and a line about yourself on your profile
+{
+  await call("POST", "/heartbeat", { secret: dee.secret, body: { country: "NO", about: "  Endgames   and long walks.\n" } });
+  let u = (await call("GET", `/users/${dee.id}`, { secret: ann.secret })).data.user;
+  ok(u.country === "NO" && u.about === "Endgames and long walks.", "a profile can show a country and a line about the player");
+  await call("POST", "/heartbeat", { secret: dee.secret, body: { country: "norway", about: "x".repeat(400) } });
+  u = (await call("GET", `/users/${dee.id}`, { secret: ann.secret })).data.user;
+  ok(u.country === "" && u.about.length === 160, "the country must be a two-letter code, and the line is cut at 160 characters");
+  await call("POST", "/heartbeat", { secret: dee.secret, body: {} });
+  ok((await call("GET", `/users/${dee.id}`, { secret: ann.secret })).data.user.about.length === 160, "a heartbeat without them keeps them");
+}
+
 // blocking
 {
   const eve = (await call("POST", "/register", { body: { name: "Eve" }, ip: "10.1.1.1" })).data;

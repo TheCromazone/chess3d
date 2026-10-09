@@ -65,6 +65,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Variant ratings, leaderboards and history | ✅ | a rating per variant from rated games (from 1500), a leaderboard per variant, ratings on player profiles, and every variant game replayable from the profile |
 | Daily / correspondence chess | ✅ | 1, 3 or 7 days per move (or no limit), lose on time when a deadline passes (rules v3); persistent rooms, "your move" list with time left, daily challenges to friends |
 | Daily: conditional moves | ✅ | while it's your opponent's move, line up replies ("if Nf6, then e5", as deep as you like); the room plays your reply the moment they move, and they never see the plan (rules v8) |
+| Daily: notes | ✅ | private notes on each daily game, kept on your device |
 | Daily: vacation | ✅ | one button adds 1 to 14 days to your clock in every timed daily game, so you don't lose on time while away; your opponents see you're on vacation; up to 14 days per game |
 | Leagues | ✅ | eight tiers, Wood to Legend; weekly divisions of up to 50; trophies from rated games against random opponents (rapid 15, blitz 9, bullet 3 a win) and double in arenas, read by the server from the game room; the top of each division moves up every Sunday, nobody moves down |
 | Tournaments / arenas | ✅ | live arenas against real players every 30 minutes (blitz on the hour, bullet on the half hour): instant re-pairing, streak bonuses, live standings, results read by the server from the game room; Bot Arena for practice |
@@ -133,7 +134,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Insights (accuracy trend, by phase, by colour / time control, mistakes per game) | ✅ | from your archive and reviews |
 | Achievements / streaks | ✅ | 24 achievements |
 | Friends with online status | ✅ | friend codes and invite links, requests (accept / decline), online / playing / last seen, watch their live games; also "people you've played" with your record vs each |
-| Player profiles | ✅ | any player's ratings and recent games (the last 30 online and bot games), each opening on the analysis board |
+| Player profiles | ✅ | any player's ratings, league, country flag and a line about them, and recent games (the last 30 online and bot games), each opening on the analysis board |
 | Member search | ✅ | find players by name (or add them by friend code) and open their profile; names are unique |
 | Forums | ✅ | five forums (general, openings, tactics, endgames, help): topics, replies, delete your own, anything three players report is hidden |
 | Blogs | ✅ | players publish posts (likes, delete your own, reporting) |

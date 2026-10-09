@@ -1,4 +1,5 @@
 // Full-page screens: profile (ratings, stats, archive, achievements) and settings.
+import { countryOptions, countryName, flagEmoji } from "../ui/countries.js";
 import { h, icon, timeAgo, downloadText } from "../ui/dom.js";
 import { sparkline, switchRow, segmented, toast, confirmModal, openModal, tcLabel } from "../ui/components.js";
 import { getProfile, updateProfile, getGames, ACHIEVEMENTS, getSettings, setSettings, exportAll, importAll, resetAll, getDailyGames, getVariantGames } from "../store.js";
@@ -28,7 +29,9 @@ export class ProfilePage {
     const avatar = h("button.avatar.lg", { style: { background: p.avatar.bg }, "aria-label": "Change avatar", onclick: () => this.editProfile() }, p.avatar.emoji);
     const page = h("div.page",
       h("div.page-head", avatar,
-        h("div", h("h1", p.name), h("p", `Joined ${new Date(p.created).toLocaleDateString()}. ${plural(p.stats.games, "game")} played.`)),
+        h("div", h("h1", p.name, p.country ? h("span.flag", { title: countryName(p.country), "aria-label": countryName(p.country) }, " " + flagEmoji(p.country)) : null),
+          p.about ? h("p.about", p.about) : null,
+          h("p", `Joined ${new Date(p.created).toLocaleDateString()}. ${plural(p.stats.games, "game")} played.`)),
         h("div", { style: { marginLeft: "auto", display: "flex", gap: "8px" } },
           h("button.btn.small", { onclick: () => this.app.go("#/insights") }, icon("analysis", 16), "Insights"),
           h("button.btn.small", { onclick: () => this.app.go("#/settings"), "aria-label": "Settings" }, icon("settings", 16), "Settings"),
@@ -178,11 +181,16 @@ export class ProfilePage {
     const p = getProfile();
     let emoji = p.avatar.emoji, bg = p.avatar.bg;
     const name = h("input.input", { value: p.name, maxlength: "16", "aria-label": "Display name" });
+    const country = h("select.input", { "aria-label": "Country" }, h("option", { value: "" }, "Not shown"),
+      ...countryOptions().map((c) => h("option", { value: c.code, selected: c.code === p.country ? "" : null }, `${flagEmoji(c.code)} ${c.name}`)));
+    const about = h("textarea.input", { maxlength: "160", rows: "2", placeholder: "e.g. Club player from Oslo. Loves the Caro-Kann.", "aria-label": "About you" });
+    about.value = p.about || "";
     const emojiGrid = h("div.palette", ...EMOJIS.map(e => h(`button${e === emoji ? ".on" : ""}`, { onclick: (ev) => { emoji = e; emojiGrid.querySelectorAll("button").forEach(b => b.classList.remove("on")); ev.currentTarget.classList.add("on"); } }, e)));
     const bgGrid = h("div.palette", ...BGS.map(c => h(`button${c === bg ? ".on" : ""}`, { style: { background: c }, "aria-label": c, onclick: (ev) => { bg = c; bgGrid.querySelectorAll("button").forEach(b => b.classList.remove("on")); ev.currentTarget.classList.add("on"); } }, "")));
     const m = openModal({
       title: "Edit profile",
       body: [h("div.field", h("label", "Display name (letters, numbers, _)"), name), h("div.field", h("div.lbl", "Avatar"), emojiGrid), h("div.field", h("div.lbl", "Color"), bgGrid),
+        h("div.field", h("label", "Country"), country), h("div.field", h("label", "About you"), about),
         h("button.btn.primary.block", {
           onclick: async () => {
             const n = name.value.replace(/[^A-Za-z0-9_]/g, "").slice(0, 16);
@@ -195,7 +203,7 @@ export class ProfilePage {
                 if (!r.available) { toast(`${n} is taken. Try another name.`); return; }
               } catch (e) { toast(e.message); return; }
             }
-            updateProfile(pr => { pr.name = n; pr.avatar = { emoji, bg }; });
+            updateProfile(pr => { pr.name = n; pr.avatar = { emoji, bg }; pr.country = country.value; pr.about = about.value.replace(/\s+/g, " ").trim().slice(0, 160); });
             m.close(); this.render();
           },
         }, "Save")],

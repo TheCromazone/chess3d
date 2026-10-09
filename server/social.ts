@@ -251,6 +251,8 @@ const MIGRATIONS = [
   `ALTER TABLE social_users ADD COLUMN room TEXT`,     // the live game a player is in, for friends to watch
   `ALTER TABLE social_users ADD COLUMN rush INTEGER NOT NULL DEFAULT 0`,   // best 5-minute Puzzle Rush
   `ALTER TABLE social_users ADD COLUMN vratings TEXT NOT NULL DEFAULT '{}'`,   // variant ratings, {variant: {r, n}}
+  `ALTER TABLE social_users ADD COLUMN country TEXT NOT NULL DEFAULT ''`,      // ISO 3166 code, for the flag on a profile
+  `ALTER TABLE social_users ADD COLUMN about TEXT NOT NULL DEFAULT ''`,        // a line about yourself
 ];
 
 // variants with their own rating (and leaderboard)
@@ -399,6 +401,8 @@ interface UserRow {
   room?: string | null;
   rush?: number;
   vratings?: string | null;
+  country?: string | null;
+  about?: string | null;
   r_bullet: number; n_bullet: number; r_blitz: number; n_blitz: number; r_rapid: number; n_rapid: number;
   r_puzzle: number; n_puzzle: number; r_bots: number; n_bots: number;
 }
@@ -454,6 +458,7 @@ function publicUser(u: UserRow, now: number) {
   return {
     id: u.id, name: u.name, code: u.code, avatar, online,
     status: online ? u.status : "offline", lastSeen: u.last_seen, games: u.games, rush: u.rush ?? 0, variants: variantRatingsOf(u),
+    country: u.country ?? "", about: u.about ?? "",
     ratings: Object.fromEntries(CATS.map((c) => [c, { r: u[`r_${c}`], n: u[`n_${c}`] }])),
   };
 }
@@ -801,11 +806,13 @@ export class Social {
       const rushIn = Number(b["rush"]);
       const rush = Number.isFinite(rushIn) ? Math.max(0, Math.min(300, Math.round(rushIn))) : (me.rush ?? 0);
       const vratings = b["vratings"] !== undefined ? JSON.stringify(cleanVariantRatings(b["vratings"])) : (me.vratings ?? "{}");
+      const country = b["country"] === undefined ? (me.country ?? "") : /^[A-Z]{2}$/.test(String(b["country"])) ? String(b["country"]) : "";
+      const about = b["about"] === undefined ? (me.about ?? "") : cleanText(b["about"], 160).replace(/\s+/g, " ").trim();
       const [, unread, reqs, latest, updated] = await this.many(
-        this.q(`UPDATE social_users SET last_seen = ?, status = ?, name = ?, avatar = ?, games = ?, room = ?, rush = ?, vratings = ?,
+        this.q(`UPDATE social_users SET last_seen = ?, status = ?, name = ?, avatar = ?, games = ?, room = ?, rush = ?, vratings = ?, country = ?, about = ?,
             r_bullet = ?, n_bullet = ?, r_blitz = ?, n_blitz = ?, r_rapid = ?, n_rapid = ?,
             r_puzzle = ?, n_puzzle = ?, r_bots = ?, n_bots = ? WHERE id = ?`,
-          now, status, name, avatar, games, room, rush, vratings,
+          now, status, name, avatar, games, room, rush, vratings, country, about,
           vals["r_bullet"], vals["n_bullet"], vals["r_blitz"], vals["n_blitz"], vals["r_rapid"], vals["n_rapid"],
           vals["r_puzzle"], vals["n_puzzle"], vals["r_bots"], vals["n_bots"], me.id),
         this.q("SELECT COUNT(*) AS n FROM social_messages WHERE recipient = ? AND seen = 0", me.id),

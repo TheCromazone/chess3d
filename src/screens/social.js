@@ -8,6 +8,7 @@ import { OnlineGame } from "../modes/online-game.js";
 import { makePlayerId } from "../net/room.js";
 import { DAILY_PACES } from "../modes/daily.js";
 import { tierBadge, LEAGUE_TIERS } from "./league.js";
+import { countryName, flagEmoji } from "../ui/countries.js";
 import { gamePgn } from "./pages.js";
 import { signInModal } from "./account.js";
 import { SFX } from "../audio.js";
@@ -389,7 +390,9 @@ export class SocialScreen {
     const m = openModal({
       title: u.name,
       sub: `${presenceText(u)}${u.games ? `, ${u.games} game${u.games === 1 ? "" : "s"} played` : ""}`,
-      body: [h("div.profile-pop", userAvatar(u, ".lg"), grid), leagueSlot,
+      body: [h("div.profile-pop", userAvatar(u, ".lg"), grid),
+        u.country || u.about ? h("p.profile-about", u.country ? h("span", { title: countryName(u.country) }, `${flagEmoji(u.country)} ${countryName(u.country)}`) : null, u.country && u.about ? ". " : null, u.about || null) : null,
+        leagueSlot,
         Object.keys(u.variants || {}).length ? h("p.note", "Variants: " + Object.entries(u.variants).sort((a, b) => b[1].n - a[1].n).map(([k, v]) => `${VARIANT_NAMES[k] || k} ${v.r}`).join(", ")) : null,
         blocked ? h("p.note", "You've blocked this player.") : actions, remove, kick, blockBtn, h("div.lbl.note", "Recent games"), games],
     });

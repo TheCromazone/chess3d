@@ -216,6 +216,7 @@ export async function beat() {
   let r;
   try {
     r = await api("POST", "/heartbeat", { status: playing ? "playing" : "online", room: live.room, name: socialName(p.name), avatar: p.avatar, ratings, games: p.stats.games, rush: (p.rush && p.rush["5"]) || 0,
+      country: p.country || "", about: p.about || "",
       vratings: Object.fromEntries(Object.entries(p.variants || {}).map(([k, v]) => [k, { r: v.r, n: v.n }])) });
   } catch {
     state.offline = true;
