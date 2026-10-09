@@ -73,7 +73,7 @@ export class WatchPage {
         s.image ? h("img", { src: s.image, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }) : h("span.stream-ph", "♞"),
         h("span.rt", h("b", s.name), h("small", s.title || (s.platform === "youtube" ? "Live on YouTube" : "Live on Twitch"))),
         h("span.live-dot", "LIVE"))) : [h("p.note", "Nobody we follow is streaming right now.")]));
-      videoBox.replaceChildren(...d.videos.map((v) => h("button.video", { onclick: () => playVideo(v), "aria-label": `Play ${v.title}` },
+      videoBox.replaceChildren(...d.videos.map((v) => h("button.video", { onclick: () => playVideo(v), "aria-label": v.title },
         h("img", { src: `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`, alt: "", loading: "lazy" }),
         h("b", v.title), h("small", `${v.channel}, ${timeAgo(v.date)}`))));
       newsBox.replaceChildren(...d.news.map((n) => h("a.row.news", { href: n.link, target: "_blank", rel: "noopener" },

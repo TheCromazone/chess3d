@@ -989,7 +989,7 @@ export class SocialScreen {
     } else if (variant) {
       meLine = d.me.rank
         ? h("div.status-line.good", icon("trophy", 18), h("span", `You're #${d.me.rank} of ${d.total} in ${VARIANT_NAMES[variant]}, with ${d.me.rating}.`))
-        : h("div.status-line", icon("trophy", 18), h("span", `Play a rated ${VARIANT_NAMES[variant]} game against a random opponent to get on this board.`));
+        : h("div.status-line", icon("trophy", 18), h("span", "Play a rated game of this variant against a random opponent to get on this board."));
     } else if (rush) {
       meLine = d.me.rank
         ? h("div.status-line.good", icon("trophy", 18), h("span", `You're #${d.me.rank} of ${d.total} with ${d.me.rating} puzzles.`))
@@ -997,7 +997,7 @@ export class SocialScreen {
     } else {
       meLine = d.me.rank
         ? h("div.status-line.good", icon("trophy", 18), h("span", `You're #${d.me.rank} of ${d.total} with ${d.me.rating}.`))
-        : h("div.status-line", icon("trophy", 18), h("span", `Play ${d.minGames} rated ${CAT_LABEL[lbCat].toLowerCase()} ${unit} to get ranked (you have ${d.me.games}).`));
+        : h("div.status-line", icon("trophy", 18), h("span", lbCat === "puzzle" ? "Solve more rated puzzles to get ranked" : "Play more rated games in this category to get ranked", ` (${d.me.games}/${d.minGames}).`));
     }
     const rows = list.map((u, i) => {
       const me = u.id === S.myId();
@@ -1017,9 +1017,9 @@ export class SocialScreen {
         h("tbody", ...rows)))
         : h("p.note", "Nobody is ranked here yet. Be the first."),
       h("p.note", rush ? "Best 5-minute Puzzle Rush scores from runs the server timed and checked, from players active in the last 30 days."
-        : lbCat === "bots" ? `Ratings against the bots, which are played on each device. Players need ${d.minGames}+ games and a visit in the last 30 days to be listed.`
+        : lbCat === "bots" ? ["Ratings against the bots, which are played on each device.", " ", "Players need a few rated games and a visit in the last 30 days to be listed."]
         : lbScope === "friends" ? "Ratings are worked out by the server from each game's result (puzzles: from each attempt)."
-        : `Ratings are worked out by the server from each game's result (puzzles: from each attempt). Players need ${d.minGames}+ ${unit} the server has rated and a visit in the last 30 days to be listed.`));
+        : ["Ratings are worked out by the server from each game's result (puzzles: from each attempt).", " ", "Players need a few rated games and a visit in the last 30 days to be listed."]));
   }
 }
 

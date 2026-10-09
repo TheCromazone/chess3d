@@ -80,7 +80,7 @@ export class LeagueScreen {
         h("span", `Last week you finished #${d.last.place} of ${d.last.size} in ${LEAGUE_TIERS[d.last.tier]}${moved ? `, and moved up to ${LEAGUE_TIERS[Math.min(7, d.last.tier + 1)]}.` : "."}`)));
     }
     if (!div) {
-      out.push(h("p.note", `Play a rated game against a random opponent to join this week's ${LEAGUE_TIERS[tier]} league. You'll be grouped with up to 49 players of your tier.`));
+      out.push(h("p.note", "Play a rated game against a random opponent to join this week's league.", " ", "You'll be grouped with up to 49 players of your tier."));
     } else {
       const promote = div.promote;
       const rows = [];
