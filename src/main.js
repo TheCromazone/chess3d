@@ -10,7 +10,7 @@ import { PuzzleScreen, RushScreen } from "./modes/puzzles.js";
 import { LearnPage, LessonScreen, DrillScreen, OpeningTrainer } from "./modes/learn.js";
 import { WatchPage, ReplayScreen, BotTV } from "./modes/watch.js";
 import { ArenaScreen } from "./modes/arena.js";
-import { DailyScreen } from "./modes/daily.js";
+import { DailyScreen, watchDaily } from "./modes/daily.js";
 import { InsightsPage } from "./screens/insights.js";
 import { maybeWelcome } from "./screens/welcome.js";
 import { BattleScreen } from "./modes/battle.js";
@@ -82,6 +82,8 @@ addEventListener("pointerdown", () => unlockAudio(), { once: true });
 app.start();
 // friends, messages and challenges: presence heartbeat and notices (only once social is turned on)
 startSocial(app);
+// daily games: a notice when it's your move (checked every few minutes while the app is open)
+watchDaily(app);
 // the opening book (~460 KB) isn't needed for first paint; screens that use it load it on demand
 (window.requestIdleCallback || ((f) => setTimeout(f, 1500)))(() => loadOpenings());
 

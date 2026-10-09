@@ -7,6 +7,8 @@ import { toast, segmented, tcLabel } from "../ui/components.js";
 import { getDailyGames, upsertDaily, removeDaily } from "../store.js";
 import { RoomClient, parsePlayerId } from "../net/room.js";
 import { OnlineGame } from "./online-game.js";
+import { notice } from "../ui/people.js";
+import { SFX } from "../audio.js";
 
 export const DAILY_PACES = [{ value: "1d", label: "1 day" }, { value: "3d", label: "3 days" }, { value: "7d", label: "7 days" }, { value: "inf", label: "No limit" }];
 let pace = "3d";
@@ -30,6 +32,55 @@ function peek(entry, timeoutMs = 6000) {
   });
 }
 
+// read one game's room and update its entry; returns the fresh entry (or null if unreachable)
+async function check(e) {
+  const s = await peek(e);
+  if (!s) return null;
+  const v = s.view;
+  const myColor = v ? (v.white === e.playerId ? "w" : v.black === e.playerId ? "b" : null) : e.myColor;
+  const oppId = v && myColor ? (myColor === "w" ? v.black : v.white) : null;
+  const turn = v && v.moves ? (v.moves.length % 2 === 0 ? "w" : "b") : null;
+  let result = null;
+  if (s.status === "over" && s.result) result = s.result.draw ? "draw" : (s.result.winner === e.playerId ? "won" : "lost");
+  // per-move deadline for whoever is to move (daily games with a time limit)
+  const deadline = v && v.tc && v.tc.perMove && s.status === "playing" && v.clock.lastAt !== null && turn
+    ? Date.now() + (v.clock[turn] - Math.max(0, (v.serverNow || Date.now()) - v.clock.lastAt)) : null;
+  return upsertDaily({
+    room: e.room, playerId: e.playerId, myColor, tc: v && v.tcKey ? v.tcKey : e.tc || null, deadline,
+    opponent: oppId ? parsePlayerId(oppId).name : e.opponent || null,
+    moves: v ? v.moves.length : 0, status: s.status, turn, result,
+    lastMove: v && v.san && v.san.length ? v.san[v.san.length - 1] : null,
+  });
+}
+
+// While the app is open, look at your daily games every few minutes and say when it's your move
+// (chess.com notifies you the same way). Skipped while you're in a game.
+export function watchDaily(app) {
+  const announced = new Set(getDailyGames().filter(e => e.status === "playing" && e.turn === e.myColor).map(e => `${e.room}:${e.moves}`));
+  const run = async () => {
+    if (document.hidden || document.getElementById("app")?.classList.contains("in-game")) return;
+    for (const e of getDailyGames().filter(x => x.status === "playing" || x.status === "waiting")) {
+      const f = await check(e);
+      if (!f || f.status !== "playing" || f.turn !== f.myColor) continue;
+      const key = `${f.room}:${f.moves}`;
+      if (announced.has(key)) continue;
+      announced.add(key);
+      if (app.controller instanceof OnlineGame && app.controller.room === f.room) continue;
+      SFX.notify();
+      notice({
+        avatar: h("span.ri", icon("calendar", 20)),
+        title: `Your move vs ${f.opponent || "your opponent"}`,
+        text: `${f.lastMove ? `They played ${f.lastMove}. ` : ""}${f.deadline ? timeLeftText(f.deadline - Date.now()) : "Daily game"}`,
+        ms: 15000,
+        actions: [{ label: "Play", primary: true, onClick: () => app.launch(() => new OnlineGame(app, { kind: "daily", room: f.room, playerId: f.playerId, tcKey: f.tc || "inf" }), "#/online") }],
+      });
+    }
+  };
+  setInterval(run, 150000);
+  setTimeout(run, 20000);
+}
+const timeLeftText = (ms) => { const t = timeLeft(ms); return t[0].toUpperCase() + t.slice(1) + "."; };
+
 export class DailyScreen {
   constructor(app) { this.app = app; }
   destroy() { this.dead = true; }
@@ -44,30 +95,7 @@ export class DailyScreen {
   }
 
   async refresh() {
-    const games = getDailyGames();
-    await Promise.all(games.map(async (e) => {
-      const s = await peek(e);
-      if (this.dead || !s) return;
-      const v = s.view;
-      const myColor = v ? (v.white === e.playerId ? "w" : v.black === e.playerId ? "b" : null) : e.myColor;
-      const oppId = v && myColor ? (myColor === "w" ? v.black : v.white) : null;
-      let turn = null;
-      if (v && v.moves) turn = v.moves.length % 2 === 0 ? "w" : "b";
-      let result = null;
-      if (s.status === "over" && s.result) {
-        const r = s.result;
-        result = r.draw ? "draw" : (r.winner === e.playerId ? "won" : "lost");
-      }
-      // per-move deadline for whoever is to move (daily games with a time limit)
-      const deadline = v && v.tc && v.tc.perMove && s.status === "playing" && v.clock.lastAt !== null && turn
-        ? Date.now() + (v.clock[turn] - Math.max(0, (v.serverNow || Date.now()) - v.clock.lastAt)) : null;
-      upsertDaily({
-        room: e.room, playerId: e.playerId, myColor, tc: v && v.tcKey ? v.tcKey : e.tc || null, deadline,
-        opponent: oppId ? parsePlayerId(oppId).name : e.opponent || null,
-        moves: v ? v.moves.length : 0, status: s.status, turn, result,
-        lastMove: v && v.san && v.san.length ? v.san[v.san.length - 1] : null,
-      });
-    }));
+    await Promise.all(getDailyGames().map((e) => (this.dead ? null : check(e))));
     if (!this.dead) this.render();
   }
 

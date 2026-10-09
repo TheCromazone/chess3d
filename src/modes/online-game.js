@@ -337,9 +337,10 @@ export class OnlineGame extends BaseGame {
 
   // finish is driven by the server; rating + bookkeeping happen here
   onFinish(r) {
+    // arena games are scored by the server from the room, aborted ones included (they don't count)
+    if (this.cfg.arena && this.myColor) this._reportArena();
     if (r.reason === "aborted" || !this.myColor) return {};
     const rated = this.kind === "pool" || !!this.cfg.arena;
-    if (this.cfg.arena) this._reportArena();
     const cls = timeClass(this.tcKey);
     let delta = null;
     if (rated && cls) {

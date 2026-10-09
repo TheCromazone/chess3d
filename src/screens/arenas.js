@@ -43,6 +43,7 @@ function formMarks(form) {
 function idle(app) {
   app.setLobby(true);
   app.board.syncFromBoard(new Chess().board());
+  app.board.viewSide("w", false);
   if (app.board.setIdle) app.board.setIdle(true);
 }
 
@@ -76,7 +77,8 @@ export class ArenasScreen {
     else if (!d) body.push(h("p.note", "Loading arenas…"));
     else {
       const t = d.now;
-      body.push(h("div.rows", ...d.arenas.map(a => {
+      // a finished arena nobody played isn't worth listing
+      body.push(h("div.rows", ...d.arenas.filter(a => a.players || a.ends > t).map(a => {
         const running = a.starts <= t && t < a.ends, over = t >= a.ends;
         const status = running ? `Running, ${minutesText(a.ends - t)} left` : over ? "Finished" : `Starts in ${minutesText(a.starts - t)}`;
         return h("button.row", { onclick: () => this.app.go(`#/arenas/${a.id}`) },
