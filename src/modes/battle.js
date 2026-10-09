@@ -73,7 +73,7 @@ export class BattleScreen {
           ? (S.registered()
             ? h("div.card", h("h3", "Battle a real player"), h("p.note", "You're matched with someone else looking for a battle. Both of you get the same puzzles, and you see each other's score live."))
             : h("div.card", h("h3", "Turn on Social to battle real players"), h("p.note", "Matching uses your social profile: a key on this device, no sign-up."),
-              h("button.btn", { style: { marginTop: "10px" }, onclick: () => this.app.go("#/social") }, icon("users", 18), "Open Social")))
+              h("button.btn.primary", { style: { marginTop: "10px" }, onclick: () => this.app.go("#/social") }, icon("users", 18), "Open Social")))
           : [h("div.card", h("div.bot-hero", h("div.avatar.lg", { style: { background: this.opp.avatar.bg } }, this.opp.avatar.emoji),
             h("div", h("h3", this.opp.name), h("div.rating", String(this.opp.elo)), h("p.note", this.opp.style)))),
           h("div.lbl.note", "Choose an opponent"), list],
@@ -161,6 +161,8 @@ export class BattleScreen {
     this.app.setLobby(false);
     this.app.setInGame(true);
     this.app.leaveGuard = async () => this.state !== "playing" || confirmModal({ title: "Leave the battle?", sub: "Leaving now counts as a loss.", yes: "Leave", danger: true }).then(ok => { if (ok) this.end(); return ok; });
+    const pr = getProfile();
+    this.app.strips({ name: this.opp.name, rating: this.opp.elo, avatar: this.opp.avatar }, { name: pr.name, rating: pr.ratings.puzzle.r, avatar: pr.avatar });
     this.seq = rushSequence(battle ? battle.seed : Math.floor(Math.random() * 1e6), 80);
     this.me = { score: 0, strikes: 0, i: 0, out: false, log: [] };
     this.bot = { score: 0, strikes: 0, i: 0, out: false, log: [] };

@@ -382,7 +382,9 @@ export class OnlineGame extends BaseGame {
   // both players have social on: offer to add the opponent (chess.com does this after a game)
   _addFriendButton() {
     const btns = [];
-    if (this.oppCode && Social.registered() && this.oppCode !== Social.myCode()) {
+    const known = Social.cached("/friends");
+    const already = known && known.friends.some(f => f.code === this.oppCode);
+    if (this.oppCode && Social.registered() && this.oppCode !== Social.myCode() && !already) {
       const add = h("button.btn", {
         onclick: async () => {
           add.disabled = true;
