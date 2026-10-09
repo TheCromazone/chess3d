@@ -33,7 +33,7 @@ export class ProfilePage {
         h("div", h("h1", p.name, p.country ? h("span.flag", { title: countryName(p.country), "aria-label": countryName(p.country) }, " " + flagEmoji(p.country)) : null),
           p.about ? h("p.about", p.about) : null,
           h("p", `Joined ${new Date(p.created).toLocaleDateString()}. ${plural(p.stats.games, "game")} played.`)),
-        h("div", { style: { marginLeft: "auto", display: "flex", gap: "8px" } },
+        h("div", { style: { marginLeft: "auto", display: "flex", flexWrap: "wrap", gap: "8px" } },
           h("button.btn.small", { onclick: () => this.app.go("#/insights") }, icon("analysis", 16), "Insights"),
           h("button.btn.small", { onclick: () => this.app.go("#/settings"), "aria-label": "Settings" }, icon("settings", 16), "Settings"),
           h("button.btn.small", { onclick: () => this.editProfile() }, icon("edit", 16), "Edit profile"))));

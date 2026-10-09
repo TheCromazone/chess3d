@@ -150,7 +150,7 @@ a { color: var(--accent-text); }
 
 /* ---------- side panel ---------- */
 #side { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
-.side-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; }
+.side-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 14px 16px 10px; }
 .side-head h2 { font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1.1; letter-spacing: .2px; }
 .side-head .back { margin-left: -6px; padding: 6px; border-radius: 8px; color: var(--ink-2); }
 .side-head .grow { flex: 1; }
@@ -171,7 +171,7 @@ a { color: var(--accent-text); }
 .btn.ghost { background: transparent; border-color: var(--line-2); }
 .btn.danger { background: rgba(226, 88, 74, .16); border-color: rgba(226, 88, 74, .5); color: var(--danger-ink); }
 .btn.small { min-height: 34px; padding: 6px 12px; font-size: 13px; }
-.btn-row { display: flex; gap: 8px; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .btn-row > .btn { flex: 1; }
 
 .iconbar { display: flex; gap: 4px; }

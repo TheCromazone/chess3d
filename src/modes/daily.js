@@ -165,7 +165,7 @@ export class DailyScreen {
       if (e.status === "playing" && e.away > Date.now()) state += ", " + t(`you're on vacation until ${shortDate(e.away)}`);
       else if (e.status === "playing" && e.oppAway > Date.now()) state += ", " + t(`they're on vacation until ${shortDate(e.oppAway)}`);
       rows.appendChild(h("div", { style: { display: "flex", gap: "6px", alignItems: "stretch" } },
-        h("button.row", { onclick: () => this.open(e), style: { flex: "1" } },
+        h("button.row", { onclick: () => this.open(e), style: { flex: "1", minWidth: "0" } },
           h("span.ri", icon("calendar", 20)),
           h("span.rt", h("b", e.opponent ? `vs ${e.opponent}` : "New daily game"),
             h("small", [state, e.moves ? t(`${Math.ceil(e.moves / 2)} move${Math.ceil(e.moves / 2) === 1 ? "" : "s"}`) : null, e.lastMove ? t(`last ${e.lastMove}`) : null,
