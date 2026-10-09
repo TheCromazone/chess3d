@@ -72,6 +72,11 @@ every other device out and gives this one a new key. `GET|POST /backup` keeps on
 profile (the same JSON as the export file, minus the key; up to 1.8 MB), which a newly signed-in
 device restores.
 
+Names are unique ignoring case: registering a taken name adds a number, a rename to a taken name
+doesn't go through, and `GET /names?n=` checks one. Forums: `GET|POST /forums`, `GET|POST
+/forums/:id`, `POST /forums/:id/delete`, `POST /forums/:id/posts/:pid/delete`, and `POST /report
+{kind, id}`; three reports from different players hide a topic or reply.
+
 Limits: 20 registrations per IP per hour, 30 messages per minute, 40 friend requests per hour,
 5 clubs per owner, 500-character messages. Each request batches its queries into one D1 round trip
 after the key lookup. `npm run test:social` runs the API against SQLite through a D1-shaped shim.

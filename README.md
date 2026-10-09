@@ -29,6 +29,7 @@ lessons, Stockfish game review, and analysis. There's no sign-up: your device ho
 - **Friends:** share your friend code or an invite link, accept requests, and see who's online or playing.
 - **Challenges and messages:** challenge a friend to a live or daily game and they get a pop-up with Accept / Decline; message friends one to one.
 - **Clubs:** public or invite-only clubs with their own chat and member list.
+- **Forums:** topics and replies in five forums, with reporting.
 - **Leaderboards:** global top 50 for blitz, bullet, rapid, puzzles and bots (ratings are reported by each player's device).
 - **Account, no password:** your profile key is the account. Sign in on your other devices with a one-time code or your recovery key; your profile, ratings, settings and games back up automatically and follow you. Sign out of a device, or of all the others, from Settings.
 - Social is off until you turn it on; you can delete your profile from Settings at any time.
