@@ -110,8 +110,8 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Direct messages | ✅ | threads with friends, unread counts on the nav, notices for new messages |
 | Clubs | ✅ | create (public or invite-only), join by code or from the public list, club chat, member list with presence |
 | Leaderboards | ✅ | global top 50 per category (blitz, bullet, rapid, puzzles, bots) with your rank; ratings are self-reported by devices and labelled so; bot ladder on the profile |
-| Accounts | 🟡 | no sign-in by design: a device key instead of a password; move it with export / import; delete your social profile any time |
-| Data portability | ✅ | export / import backup (includes the social key) |
+| Accounts | ✅ | passwordless by the user's choice: your profile key is the account; sign in on other devices with a one-time code or your recovery key; profile, ratings, settings and games back up to the cloud and follow you; sign out of this or all other devices; delete the profile |
+| Data portability | ✅ | automatic cloud backup with a profile, plus export / import of a backup file |
 
 ## Settings & polish
 

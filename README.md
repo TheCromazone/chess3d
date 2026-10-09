@@ -30,7 +30,8 @@ lessons, Stockfish game review, and analysis. There's no sign-up: your device ho
 - **Challenges and messages:** challenge a friend to a live or daily game and they get a pop-up with Accept / Decline; message friends one to one.
 - **Clubs:** public or invite-only clubs with their own chat and member list.
 - **Leaderboards:** global top 50 for blitz, bullet, rapid, puzzles and bots (ratings are reported by each player's device).
-- Social is off until you turn it on; you can delete your social profile from Settings at any time.
+- **Account, no password:** your profile key is the account. Sign in on your other devices with a one-time code or your recovery key; your profile, ratings, settings and games back up automatically and follow you. Sign out of a device, or of all the others, from Settings.
+- Social is off until you turn it on; you can delete your profile from Settings at any time.
 
 **You**
 - Local profile with ratings per category, rating history, stats, Insights (accuracy by phase, colour and time control), a game archive (review or download any game as PGN), and achievements. Export and import your data.

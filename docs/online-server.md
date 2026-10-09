@@ -65,6 +65,13 @@ and an 8-character friend code; the client keeps the secret in localStorage and 
 Columns added after the first release go in `MIGRATIONS` (each `ALTER TABLE` runs once per isolate,
 and its "duplicate column" error is ignored after the first time).
 
+Accounts: `POST /link/create` makes a one-time code (10 minutes) and `POST /link/claim {code}`
+(no key needed) signs a new device in to that profile with its own key, stored in `social_keys`;
+authentication accepts the profile's key or any linked device's key. `POST /devices/reset` signs
+every other device out and gives this one a new key. `GET|POST /backup` keeps one cloud backup per
+profile (the same JSON as the export file, minus the key; up to 1.8 MB), which a newly signed-in
+device restores.
+
 Limits: 20 registrations per IP per hour, 30 messages per minute, 40 friend requests per hour,
 5 clubs per owner, 500-character messages. Each request batches its queries into one D1 round trip
 after the key lookup. `npm run test:social` runs the API against SQLite through a D1-shaped shim.
