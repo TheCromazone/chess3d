@@ -83,7 +83,20 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS social_users_name ON social_users (name COLLATE NOCASE)`,
   `CREATE TABLE IF NOT EXISTS social_links (code TEXT PRIMARY KEY, uid TEXT NOT NULL, expires INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS social_backups (uid TEXT PRIMARY KEY, data TEXT NOT NULL, updated INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS social_topics (
+     id TEXT PRIMARY KEY, cat TEXT NOT NULL, uid TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL,
+     created INTEGER NOT NULL, last_at INTEGER NOT NULL, replies INTEGER NOT NULL DEFAULT 0, hidden INTEGER NOT NULL DEFAULT 0)`,
+  `CREATE INDEX IF NOT EXISTS social_topics_cat ON social_topics (cat, hidden, last_at)`,
+  `CREATE TABLE IF NOT EXISTS social_posts (
+     id INTEGER PRIMARY KEY AUTOINCREMENT, topic TEXT NOT NULL, uid TEXT NOT NULL, body TEXT NOT NULL,
+     created INTEGER NOT NULL, hidden INTEGER NOT NULL DEFAULT 0)`,
+  `CREATE INDEX IF NOT EXISTS social_posts_topic ON social_posts (topic, id)`,
+  `CREATE TABLE IF NOT EXISTS social_reports (kind TEXT NOT NULL, item TEXT NOT NULL, uid TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY (kind, item, uid))`,
 ];
+
+// Forums: a few fixed categories; anything three different players report is hidden
+const FORUM_CATS = ["general", "openings", "tactics", "endgames", "help"];
+const REPORTS_TO_HIDE = 3;
 
 const LINK_MS = 10 * 60_000;         // a device link code works for 10 minutes, once
 const BACKUP_MAX = 1_800_000;        // characters; D1 rows top out at 2 MB
@@ -633,6 +646,9 @@ export class Social {
       return { ok: true };
     }
 
+    // ---- forums ----
+    if (seg0 === "forums" || path === "/report") return this.forums(request, me, seg, url, now);
+
     // GET /names?n=: is a name free?
     if (method === "GET" && path === "/names") {
       const n = str(url.searchParams.get("n"), 16);
@@ -675,6 +691,9 @@ export class Social {
         this.q("DELETE FROM social_keys WHERE uid = ?", me.id),
         this.q("DELETE FROM social_links WHERE uid = ?", me.id),
         this.q("DELETE FROM social_backups WHERE uid = ?", me.id),
+        this.q("DELETE FROM social_posts WHERE uid = ?", me.id),
+        this.q("DELETE FROM social_topics WHERE uid = ?", me.id),
+        this.q("DELETE FROM social_reports WHERE uid = ?", me.id),
         this.q("DELETE FROM social_battles WHERE a_uid = ? AND b_uid IS NULL", me.id),
         this.q("DELETE FROM social_users WHERE id = ?", me.id));
       for (const c of clubs ?? []) {
@@ -913,6 +932,89 @@ export class Social {
       const battle = view(out[1]?.[0]);
       if (!battle) throw new HttpError(404, "no such battle");
       return { battle };
+    }
+    throw new HttpError(404, "not found");
+  }
+
+  private async forums(request: Request, me: UserRow, seg: string[], url: URL, now: number): Promise<unknown> {
+    const method = request.method;
+    const author = (r: Record<string, unknown>) => {
+      let avatar: unknown = null;
+      try { avatar = r["avatar"] ? JSON.parse(String(r["avatar"])) : null; } catch { avatar = null; }
+      return { id: r["uid"], name: r["name"] ?? "Deleted player", avatar };
+    };
+    // POST /report {kind: "topic" | "post", id}
+    if (method === "POST" && seg[0] === "report") {
+      const b = await body(request);
+      const kind = b["kind"] === "post" ? "post" : "topic", item = str(String(b["id"] ?? ""), 32);
+      const table = kind === "post" ? "social_posts" : "social_topics";
+      const [, count] = await this.many(
+        this.q("INSERT OR IGNORE INTO social_reports (kind, item, uid, created) VALUES (?, ?, ?, ?)", kind, item, me.id, now),
+        this.q("SELECT COUNT(*) AS n FROM social_reports WHERE kind = ? AND item = ?", kind, item));
+      if (Number(count?.[0]?.["n"] ?? 0) >= REPORTS_TO_HIDE) await this.q(`UPDATE ${table} SET hidden = 1 WHERE id = ?`, item).run();
+      return { ok: true };
+    }
+    // GET /forums?cat=: topics, most recently active first
+    if (method === "GET" && seg.length === 1) {
+      const cat = FORUM_CATS.includes(url.searchParams.get("cat") || "") ? url.searchParams.get("cat") : null;
+      const r = await this.q(`SELECT t.id, t.cat, t.uid, t.title, t.created, t.last_at, t.replies, u.name, u.avatar FROM social_topics t
+          LEFT JOIN social_users u ON u.id = t.uid WHERE t.hidden = 0 AND (? IS NULL OR t.cat = ?) ORDER BY t.last_at DESC LIMIT 50`, cat, cat).all();
+      return { cats: FORUM_CATS, topics: r.results.map((t) => ({ id: t["id"], cat: t["cat"], title: t["title"], created: t["created"], lastAt: t["last_at"], replies: t["replies"], author: author(t) })) };
+    }
+    // POST /forums {cat, title, body}: a new topic
+    if (method === "POST" && seg.length === 1) {
+      const b = await body(request);
+      const cat = FORUM_CATS.includes(String(b["cat"])) ? String(b["cat"]) : "general";
+      const title = cleanText(b["title"], 100), text = cleanText(b["body"], 4000);
+      if (title.length < 4) throw new HttpError(400, "titles need at least 4 characters");
+      if (!text) throw new HttpError(400, "write something in the post");
+      await this.rateLimit("SELECT COUNT(*) AS n FROM social_topics WHERE uid = ? AND created > ?", [me.id, now - 3_600_000], 5, "new topics");
+      const id = "t_" + randomString(10).toLowerCase();
+      await this.q("INSERT INTO social_topics (id, cat, uid, title, body, created, last_at) VALUES (?, ?, ?, ?, ?, ?, ?)", id, cat, me.id, title, text, now, now).run();
+      return { id };
+    }
+    const id = str(seg[1], 32);
+    // GET /forums/:id: the topic and its replies
+    if (method === "GET" && seg.length === 2) {
+      const [topic, posts] = await this.many(
+        this.q(`SELECT t.*, u.name, u.avatar FROM social_topics t LEFT JOIN social_users u ON u.id = t.uid WHERE t.id = ? AND t.hidden = 0`, id),
+        this.q(`SELECT p.id, p.uid, p.body, p.created, u.name, u.avatar FROM social_posts p LEFT JOIN social_users u ON u.id = p.uid
+            WHERE p.topic = ? AND p.hidden = 0 ORDER BY p.id LIMIT 300`, id));
+      const t = topic?.[0];
+      if (!t) throw new HttpError(404, "that topic was removed");
+      return {
+        topic: { id: t["id"], cat: t["cat"], title: t["title"], body: t["body"], created: t["created"], replies: t["replies"], author: author(t), mine: t["uid"] === me.id },
+        posts: (posts ?? []).map((p) => ({ id: p["id"], body: p["body"], created: p["created"], author: author(p), mine: p["uid"] === me.id })),
+      };
+    }
+    // POST /forums/:id {body}: reply
+    if (method === "POST" && seg.length === 2) {
+      const b = await body(request);
+      const text = cleanText(b["body"], 4000);
+      if (!text) throw new HttpError(400, "write something first");
+      const [topic, recent] = await this.many(
+        this.q("SELECT 1 AS x FROM social_topics WHERE id = ? AND hidden = 0", id),
+        this.q("SELECT COUNT(*) AS n FROM social_posts WHERE uid = ? AND created > ?", me.id, now - 3_600_000));
+      if (!topic?.length) throw new HttpError(404, "that topic was removed");
+      if (Number(recent?.[0]?.["n"] ?? 0) >= 60) throw new HttpError(429, "too many replies; slow down");
+      await this.many(
+        this.q("INSERT INTO social_posts (topic, uid, body, created) VALUES (?, ?, ?, ?)", id, me.id, text, now),
+        this.q("UPDATE social_topics SET replies = replies + 1, last_at = ? WHERE id = ?", now, id));
+      return { ok: true };
+    }
+    // POST /forums/:id/delete, POST /forums/:id/posts/:pid/delete: authors remove their own words
+    if (method === "POST" && seg[2] === "delete") {
+      await this.many(
+        this.q("DELETE FROM social_posts WHERE topic = ? AND EXISTS (SELECT 1 FROM social_topics WHERE id = ? AND uid = ?)", id, id, me.id),
+        this.q("DELETE FROM social_topics WHERE id = ? AND uid = ?", id, me.id));
+      return { ok: true };
+    }
+    if (method === "POST" && seg[2] === "posts" && seg[4] === "delete") {
+      const pid = Number(seg[3]);
+      await this.many(
+        this.q("UPDATE social_topics SET replies = replies - 1 WHERE id = ? AND EXISTS (SELECT 1 FROM social_posts WHERE id = ? AND topic = ? AND uid = ?)", id, pid, id, me.id),
+        this.q("DELETE FROM social_posts WHERE id = ? AND topic = ? AND uid = ?", pid, id, me.id));
+      return { ok: true };
     }
     throw new HttpError(404, "not found");
   }

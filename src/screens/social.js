@@ -15,8 +15,11 @@ const TABS = [
   { id: "friends", label: "Friends" },
   { id: "messages", label: "Messages" },
   { id: "clubs", label: "Clubs" },
+  { id: "forums", label: "Forums" },
   { id: "leaderboard", label: "Leaderboard" },
 ];
+const FORUM_LABEL = { general: "General", openings: "Openings", tactics: "Tactics", endgames: "Endgames", help: "Help and feedback" };
+let forumCat = null;
 const CAT_LABEL = { blitz: "Blitz", bullet: "Bullet", rapid: "Rapid", puzzle: "Puzzles", bots: "Vs bots" };
 let lastTc = "10+0";
 let lastPace = "3d";
@@ -162,7 +165,8 @@ export class SocialScreen {
     this._counts();
     const tok = this.tok;
     const run = { friends: () => this._friends(tok), messages: () => (this.view.chat ? this._thread(tok, this.view.chat) : this._conversations(tok)),
-      clubs: () => (this.view.club ? this._club(tok, this.view.club) : this._clubs(tok)), leaderboard: () => this._leaderboard(tok) };
+      clubs: () => (this.view.club ? this._club(tok, this.view.club) : this._clubs(tok)), leaderboard: () => this._leaderboard(tok),
+      forums: () => (this.view.topic ? this._topic(tok, this.view.topic) : this._forums(tok)) };
     (run[this.view.tab] || run.friends)();
   }
 
@@ -581,6 +585,82 @@ export class SocialScreen {
     addMsgs(d.messages);
     list.scrollTop = list.scrollHeight;
     this.poll = setInterval(pull, 5000);
+  }
+
+  // ---------- forums ----------
+  async _forums(tok) {
+    const cats = segmented([{ value: null, label: "All" }, ...Object.keys(FORUM_LABEL).map(c => ({ value: c, label: FORUM_LABEL[c] }))], forumCat, (v) => { forumCat = v; this._forums(++this.tok); });
+    const box = h("div.rows", h("p.note", "Loading topics…"));
+    this.body.replaceChildren(h("div.forum-bar", cats, h("button.btn.primary", { onclick: () => this._newTopic() }, icon("plus", 18), "New topic")), box);
+    const path = "/forums" + (forumCat ? `?cat=${forumCat}` : "");
+    const draw = (d) => {
+      box.replaceChildren(...(d.topics.length ? d.topics.map(t => h("a.row.topic-row", { href: `#/social/topic/${t.id}` },
+        userAvatar(t.author, ".sm"),
+        h("span.rt", h("b", t.title), h("small", `${FORUM_LABEL[t.cat] || t.cat}, by ${t.author.name}, ${t.replies} repl${t.replies === 1 ? "y" : "ies"}, active ${timeAgo(t.lastAt)}`)),
+        h("span.rv", icon("chevron", 18))))
+        : [h("p.note", "No topics here yet. Start the conversation.")]));
+    };
+    if (S.cached(path)) draw(S.cached(path));
+    try { const d = await S.api("GET", path); if (this._live(tok)) draw(d); }
+    catch (e) { if (this._live(tok)) box.replaceChildren(errorLine(e, () => this._forums(++this.tok))); }
+  }
+
+  _newTopic() {
+    let cat = forumCat || "general";
+    const title = h("input.input", { maxlength: "100", placeholder: "Title", "aria-label": "Topic title" });
+    const text = h("textarea.input.prose", { maxlength: "4000", rows: "6", placeholder: "What's on your mind?", "aria-label": "First post" });
+    const go = h("button.btn.primary.block", {
+      onclick: async () => {
+        go.disabled = true;
+        try { const r = await S.api("POST", "/forums", { cat, title: title.value, body: text.value }); m.close(); this.app.go(`#/social/topic/${r.id}`); }
+        catch (e) { toast(e.message); go.disabled = false; }
+      },
+    }, "Post topic");
+    const m = openModal({
+      title: "New topic",
+      body: [h("div.field", h("div.lbl", "Forum"), segmented(Object.keys(FORUM_LABEL).map(c => ({ value: c, label: FORUM_LABEL[c] })), cat, (v) => { cat = v; })),
+        h("div.field", h("label", "Title"), title), h("div.field", h("label", "Post"), text),
+        h("p.note", "Be kind. Posts that three players report are hidden."), go],
+    });
+    title.focus();
+  }
+
+  async _topic(tok, id) {
+    let d;
+    try { d = await S.api("GET", `/forums/${id}`); } catch (e) { this.body.replaceChildren(errorLine(e, () => this.app.go("#/social/forums"))); return; }
+    if (!this._live(tok)) return;
+    const t = d.topic;
+    const actions = (kind, item, mine, del) => h("div.post-actions",
+      mine ? h("button.btn.small.ghost", {
+        onclick: async () => {
+          if (!(await confirmModal({ title: kind === "topic" ? "Delete this topic?" : "Delete this reply?", sub: kind === "topic" ? "The topic and all its replies are removed." : "", yes: "Delete", danger: true }))) return;
+          try { await S.api("POST", del, {}); toast("Deleted"); if (kind === "topic") this.app.go("#/social/forums"); else this.render(); } catch (e) { toast(e.message); }
+        },
+      }, icon("trash", 14), "Delete")
+        : h("button.btn.small.ghost", {
+          onclick: async (e) => {
+            if (!(await confirmModal({ title: "Report this?", sub: "Report posts that are abusive, spam or off-topic. Anything three players report is hidden.", yes: "Report" }))) return;
+            try { await S.api("POST", "/report", { kind, id: item }); toast("Thanks, reported"); e.target.closest("button").disabled = true; } catch (err) { toast(err.message); }
+          },
+        }, icon("flag", 14), "Report"));
+    const post = (p, kind, del) => h("article.post",
+      h("header", userAvatar(p.author, ".sm"), h("b", p.author.name), h("small.muted", timeAgo(p.created))),
+      h("div.post-body", p.body),
+      actions(kind, kind === "topic" ? t.id : p.id, p.mine, del));
+    const reply = h("textarea.input.prose", { maxlength: "4000", rows: "3", placeholder: "Write a reply", "aria-label": "Reply" });
+    const send = h("button.btn.primary", {
+      onclick: async () => {
+        if (!reply.value.trim()) return;
+        send.disabled = true;
+        try { await S.api("POST", `/forums/${t.id}`, { body: reply.value }); this.render(); } catch (e) { toast(e.message); send.disabled = false; }
+      },
+    }, "Post reply");
+    this.body.replaceChildren(
+      h("div.club-head", h("a.btn.small.ghost", { href: "#/social/forums", "aria-label": "All topics" }, icon("back", 16)),
+        h("div.club-title", h("h2", t.title), h("p.note", `${FORUM_LABEL[t.cat] || t.cat}, ${t.replies} repl${t.replies === 1 ? "y" : "ies"}`))),
+      h("div.thread-posts", post({ ...t, mine: t.mine }, "topic", `/forums/${t.id}/delete`),
+        ...d.posts.map(p => post(p, "post", `/forums/${t.id}/posts/${p.id}/delete`))),
+      h("section.card.reply-box", reply, h("div.btn-row.reply-actions", send)));
   }
 
   // ---------- leaderboard ----------

@@ -412,6 +412,19 @@ textarea.input { min-height: 110px; resize: vertical; font-family: ui-monospace,
 .social-body section h2 { margin-bottom: 10px; }
 .friend-lists, .club-lists { display: flex; flex-direction: column; gap: 22px; }
 .search-sec { display: flex; flex-direction: column; gap: 8px; max-width: 640px; }
+.forum-bar { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
+.forum-bar .seg { flex: 1; min-width: 260px; }
+.topic-row .rt b { white-space: normal; }
+.thread-posts { display: flex; flex-direction: column; gap: 10px; max-width: 760px; }
+.post { background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.post:first-child { border-color: var(--line-2); }
+.post header { display: flex; align-items: center; gap: 8px; }
+.post-body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; }
+.post-actions { display: flex; justify-content: flex-end; }
+.post-actions .btn { min-height: 30px; font-size: 12.5px; color: var(--ink-3); }
+.reply-box { display: flex; flex-direction: column; gap: 10px; max-width: 760px; }
+.reply-actions { justify-content: flex-end; }
+.reply-actions > .btn { flex: none; }
 .search-results:empty { display: none; }
 .code-card .btn { white-space: nowrap; }
 .lb-box { display: flex; flex-direction: column; gap: 12px; }

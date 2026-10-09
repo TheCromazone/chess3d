@@ -225,6 +225,28 @@ ok((await call("GET", "/me", { secret: ann.secret })).data.me.name === "ANN", "y
 await call("POST", "/heartbeat", { secret: ann.secret, body: { name: "Ann" } });
 await call("POST", "/delete", { secret: ann2.secret });
 
+// forums
+const t1 = (await call("POST", "/forums", { secret: ann.secret, body: { cat: "openings", title: "Best reply to 1.e4?", body: "Sicilian or e5?" } })).data;
+ok(t1.id && t1.id.startsWith("t_"), "a topic can be started");
+ok((await call("POST", "/forums", { secret: ann.secret, body: { title: "Hi", body: "x" } })).status === 400, "titles need some length");
+await call("POST", `/forums/${t1.id}`, { secret: cid.secret, body: { body: "The Caro-Kann!" } });
+await call("POST", `/forums/${t1.id}`, { secret: dee.secret, body: { body: "e5, always" } });
+let topics = (await call("GET", "/forums", { secret: dee.secret, query: "?cat=openings" })).data.topics;
+ok(topics[0].title === "Best reply to 1.e4?" && topics[0].replies === 2 && topics[0].author.name === "Ann", "topics list replies and author");
+let th = (await call("GET", `/forums/${t1.id}`, { secret: dee.secret })).data;
+ok(th.posts.length === 2 && th.posts[1].mine && !th.topic.mine, "a topic shows its replies, marking your own");
+await call("POST", `/forums/${t1.id}/posts/${th.posts[0].id}/delete`, { secret: dee.secret });
+ok((await call("GET", `/forums/${t1.id}`, { secret: dee.secret })).data.posts.length === 2, "you can't delete someone else's reply");
+await call("POST", `/forums/${t1.id}/posts/${th.posts[1].id}/delete`, { secret: dee.secret });
+th = (await call("GET", `/forums/${t1.id}`, { secret: ann.secret })).data;
+ok(th.posts.length === 1 && th.topic.replies === 1, "but you can delete your own");
+for (const u of [cid, dee]) await call("POST", "/report", { secret: u.secret, body: { kind: "topic", id: t1.id } });
+ok((await call("GET", `/forums/${t1.id}`, { secret: ann.secret })).status === 200, "two reports don't hide a topic");
+const rep3 = (await call("POST", "/register", { body: { name: "Rex" }, ip: "5.5.5.5" })).data;
+await call("POST", "/report", { secret: rep3.secret, body: { kind: "topic", id: t1.id } });
+ok((await call("GET", `/forums/${t1.id}`, { secret: ann.secret })).status === 404, "three reports hide it");
+await call("POST", "/delete", { secret: rep3.secret });
+
 // finding players by name
 const found = (await call("GET", "/search", { secret: ann.secret, query: "?q=ci" })).data.players;
 ok(found.length === 1 && found[0].name === "Cid", "players can be found by the start of their name");
