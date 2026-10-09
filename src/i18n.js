@@ -8,7 +8,13 @@ export const LANGUAGES = [
   { code: "es", name: "Español" },
   { code: "fr", name: "Français" },
   { code: "de", name: "Deutsch" },
+  { code: "it", name: "Italiano" },
+  { code: "pl", name: "Polski" },
   { code: "pt", name: "Português" },
+  { code: "tr", name: "Türkçe" },
+  { code: "ru", name: "Русский" },
+  { code: "ja", name: "日本語" },
+  { code: "zh", name: "中文（简体）" },
 ];
 const KEY = "chess3d.lang";
 const ATTRS = ["aria-label", "placeholder", "title", "alt"];
