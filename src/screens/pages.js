@@ -1,5 +1,6 @@
 // Full-page screens: profile (ratings, stats, archive, achievements) and settings.
 import { countryOptions, countryName, flagEmoji } from "../ui/countries.js";
+import { LANGUAGES, currentLanguage, setLanguage } from "../i18n.js";
 import { h, icon, timeAgo, downloadText } from "../ui/dom.js";
 import { sparkline, switchRow, segmented, toast, confirmModal, openModal, tcLabel } from "../ui/components.js";
 import { getProfile, updateProfile, getGames, ACHIEVEMENTS, getSettings, setSettings, exportAll, importAll, resetAll, getDailyGames, getVariantGames } from "../store.js";
@@ -246,6 +247,9 @@ export class SettingsPage {
     const chips = (items, cur, key) => h("div.theme-grid", ...items.map(t => h(`button.theme-chip${t.id === cur ? ".on" : ""}`, { onclick: () => set({ [key]: t.id }) },
       h("span.sw", { style: { background: t.swatch, backgroundSize: "cover", backgroundPosition: "center" } }), t.name)));
     const page = h("div", { style: { display: "flex", flexDirection: "column", gap: "12px" } },
+      h("section.settings-sec", h("h2", "Language"),
+        h("select.input", { "aria-label": "Language", onchange: (e) => { setLanguage(e.target.value); location.reload(); } },
+          ...LANGUAGES.map((l) => h("option", { value: l.code, selected: l.code === currentLanguage() ? "" : null, "data-no-i18n": "" }, l.name)))),
       h("section.settings-sec", h("h2", "Appearance"),
         segmented([{ value: "dark", label: "Dark" }, { value: "light", label: "Light" }, { value: "system", label: "Match device" }], s.appearance || "dark", (v) => setSettings({ appearance: v }))),
       h("section.settings-sec", h("h2", "Board"),

@@ -621,7 +621,7 @@ export class OnlineGame extends BaseGame {
     for (const m of (this.chat || []).slice(-30)) {
       if (muted && m.c !== this.myColor) continue;
       const who = m.c === this.myColor ? "You" : (this.players[m.c]?.name || "Opponent");
-      log.appendChild(h("div.chatline", h("b", who), h("span", m.text)));
+      log.appendChild(h("div.chatline", h("b", who), h("span", { "data-no-i18n": "" }, m.text)));
     }
     if (muted) log.appendChild(h("small.muted", "You blocked this player, so their messages are hidden."));
     const input = h("input.input", { placeholder: "Send a message", maxlength: "200", "aria-label": "Chat message" });

@@ -1,6 +1,7 @@
 // Bundles the client and the server rules module into dist/
 // (dist/ mirrors the deploy layout: public/ + game.js + logic.js + stockfish/ + design/).
 // OUTDIR=<dir> builds somewhere else (parallel sandboxes); default is dist/.
+import { buildI18n } from "./i18n-build.mjs";
 import { build } from "esbuild";
 import { rmSync, mkdirSync, copyFileSync, cpSync, readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -70,6 +71,8 @@ await build({
 
 cpSync(join(root, "public"), dist, { recursive: true });
 cpSync(join(root, "design"), join(dist, "design"), { recursive: true });
+// language tables (i18n/ -> dist/i18n/<code>.json)
+console.log("languages", JSON.stringify(buildI18n(root, join(dist, "i18n"))));
 
 // stamp the service worker with a content hash so each deploy gets a fresh cache
 {

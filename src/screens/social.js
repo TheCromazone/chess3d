@@ -391,7 +391,7 @@ export class SocialScreen {
       title: u.name,
       sub: `${presenceText(u)}${u.games ? `, ${u.games} game${u.games === 1 ? "" : "s"} played` : ""}`,
       body: [h("div.profile-pop", userAvatar(u, ".lg"), grid),
-        u.country || u.about ? h("p.profile-about", u.country ? h("span", { title: countryName(u.country) }, `${flagEmoji(u.country)} ${countryName(u.country)}`) : null, u.country && u.about ? ". " : null, u.about || null) : null,
+        u.country || u.about ? h("p.profile-about", u.country ? h("span", { title: countryName(u.country) }, `${flagEmoji(u.country)} ${countryName(u.country)}`) : null, u.country && u.about ? ". " : null, u.about ? h("span", { "data-no-i18n": "" }, u.about) : null) : null,
         leagueSlot,
         Object.keys(u.variants || {}).length ? h("p.note", "Variants: " + Object.entries(u.variants).sort((a, b) => b[1].n - a[1].n).map(([k, v]) => `${VARIANT_NAMES[k] || k} ${v.r}`).join(", ")) : null,
         blocked ? h("p.note", "You've blocked this player.") : actions, remove, kick, blockBtn, h("div.lbl.note", "Recent games"), games],
@@ -506,7 +506,7 @@ export class SocialScreen {
           : h("button.btn.small" + (mine ? "" : ".primary"), { onclick: () => acceptChallenge(this.app, c) }, mine ? "Open game" : "Accept"),
         when);
     }
-    return h(`div.msg${mine ? ".mine" : ""}`, h("span", m.body), when);
+    return h(`div.msg${mine ? ".mine" : ""}`, h("span", { "data-no-i18n": "" }, m.body), when);
   }
 
   // ---------- clubs ----------
@@ -588,7 +588,7 @@ export class SocialScreen {
       if (!last) list.querySelector(".thread-empty")?.remove();
       for (const m of msgs) {
         const mine = m.sender === S.myId();
-        list.insertBefore(h(`div.msg${mine ? ".mine" : ""}`, mine ? null : h("b.msg-from", m.sender_name), h("span", m.body), h("time", timeAgo(m.created))), list.querySelector(".msg.pending"));
+        list.insertBefore(h(`div.msg${mine ? ".mine" : ""}`, mine ? null : h("b.msg-from", m.sender_name), h("span", { "data-no-i18n": "" }, m.body), h("time", timeAgo(m.created))), list.querySelector(".msg.pending"));
         last = m.id;
       }
       if (atBottom || list.children.length === msgs.length) list.scrollTop = list.scrollHeight;
@@ -749,7 +749,7 @@ export class SocialScreen {
     const draw = (d) => {
       box.replaceChildren(...(d.topics.length ? d.topics.map(t => h("a.row.topic-row", { href: `#/social/topic/${t.id}` },
         userAvatar(t.author, ".sm"),
-        h("span.rt", h("b", t.title), h("small", `${FORUM_LABEL[t.cat] || t.cat}, by ${t.author.name}, ${t.replies} repl${t.replies === 1 ? "y" : "ies"}, active ${timeAgo(t.lastAt)}`)),
+        h("span.rt", h("b", { "data-no-i18n": "" }, t.title), h("small", `${FORUM_LABEL[t.cat] || t.cat}, by ${t.author.name}, ${t.replies} repl${t.replies === 1 ? "y" : "ies"}, active ${timeAgo(t.lastAt)}`)),
         h("span.rv", icon("chevron", 18))))
         : [h("p.note", "No topics here yet. Start the conversation.")]));
     };
@@ -798,7 +798,7 @@ export class SocialScreen {
         }, icon("flag", 14), "Report"));
     const post = (p, kind, del) => h("article.post",
       h("header", userAvatar(p.author, ".sm"), h("b", p.author.name), h("small.muted", timeAgo(p.created))),
-      h("div.post-body", p.body),
+      h("div.post-body", { "data-no-i18n": "" }, p.body),
       actions(kind, kind === "topic" ? t.id : p.id, p.mine, del));
     const reply = h("textarea.input.prose", { maxlength: "4000", rows: "3", placeholder: "Write a reply", "aria-label": "Reply" });
     const send = h("button.btn.primary", {
@@ -810,7 +810,7 @@ export class SocialScreen {
     }, "Post reply");
     this.body.replaceChildren(
       h("div.club-head", h("a.btn.small.ghost", { href: "#/social/forums", "aria-label": "All topics" }, icon("back", 16)),
-        h("div.club-title", h("h2", t.title), h("p.note", `${FORUM_LABEL[t.cat] || t.cat}, ${t.replies} repl${t.replies === 1 ? "y" : "ies"}`))),
+        h("div.club-title", h("h2", { "data-no-i18n": "" }, t.title), h("p.note", `${FORUM_LABEL[t.cat] || t.cat}, ${t.replies} repl${t.replies === 1 ? "y" : "ies"}`))),
       h("div.thread-posts", post({ ...t, mine: t.mine }, "topic", `/forums/${t.id}/delete`),
         ...d.posts.map(p => post(p, "post", `/forums/${t.id}/posts/${p.id}/delete`))),
       h("section.card.reply-box", reply, h("div.btn-row.reply-actions", send)));
@@ -824,7 +824,7 @@ export class SocialScreen {
     const draw = (d) => {
       box.replaceChildren(...(d.posts.length ? d.posts.map((p) => h("a.row.blog-row", { href: `#/social/blog/${p.id}` },
         userAvatar(p.author, ".sm"),
-        h("span.rt", h("b", p.title), h("small.blog-excerpt", p.excerpt.replace(/\s+/g, " ")), h("small", `${p.author.name}, ${timeAgo(p.created)}${p.likes ? `, ${p.likes} like${p.likes === 1 ? "" : "s"}` : ""}`)),
+        h("span.rt", h("b", { "data-no-i18n": "" }, p.title), h("small.blog-excerpt", { "data-no-i18n": "" }, p.excerpt.replace(/\s+/g, " ")), h("small", `${p.author.name}, ${timeAgo(p.created)}${p.likes ? `, ${p.likes} like${p.likes === 1 ? "" : "s"}` : ""}`)),
         h("span.rv", icon("chevron", 18))))
         : [h("p.note", "No posts yet. Be the first to write one.")]));
     };
@@ -885,9 +885,9 @@ export class SocialScreen {
     this.body.replaceChildren(
       h("div.club-head", h("a.btn.small.ghost", { href: "#/social/blogs", "aria-label": "All posts" }, icon("back", 16))),
       h("article.blog-post",
-        h("h2", p.title),
+        h("h2", { "data-no-i18n": "" }, p.title),
         h("div.blog-byline", userAvatar(p.author, ".sm"), h("b", p.author.name), h("small.muted", timeAgo(p.created))),
-        h("div.blog-body", ...p.body.split(/\n\s*\n/).map((para) => h("p", para))),
+        h("div.blog-body", { "data-no-i18n": "" }, ...p.body.split(/\n\s*\n/).map((para) => h("p", para))),
         h("div.btn-row.blog-actions", likeBtn, other)));
   }
 
@@ -918,7 +918,7 @@ export class SocialScreen {
       return h("article.coach-card",
         h("header", userAvatar(u), h("div.coach-name", h("b", `${c.title ? c.title + " " : ""}${u.name}`), h("small", [presenceText(u), R(u, "blitz"), R(u, "rapid")].filter(Boolean).join(", ")))),
         facts.length ? h("div.coach-facts", ...facts.map((f) => h("span", f))) : null,
-        h("p.coach-bio", c.bio),
+        h("p.coach-bio", { "data-no-i18n": "" }, c.bio),
         c.mine ? null : h("div.btn-row",
           h("button.btn.primary", { onclick: () => this.app.go(`#/social/chat/${u.id}`) }, icon("chat", 18), friendIds.has(u.id) ? "Message" : "Ask about lessons"),
           h("button.btn", { onclick: () => this._profile(u, friendIds.has(u.id)) }, "Profile"),
@@ -949,7 +949,7 @@ export class SocialScreen {
     const m = openModal({
       title: cur ? "Your coach listing" : "Offer lessons",
       body: [titleF, h("div.field", h("label", "About your lessons"), bio), langsF, topicsF, rateF,
-        h("p.note", "Your name, avatar and ratings show with your listing. Students add you as a friend to get in touch."), go],
+        h("p.note", "Your name, avatar and ratings show with your listing. Students message you to get in touch."), go],
     });
   }
 

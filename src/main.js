@@ -1,4 +1,5 @@
 // Entry point: routes → screens. The App owns the board, panel and navigation.
+import { startI18n } from "./i18n.js";
 import { App } from "./app.js";
 import { HomeScreen, BotsScreen, FriendScreen, LocalScreen } from "./screens/play.js";
 import { ProfilePage, SettingsPage } from "./screens/pages.js";
@@ -128,6 +129,7 @@ if (new URLSearchParams(location.search).get("room") && !location.hash && !/^zh-
 }
 
 const app = new App(routes);
+startI18n();
 addEventListener("pointerdown", () => unlockAudio(), { once: true });
 app.start();
 // friends, messages and challenges: presence heartbeat and notices (only once social is turned on)

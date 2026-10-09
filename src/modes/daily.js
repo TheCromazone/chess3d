@@ -8,6 +8,7 @@ import { getDailyGames, upsertDaily, removeDaily } from "../store.js";
 import { RoomClient, parsePlayerId } from "../net/room.js";
 import { OnlineGame } from "./online-game.js";
 import { notice } from "../ui/people.js";
+import { t } from "../i18n.js";
 import { SFX } from "../audio.js";
 
 export const DAILY_PACES = [{ value: "1d", label: "1 day" }, { value: "3d", label: "3 days" }, { value: "7d", label: "7 days" }, { value: "inf", label: "No limit" }];
@@ -154,19 +155,21 @@ export class DailyScreen {
     const yourMove = games.filter(e => e.status === "playing" && e.turn && e.turn === e.myColor);
     const rows = h("div.rows");
     for (const e of games) {
+      // the line is joined from parts, so each part is translated on its own
       let state, badge = null;
-      if (e.status === "waiting" || !e.status) state = "Waiting for your friend to open the link";
-      else if (e.status === "over") state = e.result === "won" ? "You won" : e.result === "lost" ? "You lost" : "Drawn";
-      else if (e.turn === e.myColor) { state = "Your move"; badge = h("span.badge", "Your move"); }
-      else state = "Their move";
-      if (e.status === "playing" && e.deadline) state += ` (${timeLeft(e.deadline - Date.now())})`;
-      if (e.status === "playing" && e.away > Date.now()) state += `, you're on vacation until ${shortDate(e.away)}`;
-      else if (e.status === "playing" && e.oppAway > Date.now()) state += `, they're on vacation until ${shortDate(e.oppAway)}`;
+      if (e.status === "waiting" || !e.status) state = t("Waiting for your friend to open the link");
+      else if (e.status === "over") state = t(e.result === "won" ? "You won" : e.result === "lost" ? "You lost" : "Drawn");
+      else if (e.turn === e.myColor) { state = t("Your move"); badge = h("span.badge", "Your move"); }
+      else state = t("Their move");
+      if (e.status === "playing" && e.deadline) state += ` (${t(timeLeft(e.deadline - Date.now()))})`;
+      if (e.status === "playing" && e.away > Date.now()) state += ", " + t(`you're on vacation until ${shortDate(e.away)}`);
+      else if (e.status === "playing" && e.oppAway > Date.now()) state += ", " + t(`they're on vacation until ${shortDate(e.oppAway)}`);
       rows.appendChild(h("div", { style: { display: "flex", gap: "6px", alignItems: "stretch" } },
         h("button.row", { onclick: () => this.open(e), style: { flex: "1" } },
           h("span.ri", icon("calendar", 20)),
           h("span.rt", h("b", e.opponent ? `vs ${e.opponent}` : "New daily game"),
-            h("small", `${state}${e.moves ? `, ${Math.ceil(e.moves / 2)} move${Math.ceil(e.moves / 2) === 1 ? "" : "s"}` : ""}${e.lastMove ? `, last ${e.lastMove}` : ""}${e.tc && e.tc !== "inf" ? `, ${tcLabel(e.tc)} per move` : ""}. Updated ${timeAgo(e.updated || e.created)}`)),
+            h("small", [state, e.moves ? t(`${Math.ceil(e.moves / 2)} move${Math.ceil(e.moves / 2) === 1 ? "" : "s"}`) : null, e.lastMove ? t(`last ${e.lastMove}`) : null,
+              e.tc && e.tc !== "inf" ? t(`${tcLabel(e.tc)} per move`) : null].filter(Boolean).join(", ") + ". " + t(`Updated ${timeAgo(e.updated || e.created)}`))),
           badge || h("span.rv", icon("chevron", 18))),
         e.status === "over" || e.status === "waiting" ? h("button.btn.ghost", { "aria-label": "Remove from list", title: "Remove from list", onclick: () => { removeDaily(e.room); this.render(); } }, icon("trash", 16)) : null));
     }
