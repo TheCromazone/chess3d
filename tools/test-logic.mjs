@@ -208,5 +208,33 @@ ok(vs.fen.startsWith("8/8/8/8/8/8/8/8") && vs.moves.every((m) => m === null), "f
 fog = L.applyAction(fog, P2, { t: "resign" });
 ok(L.viewFor(fog, P1).moves[1] === "e7e5" && L.viewFor(fog, P1).fen.includes("pppp1ppp"), "fog: everything is revealed when the game ends");
 
+// v6: 4-Player Chess in a four-seat room
+{
+  const [R, B, Y, G] = ["p-red", "p-blue", "p-yellow", "p-green"];
+  let f = L.setup([R, B, Y, G]);
+  ok(f.fourSeats && f.fourSeats.y === Y && f.phase === "config" && f.v >= 6, "four players: seats go Red, Blue, Yellow, Green");
+  ok(!L.validateAction(f, B, { t: "config", tc: "5+0", rules: "ffa" }).ok && L.validateAction(f, R, { t: "config", tc: "5+0", rules: "ffa" }).ok, "Red sets up the game");
+  ok(!L.validateAction(f, R, { t: "config", tc: "3d", rules: "ffa" }).ok, "no daily clocks for four players");
+  f = L.applyAction(f, R, { t: "config", tc: "5+0", rules: "ffa" });
+  ok(f.four && f.clock.g === 300000 && !L.isGameOver(f).over, "the game starts with four clocks");
+  ok(!L.validateAction(f, B, { t: "move", move: "b8-c8" }).ok, "Blue can't move on Red's turn");
+  ok(!L.validateAction(f, R, { t: "move", move: "h2-h5" }).ok && L.validateAction(f, R, { t: "move", move: "h2-h4" }).ok, "Red's moves are checked");
+  for (const [p, m] of [[R, "h2-h4"], [B, "b8-c8"], [Y, "g13-g12"], [G, "m9-l9"]]) f = L.applyAction(f, p, { t: "move", move: m });
+  ok(f.four.log.length === 4 && f.lastMove === "m9-l9" && L.viewFor(f, R).four.log.length === 4, "a round of four moves");
+  f = L.applyAction(f, B, { t: "resign" });
+  ok(f.four.pos.status[1] === "resigned" && !L.isGameOver(f).over, "free-for-all: Blue resigns and the game goes on");
+  ok(!L.validateAction(f, B, { t: "resign" }).ok, "a resigned player can't resign again");
+  ok(!L.validateAction(f, Y, { t: "flag" }).ok, "time can't be called on a player who still has some");
+  f = L.applyAction(f, Y, { t: "resign" });
+  f = L.applyAction(f, G, { t: "resign" });
+  const end = L.isGameOver(f);
+  ok(end.over && end.winner === R && end.ranking[0] === R && end.reason === "last-standing", "three out: Red wins, with the full ranking");
+  // Teams
+  let t = L.applyAction(L.setup([R, B, Y, G]), R, { t: "config", tc: "inf", rules: "teams" });
+  t = L.applyAction(t, G, { t: "resign" });
+  const te = L.isGameOver(t);
+  ok(te.over && te.winners.includes(R) && te.winners.includes(Y) && !te.winners.includes(G), "Teams: Green resigns, so Red and Yellow win");
+}
+
 console.log(failures === 0 ? "\nALL TESTS PASSED" : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

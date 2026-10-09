@@ -540,6 +540,7 @@ export class VariantsScreen {
       title: "Variants", back: "#/",
       body: [h("div.rows",
         row("cube", "Crazyhouse", "Captured pieces come back as drops. Bots, pass and play, or a friend", () => this.app.go("#/crazyhouse")),
+        row("grid", "4-Player Chess", "Four armies on one board: free-for-all or teams", () => this.app.go("#/fourplayer")),
         row("users", "Bughouse", "Two boards, two teams: your captures feed your partner", () => this.app.go("#/bughouse")),
         ...Object.entries(VX_INFO).map(([id, info]) => row(info.icon, VX_VARIANTS[id].name, info.short, () => this.app.go(`#/variant/${id}`))),
         row("grid", "Chess960", "Shuffled back rank, against bots or on one screen", () => this.app.go("#/bots")),

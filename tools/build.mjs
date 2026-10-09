@@ -46,12 +46,13 @@ await build({
   const zhCode = readFileSync(join(root, "src/core/zh.js"), "utf8")
     .replace(/^import\s.*chess\.js.*$/m, "")
     .replace(/^export (const|class|function) /gm, "$1 ");
-  // the other variants' rules (no imports of their own) go in wrapped, so their names stay private
-  const vxCode = readFileSync(join(root, "src/core/vx.js"), "utf8").replace(/^export (const|class|function) /gm, "$1 ");
+  // the other variants' rules (vx.js, fp.js: no imports of their own) go in wrapped, so their
+  // names stay private
+  const wrapped = (file, names) => `const {${names}} = (() => {\n${readFileSync(join(root, "src/core", file), "utf8").replace(/^export (const|class|function) /gm, "$1 ")}\nreturn {${names}};\n})();`;
   const srcCode = readFileSync(join(root, "src/logic-src.js"), "utf8")
     .replace(/^import\s.*chess\.js.*$/m, "const { Chess } = __ChessLib;")
     .replace(/^import\s.*zh\.js.*$/m, zhCode)
-    .replace(/^import\s*\{([^}]*)\}\s*from\s*"\.\/core\/vx\.js";$/m, (_, names) => `const {${names}} = (() => {\n${vxCode}\nreturn {${names}};\n})();`);
+    .replace(/^import\s*\{([^}]*)\}\s*from\s*"\.\/core\/(vx|fp)\.js";$/gm, (_, names, mod) => wrapped(mod + ".js", names));
   writeFileSync(join(dist, "logic.js"), libCode + "\n" + srcCode);
   console.log("logic.js assembled (inline exports)");
 }

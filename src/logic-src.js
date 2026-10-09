@@ -3,12 +3,13 @@
 import { Chess } from "chess.js";
 import { Crazyhouse, textToMove } from "./core/zh.js";
 import { VxGame, VX_VARIANTS, vxTextToMove, vxMoveToText } from "./core/vx.js";
+import { FourPlayer, FP_COLORS, fpTextToMove } from "./core/fp.js";
 
 export const meta = { game: "Chess 3D", minPlayers: 2, maxPlayers: 2 };
 
 const TIME_CONTROLS = { "1+0": [60, 0], "3+2": [180, 2], "5+0": [300, 0], "10+0": [600, 0], "15+10": [900, 10], "inf": null };
-const VERSION = 5;           // v2: chat / takebacks / abort / custom clocks; v3: daily deadlines; v4: crazyhouse, bughouse;
-                             // v5: duck chess, fog of war, giveaway, atomic, horde
+const VERSION = 6;           // v2: chat / takebacks / abort / custom clocks; v3: daily deadlines; v4: crazyhouse, bughouse;
+                             // v5: duck chess, fog of war, giveaway, atomic, horde; v6: 4-player chess
 const ROOM_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const otherColor = (c) => (c === "w" ? "b" : "w");
 
@@ -58,6 +59,7 @@ function colorOf(state, playerId) {
 }
 
 export function setup(players) {
+  if (players.length === 4) return setupFour(players);
   return {
     players: [...players],
     white: players[0],
@@ -83,6 +85,7 @@ export function setup(players) {
 
 export function validateAction(state, playerId, action) {
   if (!action || typeof action.t !== "string") return { ok: false, error: "malformed action" };
+  if (state.fourSeats) return validateFour(state, playerId, action);
   const color = colorOf(state, playerId);
   if (!color) return { ok: false, error: "you are spectating" };
   const finished = state.resigned || state.flagged || state.agreedDraw || state.timeoutDraw || state.aborted;
@@ -165,6 +168,7 @@ export function validateAction(state, playerId, action) {
 }
 
 export function applyAction(state, playerId, action) {
+  if (state.fourSeats) return applyFour(state, playerId, action);
   const color = colorOf(state, playerId);
   const now = Date.now();
 
@@ -295,6 +299,7 @@ function withPartnerEnd(state) {
 
 export function isGameOver(state) {
   if (state.phase === "config") return { over: false };
+  if (state.fourSeats) return fourOver(state);
   if (state.partnerEnd) {
     const w = state.partnerEnd.winner;
     return w ? { over: true, winner: w === "w" ? state.white : state.black, reason: "partner-" + state.partnerEnd.reason } : { over: true, draw: true, reason: "partner-" + state.partnerEnd.reason };
@@ -347,4 +352,120 @@ export function viewFor(state, playerId) {
     legal: color && g.turn() === color ? g.moves().map(vxMoveToText) : [],
     serverNow: Date.now(),
   };
+}
+
+// ---- 4-Player Chess: a four-seat room (seats fill Red, Blue, Yellow, Green); Red picks the game ----
+function setupFour(players) {
+  return {
+    players: [...players],
+    fourSeats: { r: players[0], b: players[1], y: players[2], g: players[3] },
+    four: null,
+    phase: "config",
+    tcKey: null,
+    tc: null,
+    clock: { r: 0, b: 0, y: 0, g: 0, lastAt: null },
+    lastMove: null,
+    chat: [],
+    v: VERSION,
+  };
+}
+const fourColorOf = (state, playerId) => FP_COLORS.find((c) => state.fourSeats[c] === playerId) || null;
+
+function validateFour(state, playerId, action) {
+  const color = fourColorOf(state, playerId);
+  if (!color) return { ok: false, error: "you are spectating" };
+  if (action.t === "chat") {
+    if (typeof action.text !== "string" || !action.text.trim()) return { ok: false, error: "empty message" };
+    if (action.text.length > 200) return { ok: false, error: "message too long" };
+    return { ok: true };
+  }
+  if (action.t === "config") {
+    if (state.phase !== "config") return { ok: false, error: "the game already started" };
+    if (color !== "r") return { ok: false, error: "Red sets up the game" };
+    const tc = parseTc(action.tc);
+    if (!tc.ok || tc.perMove) return { ok: false, error: "unknown time control" };
+    if (!["ffa", "teams"].includes(action.rules)) return { ok: false, error: "free-for-all or teams?" };
+    return { ok: true };
+  }
+  if (state.phase === "config") return { ok: false, error: "waiting for Red to start the game" };
+  const g = new FourPlayer(state.four.mode, state.four);
+  if (g.result) return { ok: false, error: "the game is over" };
+  const active = g.status()[FP_COLORS.indexOf(color)] === "active";
+  if (action.t === "move") {
+    if (g.turn() !== color) return { ok: false, error: "not your turn" };
+    const m = fpTextToMove(action.move);
+    if (!m || !g.isLegal(m)) return { ok: false, error: "illegal move" };
+    return { ok: true };
+  }
+  if (action.t === "resign") return active ? { ok: true } : { ok: false, error: "you're already out" };
+  if (action.t === "claim") return g.canClaim(color) ? { ok: true } : { ok: false, error: "you can't claim the win yet" };
+  if (action.t === "flag") {
+    if (!state.tc || state.clock.lastAt === null) return { ok: false, error: "no clock running" };
+    const turn = g.turn();
+    if (state.clock[turn] - (Date.now() - state.clock.lastAt) > 0) return { ok: false, error: "they still have time" };
+    return { ok: true };
+  }
+  return { ok: false, error: "unknown action" };
+}
+
+function applyFour(state, playerId, action) {
+  const color = fourColorOf(state, playerId);
+  const now = Date.now();
+  if (action.t === "chat") return { ...state, chat: [...state.chat, { c: color, text: action.text.trim().slice(0, 200), at: now }].slice(-60) };
+  if (action.t === "config") {
+    const { tc } = parseTc(action.tc);
+    const ms = tc ? tc[0] * 1000 : 0;
+    return {
+      ...state,
+      phase: "playing",
+      tcKey: action.tc,
+      tc: tc ? { initial: tc[0], inc: tc[1] } : null,
+      four: new FourPlayer(action.rules === "teams" ? "teams" : "ffa").state(),
+      clock: { r: ms, b: ms, y: ms, g: ms, lastAt: tc ? now : null },
+    };
+  }
+  const g = new FourPlayer(state.four.mode, state.four);
+  let clock = state.clock;
+  // the player to move has been using their time since the last move
+  const charge = () => {
+    if (!state.tc || clock.lastAt === null) return;
+    const turn = g.turn();
+    clock = { ...clock, [turn]: Math.max(0, clock[turn] - (now - clock.lastAt)) };
+  };
+  const done = (extra = {}) => ({ ...state, ...extra, four: g.state(), clock: { ...clock, lastAt: state.tc && !g.result ? now : null } });
+  if (action.t === "move") {
+    const mover = g.turn();
+    charge();
+    // out of time before the move arrived: that's a timeout, not a move
+    if (state.tc && clock[mover] <= 0) { timeOut(g, mover); return done(); }
+    g.play(fpTextToMove(action.move));
+    if (state.tc) clock = { ...clock, [mover]: clock[mover] + state.tc.inc * 1000 };
+    return done({ lastMove: action.move });
+  }
+  if (action.t === "flag") {
+    const who = g.turn();
+    clock = { ...clock, [who]: 0 };
+    timeOut(g, who);
+    return done();
+  }
+  if (action.t === "resign") { charge(); g.resign(color); return done(); }
+  if (action.t === "claim") { charge(); g.claim(color); return done(); }
+  return state;
+}
+
+// running out of time works like resigning (in free-for-all the king wanders on), with its own reason
+function timeOut(g, color) {
+  g.resign(color);
+  if (g.result && g.result.reason === "resignation") g.result = { ...g.result, reason: "timeout" };
+}
+
+function fourOver(state) {
+  const r = state.four && state.four.result;
+  if (!r) return { over: false };
+  if (state.four.mode === "teams") {
+    if (!r.winner) return { over: true, draw: true, reason: r.reason };
+    const winners = r.winner.split("").map((c) => state.fourSeats[c]);
+    return { over: true, winner: winners[0], winners, reason: r.reason };
+  }
+  return { over: true, winner: state.fourSeats[r.winner], ranking: r.ranking.map((c) => state.fourSeats[c]), points: r.points, reason: r.reason };
 }
