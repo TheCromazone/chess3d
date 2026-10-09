@@ -18,6 +18,11 @@ and challenges, clubs with their own chat, and a global leaderboard of self-repo
 Loop 6 added live arenas and Puzzle Battles against real players, daily games with a deadline per
 move (rules v3) and "your move" notices, adding your opponent as a friend after a game, a friends
 leaderboard, and club moderation.
+Loop 7 finished accounts (passwordless sign-in on other devices, cloud backup), proved web push
+arrives with the site closed, and added Crazyhouse and Bughouse (rules v4) and the Watch page's
+live streamers, videos and news. Loop 8 added the rest of chess.com's variants: Duck Chess, Fog of
+War, Giveaway, Atomic and Horde on one perft-checked move generator (rules v5), and 4-Player Chess,
+free-for-all and teams, in four-seat rooms (rules v6), each with bots, pass and play and online play.
 Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don't have (alternative noted)
 
 ## Play
@@ -47,6 +52,10 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | New-player onboarding (skill level seeds ratings) | ✅ | |
 | In-game chat (online) | ✅ | rules v2 live on the room server; quick phrases + free text |
 | Variants (Chess960, 3-check, KOTH) | ✅ | vs bots and pass and play; Chess960 castling verified against Stockfish perft |
+| Crazyhouse | ✅ | drops from a pocket; own bots (Stockfish doesn't play it), pass and play, friends online (rules v4) |
+| Bughouse | ✅ | two linked rooms, four players: captures go to your partner, either board ending ends the match; verified with four live players |
+| Duck Chess, Fog of War, Giveaway, Atomic, Horde | ✅ | one move generator (matches standard perft) with each variant's rules; bots for all five, pass and play (Fog of War hides the board between turns), friends online (rules v5; in Fog of War the server sends each player only what they can see) |
+| 4-Player Chess | ✅ | free-for-all (points, grey armies, wandering kings, claim win) and teams; 14x14 board, three bots or pass and play or four friends online in a four-seat room (rules v6) |
 | Daily / correspondence chess | ✅ | 1, 3 or 7 days per move (or no limit), lose on time when a deadline passes (rules v3); persistent rooms, "your move" list with time left, daily challenges to friends |
 | Tournaments / arenas | ✅ | live arenas against real players every 30 minutes (blitz on the hour, bullet on the half hour): instant re-pairing, streak bonuses, live standings, results read by the server from the game room; Bot Arena for practice |
 
@@ -93,6 +102,9 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 |---|---|---|
 | Watch games | ✅ | 40 classic games replayed + Bot TV (live bot vs bot) |
 | Spectate a live game | ✅ | Watch button on friends who are in a live game, or open any game link |
+| Live streamers | ✅ | who's streaming chess right now (Chess.com and Lichess streamer lists), linking to the stream |
+| Chess videos | ✅ | latest videos from GothamChess, Chess.com, Saint Louis Chess Club, Daniel Naroditsky and Hanging Pawns, played on the page |
+| News | ✅ | latest headlines from FIDE, Lichess and Chess.com, refreshed every 15 minutes by the game server |
 
 ## Profile & social
 

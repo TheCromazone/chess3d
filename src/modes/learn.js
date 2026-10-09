@@ -10,6 +10,7 @@ import { getProfile, updateProfile, unlock } from "../store.js";
 import { playEngine } from "../core/engines.js";
 import { moveSound, SFX } from "../audio.js";
 import { THEME_INFO, loadPuzzles, themesAvailable } from "../puzzles.js";
+import { VIDEO_LESSONS } from "../video-lessons.js";
 
 const GOOD = "rgba(82,179,106,.6)", BAD = "rgba(224,55,42,.55)";
 
@@ -20,7 +21,7 @@ export class LearnPage {
     const p = getProfile();
     const lessonCats = [...new Set(LESSONS.map(l => l.category))];
     const page = h("div.page",
-      h("div.page-head", h("h1", "Learn"), h("p", "Short interactive lessons, endgame drills against Stockfish, and an opening trainer. Progress saves on this device.")));
+      h("div.page-head", h("h1", "Learn"), h("p", "Short interactive lessons, endgame drills against Stockfish, an opening trainer and video lessons. Progress saves on this device.")));
     const chips = h("div.seg.learn-chips");
     page.append(chips);
     const addChip = (label, id) => chips.appendChild(h("button", { onclick: () => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }) }, label));
@@ -44,6 +45,28 @@ export class LearnPage {
       h("div.grid-cards", ...POPULAR_OPENINGS.map(o => h("button.tile", { onclick: () => this.app.go(`#/opening/${o.id}`) },
         h("b", o.name), h("small", o.blurb), h("small", `${o.eco} · as ${o.side === "w" ? "White" : "Black"}`),
         p.openings[o.id] ? h("span.done", `✓ Practiced ${p.openings[o.id]}×`) : null)))));
+    // video lessons: series you've opened are remembered on this device
+    let opened = {};
+    try { opened = JSON.parse(localStorage.getItem("c3d-video-lessons") || "{}"); } catch { /* storage blocked */ }
+    addChip("Video lessons", "learn-videos");
+    page.append(h("section", { id: "learn-videos" }, h("h2", "Video lessons"),
+      h("p.note", { style: { marginBottom: "10px" } }, "Whole video series from chess teachers. Each one plays here, episode after episode."),
+      ...VIDEO_LESSONS.map((group) => h("div.video-topic", h("h3", group.topic),
+        h("div.grid-cards", ...group.items.map((v) => h("button.tile.video-lesson", {
+          onclick: (e) => {
+            opened[v.id] = Date.now();
+            try { localStorage.setItem("c3d-video-lessons", JSON.stringify(opened)); } catch { /* storage blocked */ }
+            const tile = e.currentTarget;
+            if (!tile.querySelector(".done")) tile.appendChild(h("span.done", "✓ Started"));
+            openModal({
+              title: v.title, sub: `${v.by}, ${v.count} videos`, wide: true,
+              body: h("div.video-frame", h("iframe", {
+                src: `https://www.youtube-nocookie.com/embed/videoseries?list=${v.id}&rel=0`, title: v.title,
+                allow: "autoplay; encrypted-media; picture-in-picture; fullscreen", allowfullscreen: true, referrerpolicy: "strict-origin-when-cross-origin",
+              })),
+            });
+          },
+        }, h("span.ti", icon("watch", 22)), h("b", v.title), h("small", `${v.by}, ${v.count} videos`), opened[v.id] ? h("span.done", "✓ Started") : null)))))));
     const themes = h("div.grid-cards");
     addChip("Tactics by theme", "learn-themes");
     page.append(h("section", { id: "learn-themes" }, h("h2", "Tactics by theme"), themes));
