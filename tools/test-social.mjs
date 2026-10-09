@@ -36,7 +36,15 @@ const ok = (cond, name) => { console.log((cond ? "PASS" : "FAIL") + "  " + name)
 let clock = 1_800_000_000_000;
 // the room server, as the arena code sees it: room -> {status, seats, result}
 const rooms = new Map();
-const api = new Social(d1(new DatabaseSync(":memory:")), () => clock, { roomState: async (room) => rooms.get(room) ?? null });
+// push requests are captured instead of sent
+const pushes = [];
+let pushStatus = 201;
+const pending = [];
+const api = new Social(d1(new DatabaseSync(":memory:")), () => clock, {
+  roomState: async (room) => rooms.get(room) ?? null,
+  waitUntil: (p) => pending.push(p),
+  pushFetch: async (url, init) => { pushes.push({ url, init }); return new Response(null, { status: pushStatus }); },
+});
 async function call(method, path, { body, secret, query = "", ip = "1.1.1.1" } = {}) {
   const req = new Request("https://x/api/social" + path + query, {
     method, headers: { "Content-Type": "application/json", "CF-Connecting-IP": ip, ...(secret ? { Authorization: "Bearer " + secret } : {}) },
@@ -249,6 +257,37 @@ const rep3 = (await call("POST", "/register", { body: { name: "Rex" }, ip: "5.5.
 await call("POST", "/report", { secret: rep3.secret, body: { kind: "topic", id: t1.id } });
 ok((await call("GET", `/forums/${t1.id}`, { secret: ann.secret })).status === 404, "three reports hide it");
 await call("POST", "/delete", { secret: rep3.secret });
+
+// notifications when the app is closed: web push with VAPID
+const key = (await call("GET", "/push/key", { secret: ann.secret })).data.key;
+ok(/^[A-Za-z0-9_-]{87}$/.test(key), "the server publishes a P-256 VAPID key");
+ok((await call("POST", "/push/subscribe", { secret: ann.secret, body: { endpoint: "https://evil.example/x" } })).status === 400, "only browser push services are accepted");
+const ep = "https://fcm.googleapis.com/fcm/send/abc123";
+ok((await call("POST", "/push/subscribe", { secret: ann.secret, body: { endpoint: ep } })).data.ok, "a device subscribes to push");
+await call("POST", "/friends/request", { secret: dee.secret, body: { code: ann.code } });
+await Promise.all(pending.splice(0));
+const sent = pushes.find((p) => p.url === ep);
+const auth = sent && sent.init.headers.Authorization;
+const m = /^vapid t=([^.]+)\.([^.]+)\.([^,]+), k=(.+)$/.exec(auth || "");
+const pubKey = await crypto.subtle.importKey("raw", Buffer.from(key, "base64url"), { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
+const signedOk = m && await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, pubKey, Buffer.from(m[3], "base64url"), new TextEncoder().encode(m[1] + "." + m[2]));
+const claims = m && JSON.parse(Buffer.from(m[2], "base64url").toString());
+ok(sent && sent.init.method === "POST" && sent.init.headers.TTL && signedOk && m[4] === key, "a friend request wakes the device with a correctly signed VAPID push");
+ok(claims && claims.aud === "https://fcm.googleapis.com" && claims.exp > clock / 1000 && claims.sub.startsWith("https://"), "the push token is for that push service and expires");
+const notes = (await call("GET", "/notes", { secret: ann.secret })).data;
+ok(notes.request && notes.request.name === "Dee", "the service worker can see what the push was about");
+await call("POST", "/nudge", { secret: dee.secret, body: { code: ann.code, room: "daily-abc", san: "Nf3" } });
+await Promise.all(pending.splice(0));
+const n2 = (await call("GET", "/notes", { secret: ann.secret })).data.notes;
+ok(n2.length === 1 && JSON.parse(n2[0].body).san === "Nf3", "a daily move nudges the opponent");
+pushStatus = 410;
+await call("POST", "/nudge", { secret: cid.secret, body: { code: ann.code, room: "daily-xyz", san: "e4" } });
+await Promise.all(pending.splice(0));
+pushStatus = 201;
+const before = pushes.length;
+await call("POST", "/nudge", { secret: cid.secret, body: { code: ann.code, room: "daily-new", san: "d4" } });
+await Promise.all(pending.splice(0));
+ok(pushes.length === before, "a push address the service says is gone is dropped");
 
 // finding players by name
 const found = (await call("GET", "/search", { secret: ann.secret, query: "?q=ci" })).data.players;

@@ -2,7 +2,7 @@
 // one-time code (or the recovery key), keep a cloud backup of profile, ratings, settings and games,
 // and sign out here or everywhere else. Used by the Social join card and the Settings page.
 import { h, icon, timeAgo, copyText } from "../ui/dom.js";
-import { openModal, toast, confirmModal } from "../ui/components.js";
+import { openModal, toast, confirmModal, switchRow } from "../ui/components.js";
 import * as S from "../net/social.js";
 
 function reloadSoon(msg) {
@@ -78,6 +78,20 @@ export function recoveryKeyModal() {
   });
 }
 
+// a switch for notifications when the app is closed; it reflects the browser's real subscription
+function pushSwitch() {
+  const row = switchRow("Notifications when Chess 3D is closed", "Challenges, messages, friend requests and your move in daily games", false, async (on) => {
+    try {
+      if (on) { await S.enablePush(); toast("Notifications are on"); } else { await S.disablePush(); toast("Notifications are off"); }
+    } catch (e) {
+      toast(e.message);
+      row.setAttribute("aria-checked", "false");
+    }
+  });
+  S.pushEnabled().then((on) => row.setAttribute("aria-checked", String(on)));
+  return row;
+}
+
 // the Settings section
 export function accountSection(page) {
   if (!S.registered()) {
@@ -97,6 +111,7 @@ export function accountSection(page) {
     h("div.btn-row",
       h("button.btn", { onclick: () => linkDeviceModal() }, icon("link", 18), "Sign in on another device"),
       h("button.btn", { onclick: () => recoveryKeyModal() }, icon("key", 18), "Recovery key")),
+    S.pushSupported() ? pushSwitch() : null,
     h("p.note", "Your profile, ratings, settings and games are backed up to your profile automatically. ", backed),
     h("div.btn-row",
       h("button.btn", {

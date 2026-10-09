@@ -70,6 +70,42 @@ export async function join() {
   return r;
 }
 
+// ---------- notifications when the app is closed (web push) ----------
+// The service worker can't read localStorage, so the key it uses to ask "what's new?" lives in a
+// small cache of its own (named so the offline cache cleanup leaves it alone).
+const SW_AUTH = "c3d-auth";
+async function storeSwAuth() {
+  try {
+    const c = await caches.open(SW_AUTH);
+    const url = new URL("__social", document.baseURI).href;
+    const id = getSocialId();
+    if (id) await c.put(url, new Response(JSON.stringify({ secret: id.secret, api: BASE })));
+    else await c.delete(url);
+  } catch { /* no Cache Storage here */ }
+}
+export function pushSupported() { return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window; }
+async function currentSub() {
+  if (!pushSupported()) return null;
+  const reg = await navigator.serviceWorker.getRegistration();
+  return reg ? reg.pushManager.getSubscription() : null;
+}
+export async function pushEnabled() { try { return !!(await currentSub()); } catch { return false; } }
+export async function enablePush() {
+  if (!pushSupported()) throw new SocialError(0, "This browser can't show notifications from websites.");
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") throw new SocialError(0, "Notifications are blocked for this site. Allow them in your browser's site settings.");
+  const reg = await navigator.serviceWorker.ready;
+  const { key } = await api("GET", "/push/key");
+  const raw = Uint8Array.from(atob(key.replace(/-/g, "+").replace(/_/g, "/")), (ch) => ch.charCodeAt(0));
+  const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: raw });
+  await api("POST", "/push/subscribe", { endpoint: sub.endpoint });
+  await storeSwAuth();
+}
+export async function disablePush() {
+  const sub = await currentSub();
+  if (sub) { await api("POST", "/push/unsubscribe", { endpoint: sub.endpoint }).catch(() => {}); await sub.unsubscribe(); }
+}
+
 // ---------- account: other devices, recovery key, cloud backup ----------
 // Sign in with a one-time code made on another device; that profile's backup replaces local data.
 export async function claimLink(code) {
@@ -135,13 +171,16 @@ export async function signOutOthers() {
   const r = await api("POST", "/devices/reset", {});
   const id = getSocialId();
   setSocialId({ ...id, secret: r.secret });
+  storeSwAuth();
 }
 // forget the key on this device only; the profile stays (sign back in with a code or recovery key)
-export function signOutHere() { setSocialId(null); reset(); }
+export function signOutHere() { disablePush().catch(() => {}); setSocialId(null); storeSwAuth(); reset(); }
 
 export async function leave() {
+  await disablePush().catch(() => {});
   if (registered()) await api("POST", "/delete", {});
   setSocialId(null);
+  storeSwAuth();
   reset();
 }
 
@@ -200,6 +239,8 @@ export function startHeartbeat() {
   };
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { beat(); schedule(); } });
   beat().finally(schedule);
+  // a device that turned notifications on keeps its service worker's key current
+  pushEnabled().then((on) => { if (on) storeSwAuth(); });
   // settings, puzzle progress and the like change outside games too: back up every few minutes
   setInterval(() => { if (!document.hidden) backupNow().catch(() => {}); }, 5 * 60000);
 }

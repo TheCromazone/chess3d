@@ -320,6 +320,10 @@ export class OnlineGame extends BaseGame {
     if (!mv) return;
     this.pendingUci = mv.from + mv.to + (mv.promotion || "");
     this.client.action({ t: "move", from: mv.from, to: mv.to, promotion: mv.promotion || undefined });
+    // daily games: let the opponent's devices know it's their move (if they have a profile)
+    if (this.kind === "daily" && this.oppCode && Social.registered()) {
+      Social.api("POST", "/nudge", { code: this.oppCode, room: this.room, san: mv.san }).catch(() => {});
+    }
   }
 
   onAfterMove() { /* server drives everything */ }

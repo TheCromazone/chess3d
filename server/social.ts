@@ -22,6 +22,10 @@ export interface RoomState {
 }
 export interface SocialHooks {
   roomState?: (room: string) => Promise<RoomState | null>;
+  // keep work going after the response (Worker ctx.waitUntil); push sends use it
+  waitUntil?: (p: Promise<unknown>) => void;
+  // how push requests leave the Worker (tests swap it out)
+  pushFetch?: (url: string, init: RequestInit) => Promise<Response>;
 }
 
 export interface SocialDB {
@@ -92,7 +96,27 @@ const SCHEMA = [
      created INTEGER NOT NULL, hidden INTEGER NOT NULL DEFAULT 0)`,
   `CREATE INDEX IF NOT EXISTS social_posts_topic ON social_posts (topic, id)`,
   `CREATE TABLE IF NOT EXISTS social_reports (kind TEXT NOT NULL, item TEXT NOT NULL, uid TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY (kind, item, uid))`,
+  // web push: the server's VAPID key pair, each device's push endpoint, and "your move" notes
+  `CREATE TABLE IF NOT EXISTS social_config (k TEXT PRIMARY KEY, v TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS social_push (endpoint TEXT PRIMARY KEY, uid TEXT NOT NULL, created INTEGER NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS social_push_uid ON social_push (uid)`,
+  `CREATE TABLE IF NOT EXISTS social_notes (id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT NOT NULL, kind TEXT NOT NULL, body TEXT NOT NULL, created INTEGER NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS social_notes_uid ON social_notes (uid, id)`,
 ];
+
+// Web push goes only to the browsers' own push services (no arbitrary URLs leave the Worker)
+const PUSH_HOSTS = [/^fcm\.googleapis\.com$/, /^updates\.push\.services\.mozilla\.com$/, /\.push\.apple\.com$/, /\.notify\.windows\.com$/];
+const PUSH_SUBJECT = "https://chess3d-five.vercel.app";
+
+function b64url(bytes: ArrayBuffer | Uint8Array): string {
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  let bin = "";
+  for (const b of u8) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function pushHostOk(endpoint: string): boolean {
+  try { const u = new URL(endpoint); return u.protocol === "https:" && PUSH_HOSTS.some((re) => re.test(u.hostname)); } catch { return false; }
+}
 
 // Forums: a few fixed categories; anything three different players report is hidden
 const FORUM_CATS = ["general", "openings", "tactics", "endgames", "help"];
@@ -252,6 +276,47 @@ export class Social {
     return u;
   }
 
+  // The server's VAPID key pair (made once, kept in D1): pub is the raw P-256 point, base64url
+  private async vapid(): Promise<{ pub: string; key: CryptoKey }> {
+    const row = await this.q("SELECT v FROM social_config WHERE k = 'vapid'").first<{ v: string }>();
+    let stored = row ? (JSON.parse(row.v) as { pub: string; jwk: JsonWebKey }) : null;
+    if (!stored) {
+      const pair = (await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"])) as CryptoKeyPair;
+      const pub = b64url((await crypto.subtle.exportKey("raw", pair.publicKey)) as ArrayBuffer);
+      const jwk = (await crypto.subtle.exportKey("jwk", pair.privateKey)) as JsonWebKey;
+      await this.q("INSERT OR IGNORE INTO social_config (k, v) VALUES ('vapid', ?)", JSON.stringify({ pub, jwk })).run();
+      // two isolates may race: whichever pair landed first is the one everyone uses
+      const again = await this.q("SELECT v FROM social_config WHERE k = 'vapid'").first<{ v: string }>();
+      stored = again ? (JSON.parse(again.v) as { pub: string; jwk: JsonWebKey }) : { pub, jwk };
+    }
+    const key = await crypto.subtle.importKey("jwk", stored.jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+    return { pub: stored.pub, key };
+  }
+
+  // A VAPID JWT (ES256) for one push service origin
+  private async vapidHeader(endpoint: string): Promise<string> {
+    const { pub, key } = await this.vapid();
+    const enc = (o: unknown) => b64url(new TextEncoder().encode(JSON.stringify(o)));
+    const unsigned = `${enc({ typ: "JWT", alg: "ES256" })}.${enc({ aud: new URL(endpoint).origin, exp: Math.floor(this.now() / 1000) + 12 * 3600, sub: PUSH_SUBJECT })}`;
+    const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, new TextEncoder().encode(unsigned));
+    return `vapid t=${unsigned}.${b64url(sig)}, k=${pub}`;
+  }
+
+  // Wake a player's devices: an empty push, after which their service worker asks /notes what it was
+  private pushTo(uid: string) {
+    const send = (async () => {
+      const r = await this.q("SELECT endpoint FROM social_push WHERE uid = ?", uid).all<{ endpoint: string }>();
+      const go = this.hooks.pushFetch ?? ((url: string, init: RequestInit) => fetch(url, init));
+      for (const { endpoint } of r.results) {
+        try {
+          const res = await go(endpoint, { method: "POST", headers: { TTL: "86400", Urgency: "high", Authorization: await this.vapidHeader(endpoint), "Content-Length": "0" } });
+          if (res.status === 404 || res.status === 410) await this.q("DELETE FROM social_push WHERE endpoint = ?", endpoint).run();
+        } catch (e) { console.error("push failed", e); }
+      }
+    })();
+    if (this.hooks.waitUntil) this.hooks.waitUntil(send); else send.catch(() => {});
+  }
+
   private async nameTaken(name: string, exceptId: string): Promise<boolean> {
     return !!(await this.q("SELECT 1 AS x FROM social_users WHERE name = ? COLLATE NOCASE AND id <> ?", name, exceptId).first());
   }
@@ -367,6 +432,46 @@ export class Social {
       return { ok: true, updated: now };
     }
 
+    // ---- notifications when the app is closed (web push) ----
+    if (method === "GET" && path === "/push/key") return { key: (await this.vapid()).pub };
+    if (method === "POST" && path === "/push/subscribe") {
+      const b = await body(request);
+      const endpoint = str(b["endpoint"], 800);
+      if (!pushHostOk(endpoint)) throw new HttpError(400, "that isn't a browser push address");
+      await this.q("INSERT OR REPLACE INTO social_push (endpoint, uid, created) VALUES (?, ?, ?)", endpoint, me.id, now).run();
+      return { ok: true };
+    }
+    if (method === "POST" && path === "/push/unsubscribe") {
+      const b = await body(request);
+      await this.q("DELETE FROM social_push WHERE endpoint = ? AND uid = ?", str(b["endpoint"], 800), me.id).run();
+      return { ok: true };
+    }
+    // GET /notes: what a push was about (the service worker asks, then shows a notification)
+    if (method === "GET" && path === "/notes") {
+      const [msgs, reqs, notes] = await this.many(
+        this.q(`SELECT m.id, m.kind, m.body, m.created, u.name AS sender_name, m.sender FROM social_messages m
+            JOIN social_users u ON u.id = m.sender WHERE m.recipient = ? AND m.seen = 0 ORDER BY m.id DESC LIMIT 3`, me.id),
+        this.q(`SELECT u.name, f.created FROM social_friends f JOIN social_users u ON u.id = f.a
+            WHERE f.b = ? AND f.state = 'pending' ORDER BY f.created DESC LIMIT 1`, me.id),
+        this.q("SELECT id, kind, body, created FROM social_notes WHERE uid = ? AND created > ? ORDER BY id DESC LIMIT 3", me.id, now - 3_600_000));
+      return { messages: msgs ?? [], request: reqs?.[0] ?? null, notes: notes ?? [], now };
+    }
+    // POST /nudge {code, room, san}: tell a daily-game opponent it's their move
+    if (method === "POST" && path === "/nudge") {
+      const b = await body(request);
+      const code = str(b["code"], 8).toUpperCase(), room = str(b["room"], 64), san = cleanText(b["san"], 10);
+      if (!ROOM_RE.test(room)) throw new HttpError(400, "bad room");
+      const them = await this.q("SELECT id FROM social_users WHERE code = ?", code).first<{ id: string }>();
+      if (!them || them.id === me.id) return { ok: false };
+      const recent = await this.q("SELECT COUNT(*) AS n FROM social_notes WHERE uid = ? AND created > ? AND body LIKE ?", them.id, now - 60_000, `%"room":"${room}"%`).first<{ n: number }>();
+      if (recent && recent.n > 0) return { ok: true };
+      await this.many(
+        this.q("INSERT INTO social_notes (uid, kind, body, created) VALUES (?, 'move', ?, ?)", them.id, JSON.stringify({ room, from: me.name, san }), now),
+        this.q("DELETE FROM social_notes WHERE uid = ? AND created < ?", them.id, now - 86_400_000));
+      this.pushTo(them.id);
+      return { ok: true };
+    }
+
     // POST /heartbeat {status, name, avatar, ratings, games} -> {me, unread, requests}
     if (method === "POST" && path === "/heartbeat") {
       const b = await body(request);
@@ -437,6 +542,7 @@ export class Social {
       // they already asked us: accept straight away
       if (theirs?.[0]?.["state"] === "pending") { await this.accept(them.id, me.id, now); return { status: "friends" }; }
       await this.q("INSERT OR IGNORE INTO social_friends (a, b, state, created) VALUES (?, ?, 'pending', ?)", me.id, them.id, now).run();
+      this.pushTo(them.id);
       return { status: "pending", user: publicUser(them, now) };
     }
     if (method === "POST" && path === "/friends/respond") {
@@ -504,6 +610,7 @@ export class Social {
         if (!text) throw new HttpError(400, "empty message");
       }
       await this.q("INSERT INTO social_messages (sender, recipient, kind, body, created) VALUES (?, ?, ?, ?, ?)", me.id, to, kind, text, now).run();
+      this.pushTo(to);
       return { ok: true };
     }
 
@@ -711,6 +818,8 @@ export class Social {
         this.q("DELETE FROM social_posts WHERE uid = ?", me.id),
         this.q("DELETE FROM social_topics WHERE uid = ?", me.id),
         this.q("DELETE FROM social_reports WHERE uid = ?", me.id),
+        this.q("DELETE FROM social_push WHERE uid = ?", me.id),
+        this.q("DELETE FROM social_notes WHERE uid = ?", me.id),
         this.q("DELETE FROM social_battles WHERE a_uid = ? AND b_uid IS NULL", me.id),
         this.q("DELETE FROM social_users WHERE id = ?", me.id));
       for (const c of clubs ?? []) {
