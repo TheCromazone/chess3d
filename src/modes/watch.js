@@ -4,7 +4,7 @@ import { Chess } from "chess.js";
 import { MoveTree, kingSquare, capturedFromFen } from "../core/tree.js";
 import { h, icon, timeAgo } from "../ui/dom.js";
 import { MoveList, toast, openModal } from "../ui/components.js";
-import { getFeeds } from "../net/social.js";
+import { getFeeds, getDigest } from "../net/social.js";
 import { BOTS, botMove, botThinkDelay } from "../bots.js";
 import { playEngine } from "../core/engines.js";
 import { moveSound } from "../audio.js";
@@ -17,6 +17,29 @@ export async function loadClassics() {
   const res = await fetch("./data/classics.json");
   classicsCache = await res.json();
   return classicsCache;
+}
+
+// The week's results on this site, from the server's digest. Players' names are their own words, so
+// they're marked not to be translated; labels around them are separate text the interface translates.
+function weekReport(d) {
+  const name = (n) => h("span", { "data-no-i18n": "" }, n);
+  const sep = " · ";
+  const row = (ic, title, ...line) => h("div.row", h("span.ri", icon(ic, 20)), h("span.rt", h("b", title), h("small", ...line)));
+  const rows = [];
+  for (const a of d.arenas) rows.push(row("trophy", a.name, "Winner", ": ", name(a.winner), sep, "Points", ": ", String(a.score), sep, "Players", ": ", String(a.players)));
+  for (const t of d.swiss) rows.push(row("trophy", t.name, "Winner", ": ", name(t.winner), sep, "Points", ": ", String(t.score), sep, "Players", ": ", String(t.players)));
+  for (const t of d.dailyTournaments) rows.push(row("calendar", name(t.name), "Winner", ": ", name(t.winner), sep, "Players", ": ", String(t.players)));
+  for (const m of d.clubMatches) rows.push(row("users", h("span", name(m.a), ` ${m.aScore}–${m.bScore} `, name(m.b)), "Team matches"));
+  if (d.league.top.length) rows.push(row("star", "League", ...d.league.top.flatMap((p, i) => [i ? sep : "", name(p.name), " → ", p.tier]),
+    d.league.promoted > d.league.top.length ? `${sep}+${d.league.promoted - d.league.top.length}` : ""));
+  if (d.rush.length) rows.push(row("bolt", "Puzzle Rush", "Best (5 min)", ": ", ...d.rush.flatMap((r, i) => [i ? sep : "", name(r.name), ` ${r.score}`])));
+  return [
+    h("div.stat-grid",
+      h("div.stat", h("div.lbl", icon("grid", 16), "Rated games"), h("div.val", String(d.gamesTotal))),
+      h("div.stat", h("div.lbl", icon("puzzle", 16), "Puzzles solved"), h("div.val", String(d.puzzles))),
+      h("div.stat", h("div.lbl", icon("users", 16), "New players"), h("div.val", String(d.newPlayers)))),
+    rows.length ? h("div.rows", { style: { marginTop: "10px" } }, ...rows) : h("p.note", { style: { marginTop: "10px" } }, "Nothing has finished this week yet."),
+  ];
 }
 
 export class WatchPage {
@@ -32,14 +55,18 @@ export class WatchPage {
     const liveBox = h("div.stream-row", h("p.note", "Looking for live streams…"));
     const videoBox = h("div.video-grid");
     const newsBox = h("div.rows.news-list");
+    const weekBox = h("div", h("p.note", "Loading…"));
     page.append(
       h("section", h("h2", "Live games"), h("div.grid-cards", top, tv)),
       h("section", h("h2", "Events"), eventsSection(this.app)),
       h("section", h("h2", "Live now"), liveBox),
       h("section", h("h2", "Videos"), videoBox),
+      h("section", h("h2", "This week on Chess 3D"), weekBox),
       h("section", h("h2", "News"), newsBox),
       h("section", h("h2", "Classic games"), list));
     this.app.pageMode(page);
+    getDigest().then((d) => { if (!this.dead) weekBox.replaceChildren(...weekReport(d)); })
+      .catch(() => { if (!this.dead) weekBox.replaceChildren(h("p.note", "Couldn't load this week's results right now.")); });
     getFeeds().then((d) => {
       if (this.dead) return;
       liveBox.replaceChildren(...(d.streamers.length ? d.streamers.map((s) => h("a.stream", { href: s.url, target: "_blank", rel: "noopener" },

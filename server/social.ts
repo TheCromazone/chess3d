@@ -203,6 +203,8 @@ function pushHostOk(endpoint: string): boolean {
   try { const u = new URL(endpoint); return u.protocol === "https:" && PUSH_HOSTS.some((re) => re.test(u.hostname)); } catch { return false; }
 }
 
+// the weekly digest of the site's own results is recomputed at most this often
+const DIGEST_MS = 10 * 60_000;
 // News, videos and live streamers for the Watch page: public feeds, refreshed every 15 minutes
 const FEEDS_MS = 15 * 60_000;
 const NEWS_FEEDS = [
@@ -615,6 +617,67 @@ export class Social {
     if (this.hooks.waitUntil) this.hooks.waitUntil(send); else send.catch(() => {});
   }
 
+  // The week's results, written up from the server's own tables: rated games and puzzles, new players,
+  // tournament and club-match winners, league promotions and the best Puzzle Rush runs. Cached briefly.
+  private async digest(now: number): Promise<unknown> {
+    const row = await this.q("SELECT v FROM social_config WHERE k = 'digest'").first<{ v: string }>();
+    const cached = row ? (JSON.parse(row.v) as { at: number }) : null;
+    if (cached && now - cached.at < DIGEST_MS) return cached;
+    const since = now - WEEK_MS, lastWeek = leagueWeek(now) - 1;
+    // last week's divisions are settled lazily; settle any nobody has looked at yet, so the promotions are in
+    const unsettled = await this.q("SELECT id, tier FROM social_league_divs WHERE week <= ? AND settled = 0 LIMIT 20", lastWeek).all<{ id: string; tier: number }>();
+    for (const d of unsettled.results) await this.leagueSettle(d.id, d.tier);
+    const [games, puzzles, joined, arenas, swiss, swissPlayers, dtours, matches, promoted, promotions, rush] = await this.many(
+      this.q("SELECT cat, COUNT(*) AS n FROM social_rated_games WHERE created > ? GROUP BY cat", since),
+      this.q("SELECT COUNT(*) AS n, SUM(solved) AS solved FROM social_puzzle_attempts WHERE created > ?", since),
+      this.q("SELECT COUNT(*) AS n FROM social_users WHERE created > ?", since),
+      this.q(`SELECT id, name, tc, ends, winner, score, players FROM (
+          SELECT a.id, a.name, a.tc, a.ends, u.name AS winner, p.score, COUNT(*) OVER (PARTITION BY a.id) AS players,
+            ROW_NUMBER() OVER (PARTITION BY a.id ORDER BY p.score DESC, p.wins DESC, p.joined) AS rk
+          FROM social_arenas a JOIN social_arena_players p ON p.arena = a.id JOIN social_users u ON u.id = p.uid
+          WHERE a.ends > ? AND a.ends <= ?) WHERE rk = 1 AND players >= 2 AND score > 0 ORDER BY ends DESC LIMIT 6`, since, now),
+      this.q("SELECT id, name, tc, starts FROM social_swiss WHERE status = 'done' AND starts > ? ORDER BY starts DESC LIMIT 4", since),
+      this.q(`SELECT p.sid, p.uid, p.score2, p.opps, u.name, u.r_blitz, u.r_rapid FROM social_swiss_players p JOIN social_swiss s ON s.id = p.sid
+          LEFT JOIN social_users u ON u.id = p.uid WHERE s.status = 'done' AND s.starts > ?`, since),
+      this.q(`SELECT t.id, t.name, t.tc, u.name AS winner, (SELECT COUNT(*) FROM social_dtour_players q WHERE q.tid = t.id) AS players
+          FROM social_dtours t JOIN social_users u ON u.id = t.winner WHERE t.status = 'done' AND t.created > ? ORDER BY t.created DESC LIMIT 3`, now - 4 * WEEK_MS),
+      this.q(`SELECT a.name AS a_name, b.name AS b_name, m.a_score2, m.b_score2, m.boards FROM social_club_matches m
+          JOIN social_clubs a ON a.id = m.a_club JOIN social_clubs b ON b.id = m.b_club
+          WHERE m.status = 'done' AND m.starts > ? ORDER BY m.starts DESC LIMIT 3`, now - 4 * WEEK_MS),
+      this.q("SELECT COUNT(*) AS n FROM social_league_entries WHERE week = ? AND promoted = 1", lastWeek),
+      this.q(`SELECT u.name, e.tier FROM social_league_entries e JOIN social_users u ON u.id = e.uid
+          WHERE e.week = ? AND e.promoted = 1 ORDER BY e.tier DESC, e.points DESC LIMIT 3`, lastWeek),
+      this.q(`SELECT u.name, r.score FROM social_rush_runs r JOIN social_users u ON u.id = r.uid
+          WHERE r.mode = '5' AND r.started > ? AND r.score > 0 ORDER BY r.score DESC, r.started LIMIT 3`, since));
+    const rows = (r: unknown) => (r ?? []) as Record<string, unknown>[];
+    const byCat: Record<string, number> = {};
+    for (const g of rows(games)) byCat[String(g["cat"])] = Number(g["n"]);
+    // Swiss winners: most points, then Buchholz (the opponents' points), as in the standings
+    const swissWon = rows(swiss).map((t) => {
+      const list = rows(swissPlayers).filter((p) => p["sid"] === t["id"]);
+      const pts = new Map(list.map((p) => [String(p["uid"]), Number(p["score2"]) / 2]));
+      const ranked = list.map((p) => ({
+        name: String(p["name"] ?? "Deleted player"), score: Number(p["score2"]) / 2,
+        buchholz: String(p["opps"] || "").split(",").filter(Boolean).reduce((s, o) => s + (pts.get(o) ?? 0), 0),
+        rating: Number(t["tc"] === "10+0" ? p["r_rapid"] : p["r_blitz"]) || 0,
+      })).sort((a, b) => b.score - a.score || b.buchholz - a.buchholz || b.rating - a.rating);
+      return ranked[0] && ranked.length >= 2 ? { name: t["name"], tc: t["tc"], winner: ranked[0].name, score: ranked[0].score, players: ranked.length } : null;
+    }).filter(Boolean);
+    const out = {
+      at: now, since,
+      games: byCat, gamesTotal: Object.values(byCat).reduce((s, n) => s + n, 0),
+      puzzles: Number(rows(puzzles)[0]?.["solved"] ?? 0), newPlayers: Number(rows(joined)[0]?.["n"] ?? 0),
+      arenas: rows(arenas).map((a) => ({ name: a["name"], tc: a["tc"], winner: a["winner"], score: Number(a["score"]), players: Number(a["players"]) })),
+      swiss: swissWon,
+      dailyTournaments: rows(dtours).map((t) => ({ name: t["name"], tc: t["tc"], winner: t["winner"], players: Number(t["players"]) })),
+      clubMatches: rows(matches).map((m) => ({ a: m["a_name"], b: m["b_name"], aScore: Number(m["a_score2"]) / 2, bScore: Number(m["b_score2"]) / 2 })),
+      league: { promoted: Number(rows(promoted)[0]?.["n"] ?? 0), top: rows(promotions).map((p) => ({ name: p["name"], tier: LEAGUE_TIERS[Math.min(Number(p["tier"]) + 1, LEAGUE_TIERS.length - 1)] })) },
+      rush: rows(rush).map((r) => ({ name: r["name"], score: Number(r["score"]) })),
+    };
+    await this.q("INSERT OR REPLACE INTO social_config (k, v) VALUES ('digest', ?)", JSON.stringify(out)).run();
+    return out;
+  }
+
   private async feeds(now: number): Promise<unknown> {
     const row = await this.q("SELECT v FROM social_config WHERE k = 'feeds'").first<{ v: string }>();
     const cached = row ? (JSON.parse(row.v) as { at: number }) : null;
@@ -758,6 +821,8 @@ export class Social {
 
     // GET /feeds: news, videos and live streamers (public, no key needed)
     if (method === "GET" && path === "/feeds") return this.feeds(now);
+    // GET /digest: this week on Chess 3D, from the server's own results (public)
+    if (method === "GET" && path === "/digest") return this.digest(now);
 
     // POST /link/claim {code}: sign this device in to a profile with a code made on another device
     if (method === "POST" && path === "/link/claim") {

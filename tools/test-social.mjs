@@ -8,7 +8,7 @@ import { join } from "node:path";
 const out = await build({ entryPoints: [new URL("../server/social.ts", import.meta.url).pathname], bundle: true, format: "esm", platform: "neutral", write: false });
 const dir = mkdtempSync(join(tmpdir(), "social-"));
 writeFileSync(join(dir, "social.mjs"), out.outputFiles[0].text);
-const { Social, swissPairings } = await import(join(dir, "social.mjs"));
+const { Social, swissPairings, leagueWeek } = await import(join(dir, "social.mjs"));
 // Vote Chess plays moves into rooms: the tests referee them with the real rules (dist/logic.js)
 const L = await import(new URL("../dist/logic.js", import.meta.url).href);
 const actRooms = new Map();
@@ -889,6 +889,64 @@ ok(again && again.id !== o1.id && !again.opponent, "after a battle ends, searchi
   ok(!(await call("GET", "/dailytours", { secret: watcher.secret })).data.tournaments.some((t) => t.id === tid), "a tournament whose players have all left the site isn't listed");
   await call("POST", "/delete", { secret: watcher.secret });
   clock = saved;
+}
+
+// ---- the weekly digest: the server's own results, written up for the Watch page ----
+{
+  const ps = [];
+  for (const [i, name] of ["DgA", "DgB", "DgC"].entries()) ps.push((await call("POST", "/register", { body: { name }, ip: "10.4.4." + i })).data);
+  const [pa, pb, pc] = ps;
+  const run = (sql, ...args) => sqlite.prepare(sql).run(...args);
+  const H = 3_600_000;
+  // an arena two players finished, and one with a lone player (not news)
+  run("INSERT INTO social_arenas (id, name, tc, cat, starts, ends) VALUES ('ar-dg', 'Blitz Arena', '3+0', 'blitz', ?, ?)", clock - 3 * H, clock - 2 * H);
+  run("INSERT INTO social_arena_players (arena, uid, joined, score, games, wins) VALUES ('ar-dg', ?, ?, 7, 4, 3)", pa.id, clock - 3 * H);
+  run("INSERT INTO social_arena_players (arena, uid, joined, score, games, wins) VALUES ('ar-dg', ?, ?, 4, 4, 2)", pb.id, clock - 3 * H);
+  run("INSERT INTO social_arenas (id, name, tc, cat, starts, ends) VALUES ('ar-dg1', 'Bullet Arena', '1+0', 'bullet', ?, ?)", clock - 5 * H, clock - 4 * H);
+  run("INSERT INTO social_arena_players (arena, uid, joined, score, games, wins) VALUES ('ar-dg1', ?, ?, 5, 2, 2)", pc.id, clock - 5 * H);
+  // a finished Swiss: A and B tie on points, A has the better Buchholz
+  run("INSERT INTO social_swiss (id, name, tc, cat, rounds, starts, status, round) VALUES ('sw-dg', 'Blitz Swiss', '3+2', 'blitz', 2, ?, 'done', 2)", clock - 6 * H);
+  run("INSERT INTO social_swiss_players (sid, uid, joined, score2, opps) VALUES ('sw-dg', ?, ?, 2, ?)", pa.id, clock - 6 * H, pb.id + "," + pc.id);
+  run("INSERT INTO social_swiss_players (sid, uid, joined, score2, opps) VALUES ('sw-dg', ?, ?, 2, ?)", pb.id, clock - 6 * H, pa.id);
+  run("INSERT INTO social_swiss_players (sid, uid, joined, score2, opps) VALUES ('sw-dg', ?, ?, 1, ?)", pc.id, clock - 6 * H, pa.id);
+  // rated games, puzzles and Rush runs this week (and one from before)
+  for (const [room, cat, ago] of [["dg-1", "blitz", H], ["dg-2", "blitz", 2 * H], ["dg-3", "rapid", 3 * H], ["dg-old", "blitz", 9 * 86_400_000]]) run("INSERT INTO social_rated_games (room, cat, created, token) VALUES (?, ?, ?, 't')", room, cat, clock - ago);
+  for (const [pz, solved] of [["dgp1", 1], ["dgp2", 1], ["dgp3", 0]]) run("INSERT INTO social_puzzle_attempts (uid, pid, created, solved, token) VALUES (?, ?, ?, ?, 't')", pa.id, pz, clock - H, solved);
+  for (const [id, uid, mode, score, ago] of [["rdg1", pa.id, "5", 18, H], ["rdg2", pb.id, "5", 22, H], ["rdg3", pc.id, "3", 30, H], ["rdg4", pc.id, "5", 40, 8 * 86_400_000]]) run("INSERT INTO social_rush_runs (id, uid, mode, started, score) VALUES (?, ?, ?, ?, ?)", id, uid, mode, clock - ago, score);
+  // last week's Bronze division, not yet settled: A tops it
+  const lastWeek = leagueWeek(clock) - 1;
+  run("INSERT INTO social_league_divs (id, week, tier, created) VALUES ('dg-div', ?, 2, ?)", lastWeek, clock - 8 * 86_400_000);
+  run("INSERT INTO social_league_entries (week, uid, div, tier, points, games, reached) VALUES (?, ?, 'dg-div', 2, 30, 5, 1)", lastWeek, pa.id);
+  run("INSERT INTO social_league_entries (week, uid, div, tier, points, games, reached) VALUES (?, ?, 'dg-div', 2, 10, 2, 2)", lastWeek, pb.id);
+  // a finished daily tournament and a club match
+  run("INSERT INTO social_dtours (id, name, owner, tc, size, status, round, created, starts, winner) VALUES ('dt-dg', 'Digest Cup', ?, '3', 4, 'done', 2, ?, ?, ?)", pa.id, clock - 86_400_000, clock - 86_400_000, pc.id);
+  for (const p of ps) run("INSERT INTO social_dtour_players (tid, uid, pid, joined) VALUES ('dt-dg', ?, 'x', ?)", p.id, clock - 86_400_000);
+  run("INSERT INTO social_clubs (id, code, name, owner, created) VALUES ('cdg1', 'DGCODE01', 'Rooks United', ?, ?)", pa.id, clock);
+  run("INSERT INTO social_clubs (id, code, name, owner, created) VALUES ('cdg2', 'DGCODE02', 'Knight Owls', ?, ?)", pb.id, clock);
+  run("INSERT INTO social_club_matches (id, a_club, b_club, tc, boards, status, created, starts, a_score2, b_score2) VALUES ('cm-dg', 'cdg1', 'cdg2', '3', 2, 'done', ?, ?, 5, 3)", clock - 86_400_000, clock - 86_400_000);
+
+  const r = await call("GET", "/digest");
+  const d = r.data;
+  ok(r.status === 200, "the digest is public: no key needed");
+  ok(d.gamesTotal >= 3 && d.games.blitz >= 2 && d.games.rapid >= 1, "it counts this week's server-rated games by category, not older ones");
+  ok(d.puzzles >= 2, "and puzzles solved");
+  ok(d.newPlayers >= 3, "and players who joined this week");
+  const ar = d.arenas.find((x) => x.winner === "DgA");
+  ok(ar && ar.score === 7 && ar.players === 2 && ar.name === "Blitz Arena", "an arena's winner, score and field");
+  ok(!d.arenas.some((x) => x.winner === "DgC"), "an arena with a single player isn't news");
+  ok(d.swiss.some((x) => x.winner === "DgA" && x.score === 1 && x.players === 3), "a Swiss tie goes to the better Buchholz");
+  ok(d.rush[0]?.name === "DgB" && d.rush[0].score === 22 && !d.rush.some((x) => x.score === 30 || x.score === 40), "the week's best 5-minute Rush runs only");
+  ok(d.league.top.some((x) => x.name === "DgA" && x.tier === "Silver") && !d.league.top.some((x) => x.name === "DgB"), "last week's divisions are settled for it: the top of Bronze moves up to Silver");
+  ok(d.dailyTournaments.some((x) => x.name === "Digest Cup" && x.winner === "DgC" && x.players === 3), "a daily tournament's winner");
+  ok(d.clubMatches.some((x) => x.a === "Rooks United" && x.b === "Knight Owls" && x.aScore === 2.5 && x.bScore === 1.5), "a club match's score");
+  run("INSERT INTO social_rush_runs (id, uid, mode, started, score) VALUES ('rdg5', ?, '5', ?, 50)", pa.id, clock - H);
+  ok((await call("GET", "/digest")).data.at === d.at, "it's cached for a few minutes");
+  clock += 11 * 60_000;
+  ok((await call("GET", "/digest")).data.rush[0]?.score === 50, "then recomputed");
+  for (const p of ps) await call("POST", "/delete", { secret: p.secret });
+  clock += 11 * 60_000;
+  const after = (await call("GET", "/digest")).data;
+  ok(!after.arenas.some((x) => x.winner === "DgA") && !after.rush.some((x) => x.name === "DgA"), "deleted players drop out of it");
 }
 
 console.log(failures === 0 ? "\nALL SOCIAL TESTS PASSED" : `\n${failures} FAILURES`);

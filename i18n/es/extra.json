@@ -91,5 +91,14 @@
  "Your move in 1 game": "Te toca en 1 partida",
  "1 day per move": "1 día por jugada",
  "1 step": "1 paso",
- "1 piece left": "Queda 1 pieza"
+ "1 piece left": "Queda 1 pieza",
+ "This week on Chess 3D": "Esta semana en Chess 3D",
+ "Rated games": "Partidas con rating",
+ "New players": "Jugadores nuevos",
+ "Nothing has finished this week yet.": "Todavía no ha terminado nada esta semana.",
+ "Couldn't load this week's results right now.": "Ahora mismo no se pueden cargar los resultados de esta semana.",
+ "Blitz Arena": "Arena blitz",
+ "Bullet Arena": "Arena bullet",
+ "Blitz Swiss": "Suizo blitz",
+ "Rapid Swiss": "Suizo rápido"
 }

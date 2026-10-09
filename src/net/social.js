@@ -18,6 +18,13 @@ export async function getFeeds() {
   return res.json();
 }
 
+// this week on Chess 3D: rated games, winners and promotions, written up by the server (public)
+export async function getDigest() {
+  const res = await fetch(BASE + "/digest", { cache: "no-store" });
+  if (!res.ok) throw new SocialError(res.status, "Couldn't load this week's results right now.");
+  return res.json();
+}
+
 export class SocialError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }

@@ -86,5 +86,14 @@
  "Win as Black · ★★★": "Gagnez avec les Noirs · ★★★",
  "Draw as Black · ★": "Nulle avec les Noirs · ★",
  "Draw as Black · ★★": "Nulle avec les Noirs · ★★",
- "Draw as Black · ★★★": "Nulle avec les Noirs · ★★★"
+ "Draw as Black · ★★★": "Nulle avec les Noirs · ★★★",
+ "This week on Chess 3D": "Cette semaine sur Chess 3D",
+ "Rated games": "Parties classées",
+ "New players": "Nouveaux joueurs",
+ "Nothing has finished this week yet.": "Rien ne s'est encore terminé cette semaine.",
+ "Couldn't load this week's results right now.": "Impossible de charger les résultats de la semaine pour l'instant.",
+ "Blitz Arena": "Arène blitz",
+ "Bullet Arena": "Arène bullet",
+ "Blitz Swiss": "Suisse blitz",
+ "Rapid Swiss": "Suisse rapide"
 }
