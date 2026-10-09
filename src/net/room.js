@@ -126,6 +126,7 @@ export function findMatch(tcKey, playerId, onProgress = () => {}, { prefix = "po
     const c = new RoomClient(room, playerId, {
       onState: (s) => {
         if (cancelled) { c.close(); return; }
+        if (c.calledOff) return;    // see below: leaving shortly
         // superseded by a newer sweep: leave, so we never hold a second seat somewhere
         if (id !== sweepId && !settled) { c.close(); finish({ next: true }); return; }
         const seated = s.seats.includes(playerId);
@@ -136,11 +137,16 @@ export function findMatch(tcKey, playerId, onProgress = () => {}, { prefix = "po
           return;
         }
         if (s.status === "playing") {
-          // a player you've blocked sat down: call the game off before a move and look elsewhere
+          // a player you've blocked sat down: call the game off before a move and look elsewhere. Wait a
+          // moment first: they search again straight away and settle in a room of their own, which the
+          // rest of this sweep then steps around (otherwise you keep meeting and use up the pool's rooms)
           if (avoid(s.seats)) {
-            try { c.action({ t: "abort" }); } catch { /* the room drops us anyway */ }
-            setTimeout(() => c.close(), 400);
-            finish({ next: true });
+            if (!settled) {
+              c.calledOff = true;
+              try { c.action({ t: "abort" }); } catch { /* the room drops us anyway */ }
+              setTimeout(() => c.close(), 400);
+              setTimeout(() => finish({ next: true }), 3000);
+            }
             return;
           }
           if (s.connected < seats) {
