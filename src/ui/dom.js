@@ -37,7 +37,7 @@ function append(el, kids) {
 
 export function icon(name, size = 20) {
   const span = document.createElement("span");
-  span.className = "ic";
+  span.className = "ic ic-" + name;
   span.innerHTML = svg(name, size);
   return span;
 }
