@@ -721,6 +721,9 @@ ok(again && again.id !== o1.id && !again.opponent, "after a battle ends, searchi
   clock += 3 * 86_400_000;
   ok((await call("GET", `/dailytours/${t2}`, { secret: ps[1].secret })).data.tournament.status === "cancelled", "with fewer than 3 players when sign-ups close, it's cancelled");
   for (const u of ps) await call("POST", "/delete", { secret: u.secret });
+  const watcher = (await call("POST", "/register", { body: { name: "DtWatch" }, ip: "10.3.3.9" })).data;
+  ok(!(await call("GET", "/dailytours", { secret: watcher.secret })).data.tournaments.some((t) => t.id === tid), "a tournament whose players have all left the site isn't listed");
+  await call("POST", "/delete", { secret: watcher.secret });
   clock = saved;
 }
 

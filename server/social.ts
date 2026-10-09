@@ -1377,7 +1377,8 @@ export class Social {
           (SELECT COUNT(*) FROM social_dtour_players p WHERE p.tid = t.id) AS players,
           EXISTS (SELECT 1 FROM social_dtour_players p WHERE p.tid = t.id AND p.uid = ?) AS joined
           FROM social_dtours t LEFT JOIN social_users w ON w.id = t.winner
-          WHERE t.status IN ('signup', 'running') OR t.created > ?
+          WHERE (t.status IN ('signup', 'running') OR t.created > ?)
+            AND EXISTS (SELECT 1 FROM social_dtour_players p JOIN social_users u ON u.id = p.uid WHERE p.tid = t.id)
           ORDER BY CASE t.status WHEN 'signup' THEN 0 WHEN 'running' THEN 1 ELSE 2 END, t.created DESC LIMIT 40`, me.id, now - 30 * 86_400_000).all();
       return { tournaments: r.results, now };
     }
