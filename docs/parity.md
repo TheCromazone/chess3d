@@ -110,7 +110,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Challenges | ✅ | challenge a friend to a live game (any time control) or a daily game; pop-up notice with Accept / Decline wherever they are in the app; challenge friends from the invite lobby |
 | Direct messages | ✅ | threads with friends, unread counts on the nav, notices for new messages |
 | Clubs | ✅ | create (public or invite-only), join by code or from the public list, club chat, member list with presence |
-| Leaderboards | ✅ | global top 50 per category (blitz, bullet, rapid, puzzles, bots) with your rank; ratings are self-reported by devices and labelled so; bot ladder on the profile |
+| Leaderboards | ✅ | global top 50 per category (blitz, bullet, rapid, puzzles, bots, Puzzle Rush) with your rank, or just your friends; ratings are self-reported by devices and labelled so; bot ladder on the profile |
 | Accounts | ✅ | passwordless by the user's choice: your profile key is the account, with a unique name; sign in on other devices with a one-time code or your recovery key; profile, ratings, settings and games back up to the cloud and follow you; sign out of this or all other devices; delete the profile |
 | Data portability | ✅ | automatic cloud backup with a profile, plus export / import of a backup file |
 
@@ -127,3 +127,16 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Keyboard shortcuts sheet | ✅ | press ? |
 | Mobile app | ✅ | installable PWA, works offline for bots / puzzles / analysis |
 | Accessibility | ✅ | labelled controls, focus rings, reduced motion, keyboard play on the 2D board, spoken moves for screen readers |
+
+## Still different from chess.com
+
+Everything above is built, deployed and verified with two live players. What chess.com has that
+this doesn't, and why:
+
+- **Notifications when the site is closed.** Challenges, messages, friend requests and "your move"
+  in daily games pop up while the app is open (in any tab); there's no web push yet.
+- **Editorial and paid content:** news, articles, video lessons, streamers, the coach marketplace
+  and membership tiers. These are content and business features, not software ones.
+- **More variants:** Crazyhouse, Bughouse, 4-player and Duck chess. Stockfish doesn't play them, so
+  they'd have no bots, review or analysis here.
+
