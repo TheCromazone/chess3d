@@ -188,5 +188,29 @@ ok(v.outcome === "void" && row("Cid").games === 1 && row("Dee").state === "idle"
 const notYet = (await call("POST", `/arenas/${later.id}/pair`, { secret: ann.secret, body: { pid: pidA } }));
 ok(notYet.status === 403 || notYet.data.running === false, "an arena that hasn't started doesn't pair");
 
+// puzzle battles against real players
+let fa = (await call("POST", "/battles/find", { secret: ann.secret })).data.battle;
+ok(fa && !fa.opponent && !fa.starts, "the first searcher opens a battle and waits");
+let fc = (await call("POST", "/battles/find", { secret: cid.secret })).data.battle;
+ok(fc && fc.id === fa.id && fc.opponent.name === "Ann" && fc.starts > clock, "the next searcher joins it, with a short countdown");
+fa = (await call("POST", "/battles/find", { secret: ann.secret })).data.battle;
+ok(fa.id === fc.id && fa.opponent.name === "Cid" && fa.seed === fc.seed, "both get the same puzzles");
+clock = fa.starts + 1000;
+await call("POST", `/battles/${fa.id}/progress`, { secret: ann.secret, body: { score: 4, strikes: 1 } });
+await call("POST", `/battles/${fa.id}/progress`, { secret: ann.secret, body: { score: 2, strikes: 0 } });
+const prog = (await call("POST", `/battles/${fa.id}/progress`, { secret: cid.secret, body: { score: 3, strikes: 3, done: true } })).data.battle;
+ok(prog.opponent.score === 4 && prog.opponent.strikes === 1 && prog.you.done, "progress is shared and never goes backwards");
+ok((await call("POST", `/battles/${fa.id}/progress`, { secret: dee.secret, body: { score: 99 } })).status === 404, "outsiders can't touch a battle");
+// two searchers who each opened a battle still meet: the older battle wins
+clock += BATTLE_GAP();
+const o1 = (await call("POST", "/battles/find", { secret: ann.secret })).data.battle;
+clock += 100;
+const o2 = (await call("POST", "/battles/find", { secret: dee.secret })).data.battle;
+ok(o2.opponent && o2.id === o1.id, "a second searcher joins the open battle");
+function BATTLE_GAP() { return 5 * 60_000; }
+clock += 4 * 60_000;
+const again = (await call("POST", "/battles/find", { secret: ann.secret })).data.battle;
+ok(again && again.id !== o1.id && !again.opponent, "after a battle ends, searching opens a new one");
+
 console.log(failures === 0 ? "\nALL SOCIAL TESTS PASSED" : `\n${failures} FAILURES`);
 process.exit(failures ? 1 : 0);

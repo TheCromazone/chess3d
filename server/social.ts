@@ -70,7 +70,17 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS social_arena_games (
      room TEXT PRIMARY KEY, arena TEXT NOT NULL, a_uid TEXT NOT NULL, a_pid TEXT NOT NULL, b_uid TEXT NOT NULL, b_pid TEXT NOT NULL,
      created INTEGER NOT NULL, outcome TEXT, token TEXT)`,
+  `CREATE TABLE IF NOT EXISTS social_battles (
+     id TEXT PRIMARY KEY, seed INTEGER NOT NULL, created INTEGER NOT NULL, starts INTEGER NOT NULL DEFAULT 0,
+     a_uid TEXT NOT NULL, a_score INTEGER NOT NULL DEFAULT 0, a_strikes INTEGER NOT NULL DEFAULT 0, a_done INTEGER NOT NULL DEFAULT 0, a_seen INTEGER NOT NULL DEFAULT 0,
+     b_uid TEXT, b_score INTEGER NOT NULL DEFAULT 0, b_strikes INTEGER NOT NULL DEFAULT 0, b_done INTEGER NOT NULL DEFAULT 0, b_seen INTEGER NOT NULL DEFAULT 0)`,
+  `CREATE INDEX IF NOT EXISTS social_battles_open ON social_battles (b_uid, a_seen)`,
 ];
+
+// Puzzle Battle: two players race through the same seeded puzzles for three minutes
+const BATTLE_MS = 180_000;
+const BATTLE_COUNTDOWN_MS = 5_000;
+const BATTLE_FRESH_MS = 8_000;
 
 // Live arenas run on a fixed schedule so there's always one to join: every 30 minutes a new one
 // starts (blitz on the hour, bullet on the half hour) and runs for 27 minutes.
@@ -492,8 +502,9 @@ export class Social {
       };
     }
 
-    // ---- live arenas ----
+    // ---- live arenas and puzzle battles ----
     if (seg0 === "arenas") return this.arenas(request, me, seg, now);
+    if (seg0 === "battles") return this.battles(request, me, seg, now);
 
     // GET /users/:id — a friend's or club-mate's public profile
     if (method === "GET" && seg0 === "users" && seg1) {
@@ -511,6 +522,7 @@ export class Social {
         this.q("DELETE FROM social_club_members WHERE member = ?", me.id),
         this.q("DELETE FROM social_club_bans WHERE member = ?", me.id),
         this.q("DELETE FROM social_arena_players WHERE uid = ?", me.id),
+        this.q("DELETE FROM social_battles WHERE a_uid = ? AND b_uid IS NULL", me.id),
         this.q("DELETE FROM social_users WHERE id = ?", me.id));
       for (const c of clubs ?? []) {
         const club = String(c["club"]);
@@ -668,6 +680,86 @@ export class Social {
       await this.many(...stmts);
       const final = await this.q("SELECT outcome FROM social_arena_games WHERE room = ?", room).first<{ outcome: string }>();
       return { outcome: final?.outcome ?? outcome, you: game.a_uid === me.id ? "a" : "b" };
+    }
+    throw new HttpError(404, "not found");
+  }
+
+  // Puzzle battles. Scores are reported by each player's device (like ratings), so a battle is a
+  // friendly race rather than a rated event.
+  private async battles(request: Request, me: UserRow, seg: string[], now: number): Promise<unknown> {
+    const method = request.method;
+    const view = (r: Record<string, unknown> | undefined) => {
+      if (!r) return null;
+      const mine = r["a_uid"] === me.id ? "a" : "b", theirs = mine === "a" ? "b" : "a";
+      let avatar: unknown = null;
+      try { avatar = r["opp_avatar"] ? JSON.parse(String(r["opp_avatar"])) : null; } catch { avatar = null; }
+      return {
+        id: r["id"], seed: r["seed"], starts: r["starts"] || null, ends: r["starts"] ? Number(r["starts"]) + BATTLE_MS : null,
+        you: { score: r[`${mine}_score`], strikes: r[`${mine}_strikes`], done: !!r[`${mine}_done`] },
+        opponent: r[`${theirs}_uid`] ? {
+          name: r["opp_name"], avatar, rating: r["opp_rating"],
+          score: r[`${theirs}_score`], strikes: r[`${theirs}_strikes`], done: !!r[`${theirs}_done`],
+          gone: now - Number(r[`${theirs}_seen`]) > 15_000,
+        } : null,
+        now,
+      };
+    };
+    const select = `SELECT b.*, u.name AS opp_name, u.avatar AS opp_avatar, u.r_puzzle AS opp_rating FROM social_battles b
+        LEFT JOIN social_users u ON u.id = CASE WHEN b.a_uid = ? THEN b.b_uid ELSE b.a_uid END`;
+
+    // POST /battles/find: keep an open battle alive, or join the oldest live open battle (the older
+    // of two open battles always wins, so two searchers can't both wait forever)
+    if (method === "POST" && seg[1] === "find") {
+      const fresh = now - BATTLE_FRESH_MS;
+      const id = "b_" + randomString(12).toLowerCase();
+      const seed = Math.floor(Math.random() * 1e9);
+      const out = await this.many(
+        this.q("UPDATE social_battles SET a_seen = ? WHERE a_uid = ? AND b_uid IS NULL", now, me.id),
+        this.q(`UPDATE social_battles SET b_uid = ?, b_seen = ?, starts = ? WHERE id = (
+            SELECT o.id FROM social_battles o WHERE o.b_uid IS NULL AND o.a_uid <> ? AND o.a_seen > ?
+              AND o.created < COALESCE((SELECT m.created FROM social_battles m WHERE m.a_uid = ? AND m.b_uid IS NULL), 9e15)
+            ORDER BY o.created LIMIT 1)`, me.id, now, now + BATTLE_COUNTDOWN_MS, me.id, fresh, me.id),
+        this.q(`DELETE FROM social_battles WHERE a_uid = ? AND b_uid IS NULL
+            AND EXISTS (SELECT 1 FROM social_battles WHERE b_uid = ? AND starts > ?)`, me.id, me.id, now),
+        this.q(`INSERT INTO social_battles (id, seed, created, a_uid, a_seen) SELECT ?, ?, ?, ?, ?
+            WHERE NOT EXISTS (SELECT 1 FROM social_battles WHERE (a_uid = ? AND b_uid IS NULL) OR (b_uid = ? AND starts > ?))`,
+          id, seed, now, me.id, now, me.id, me.id, now),
+        // your open battle, or a paired one that still has time on it (never a finished one)
+        this.q(`${select} WHERE (b.a_uid = ? OR b.b_uid = ?) AND (b.b_uid IS NULL OR b.starts > ?)
+            ORDER BY b.starts DESC LIMIT 1`, me.id, me.id, me.id, now - BATTLE_MS + 10_000));
+      return { battle: view(out[4]?.[0]) };
+    }
+
+    // POST /battles/cancel: stop searching
+    if (method === "POST" && seg[1] === "cancel") {
+      await this.q("DELETE FROM social_battles WHERE a_uid = ? AND b_uid IS NULL", me.id).run();
+      return { ok: true };
+    }
+
+    // POST /battles/:id/progress {score, strikes, done}: report yours, read theirs
+    if (method === "POST" && seg[2] === "progress") {
+      const b = await body(request);
+      const id = str(seg[1], 32);
+      const n = (v: unknown, max: number) => Math.max(0, Math.min(max, Math.round(Number(v) || 0)));
+      const score = n(b["score"], 200), strikes = n(b["strikes"], 3), done = b["done"] ? 1 : 0;
+      const out = await this.many(
+        this.q(`UPDATE social_battles SET
+              a_score = CASE WHEN a_uid = ? THEN MAX(a_score, ?) ELSE a_score END,
+              a_strikes = CASE WHEN a_uid = ? THEN MAX(a_strikes, ?) ELSE a_strikes END,
+              a_done = CASE WHEN a_uid = ? THEN MAX(a_done, ?) ELSE a_done END,
+              a_seen = CASE WHEN a_uid = ? THEN ? ELSE a_seen END,
+              b_score = CASE WHEN b_uid = ? THEN MAX(b_score, ?) ELSE b_score END,
+              b_strikes = CASE WHEN b_uid = ? THEN MAX(b_strikes, ?) ELSE b_strikes END,
+              b_done = CASE WHEN b_uid = ? THEN MAX(b_done, ?) ELSE b_done END,
+              b_seen = CASE WHEN b_uid = ? THEN ? ELSE b_seen END
+            WHERE id = ? AND (a_uid = ? OR b_uid = ?) AND starts > 0 AND ? < starts + ?`,
+          me.id, score, me.id, strikes, me.id, done, me.id, now,
+          me.id, score, me.id, strikes, me.id, done, me.id, now,
+          id, me.id, me.id, now, BATTLE_MS + 15_000),
+        this.q(`${select} WHERE b.id = ? AND (b.a_uid = ? OR b.b_uid = ?)`, me.id, id, me.id, me.id));
+      const battle = view(out[1]?.[0]);
+      if (!battle) throw new HttpError(404, "no such battle");
+      return { battle };
     }
     throw new HttpError(404, "not found");
   }
