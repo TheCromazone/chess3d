@@ -187,7 +187,11 @@ export class OnlineGame extends BaseGame {
     }
 
     // time control: the first seat (White) configures it from the room's agreed setting
-    if (v.phase !== "config") this.sentConfig = false;   // a later reset needs a fresh config
+    if (v.phase !== "config") {
+      this.sentConfig = false;   // a later reset needs a fresh config
+      // the "Starting…" note goes once the game is under way (live games clear notes on every update; daily ones don't)
+      if (this._startNote) { this._startNote = false; this._setNote(null); }
+    }
     if (v.phase === "config") {
       this.phase = "config";
       if (this.myColor === "w" && !this.sentConfig) {
@@ -200,6 +204,7 @@ export class OnlineGame extends BaseGame {
         this.client.action({ t: "config", tc: this.v2 || SERVER_TCS.includes(tc) ? tc : nearestTc(tc), ...swap });
       }
       this._setNote(this.myColor === "w" ? "Starting…" : "Waiting for White to start the clock…");
+      this._startNote = true;
       this.renderStrips();
       return;
     }

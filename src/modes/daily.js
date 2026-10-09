@@ -140,7 +140,7 @@ export class DailyScreen {
     const left = Math.min(...games.map((e) => (e.vacationLeft == null ? 14 : e.vacationLeft)));
     const m = openModal({
       title: "Take a vacation",
-      sub: `Your clock gets this many extra days in each of your ${games.length} timed daily game${games.length === 1 ? "" : "s"}, so you won't lose on time while you're away. Each game allows 14 vacation days; you have ${left} left in the game that's used the most.`,
+      sub: `Your clock gets this many extra days in each of your ${games.length} timed daily game${games.length === 1 ? "" : "s"}, so you won't lose on time while you're away. Each game allows 14 vacation days${left < 14 ? `, and one of yours has ${left} left` : ""}.`,
       body: [segmented([1, 3, 7, 14].map((d) => ({ value: d, label: `${d} day${d === 1 ? "" : "s"}` })), days, (v) => { days = v; }), go],
     });
   }

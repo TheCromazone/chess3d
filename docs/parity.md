@@ -26,7 +26,8 @@ free-for-all and teams, in four-seat rooms (rules v6), each with bots, pass and 
 Loop 9 took Chess960, King of the Hill and Three-check online, gave every variant rated games
 against random opponents with its own rating, leaderboard and replayable history, and added live
 events (top tournaments relayed move by move), video lessons, blogs and a coach directory. Loop
-10 added Swiss tournaments, club team matches, Vote Chess, the Vision trainer and Solo Chess.
+10 added Swiss tournaments, club team matches, Vote Chess, the Vision trainer and Solo Chess. Loop 11
+added Leagues, blocking players, and for daily games vacations and conditional moves (rules v8).
 Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don't have (alternative noted)
 
 ## Play
@@ -62,6 +63,9 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | 4-Player Chess | ✅ | free-for-all (points, grey armies, wandering kings, claim win) and teams; 14x14 board, three bots, pass and play, four friends online in a four-seat room, or four random players, rated by finishing place (rules v6) |
 | Variant ratings, leaderboards and history | ✅ | a rating per variant from rated games (from 1500), a leaderboard per variant, ratings on player profiles, and every variant game replayable from the profile |
 | Daily / correspondence chess | ✅ | 1, 3 or 7 days per move (or no limit), lose on time when a deadline passes (rules v3); persistent rooms, "your move" list with time left, daily challenges to friends |
+| Daily: conditional moves | ✅ | while it's your opponent's move, line up replies ("if Nf6, then e5", as deep as you like); the room plays your reply the moment they move, and they never see the plan (rules v8) |
+| Daily: vacation | ✅ | one button adds 1 to 14 days to your clock in every timed daily game, so you don't lose on time while away; your opponents see you're on vacation; up to 14 days per game |
+| Leagues | ✅ | eight tiers, Wood to Legend; weekly divisions of up to 50; trophies from rated games against random opponents (rapid 15, blitz 9, bullet 3 a win) and double in arenas, read by the server from the game room; the top of each division moves up every Sunday, nobody moves down |
 | Tournaments / arenas | ✅ | live arenas against real players every 30 minutes (blitz on the hour, bullet on the half hour): instant re-pairing, streak bonuses, live standings, results read by the server from the game room; Bot Arena for practice |
 | Swiss tournaments | ✅ | every two hours (Blitz 3+2 over 5 rounds, Rapid 10+0 over 4): pairing by score without rematches, balanced colours, byes, forfeits for no-shows, Buchholz tie-break; checked live with three players |
 
@@ -134,6 +138,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Challenges | ✅ | challenge a friend to a live game (any time control) or a daily game; pop-up notice with Accept / Decline wherever they are in the app; challenge friends from the invite lobby |
 | Direct messages | ✅ | threads with friends, unread counts on the nav, notices for new messages |
 | Notifications | ✅ | in-app notices while open; opt-in browser notifications when closed (web push) for challenges, messages, friend requests and daily moves; verified end to end in Chrome with the site closed |
+| Block players | ✅ | a blocked player can't add, message, challenge or nudge you; their forum posts, blog posts, coach listing, club chat and game chat are hidden from you; quick pairing steers clear of them |
 | Clubs | ✅ | create (public or invite-only), join by code or from the public list, club chat, member list with presence |
 | Club team matches | ✅ | owners challenge other clubs; members sign up; boards pair by rating and each pair plays two daily games, one with each colour; scores from the rooms; checked live |
 | Vote Chess | ✅ | two clubs play one daily game, each move the one most members voted for, played at the deadline or early by the owner; checked live, with the server seating both clubs in a real room |
