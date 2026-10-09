@@ -135,8 +135,8 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Direct messages | ✅ | threads with friends, unread counts on the nav, notices for new messages |
 | Notifications | ✅ | in-app notices while open; opt-in browser notifications when closed (web push) for challenges, messages, friend requests and daily moves; verified end to end in Chrome with the site closed |
 | Clubs | ✅ | create (public or invite-only), join by code or from the public list, club chat, member list with presence |
-| Club team matches | ✅ | owners challenge other clubs; members sign up; boards pair by rating and each pair plays two daily games, one with each colour; scores from the rooms |
-| Vote Chess | ✅ | two clubs play one daily game, each move the one most members voted for, played at the deadline or early by the owner |
+| Club team matches | ✅ | owners challenge other clubs; members sign up; boards pair by rating and each pair plays two daily games, one with each colour; scores from the rooms; checked live |
+| Vote Chess | ✅ | two clubs play one daily game, each move the one most members voted for, played at the deadline or early by the owner; checked live, with the server seating both clubs in a real room |
 | Leaderboards | ✅ | global top 50 per category (blitz, bullet, rapid, puzzles, bots, Puzzle Rush) with your rank, or just your friends; ratings are self-reported by devices and labelled so; bot ladder on the profile |
 | Accounts | ✅ | passwordless by the user's choice: your profile key is the account, with a unique name; sign in on other devices with a one-time code or your recovery key; profile, ratings, settings and games back up to the cloud and follow you; sign out of this or all other devices; delete the profile |
 | Data portability | ✅ | automatic cloud backup with a profile, plus export / import of a backup file |
