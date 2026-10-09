@@ -66,6 +66,19 @@ resignation (in free-for-all their king wanders on); `claim` ends a free-for-all
 21 points ahead with two left. The result names the `winner`, plus the full `ranking` (or the
 `winners` in Teams).
 
+Rules v7 lets `config` carry `swap: true`, so the player who sets a room up takes Black (club
+matches and daily tournaments assign colours).
+
+Rules v8 adds three things. Either player may `abort` before White has set the game up (quick
+pairing does it when one player has blocked the other, or the other is outside their rating range);
+a called-off game is over with reason `aborted` and can't be set up. In daily games, `vacation
+{days}` adds that many days to the player's clock for their current or next move (14 days a game at
+most; `view.vacation` counts them and `view.away` says until when). And `conditional {lines}`, sent
+while it's the opponent's move in a standard daily game, lines up replies: each line is UCI moves,
+their move then yours, as deep as you like. When the opponent moves, the room plays the reply of the
+first line that matches and keeps the rest of those lines; any other move clears them. `viewFor`
+shows each player only their own lines.
+
 To update the rules: copy `dist/logic.js` to the project's `app/src/logic.js`, run
 `bun run build` and `bun run test` in `app/`, then deploy. Because the project was migrated,
 its logic check reports `Date.now()` (used by the clocks) as a warning rather than an error.
@@ -128,6 +141,28 @@ so each game gets the colour the pairing chose. Vote Chess (`POST /clubs/:id/vot
 `/votechess/:vid` with `accept`, `decline`, `vote {move}`, `play`) seats both clubs in a room and
 plays the leading vote through the room's internal `/__act` path (the Worker's `roomAct` hook),
 which seats a player or applies an action exactly as a player's would be checked.
+
+Daily tournaments (`/dailytours`, `POST /dailytours {name, tc, size, pid}`, `/dailytours/:id` with
+`join {pid}`, `leave`, `start`): sign-ups close two days after one is created (or when its creator
+starts it with three or more players). Each round snake-seeds the players still in by rating into
+groups of up to `size`; every group plays a double round robin of daily games (rooms `dt…`, colours
+set with `swap`). Results come from the rooms through the same helper as club matches and Swiss;
+a game nobody starts within a move's allowance is forfeited. When a round's games are all done,
+each group's winner (points, then Sonneborn–Berger) goes through, until one group is left.
+
+Leagues (`GET /league`, `POST /league/result {room, pid}`): eight tiers, Wood to Legend, in weekly
+divisions of up to 50 that end on Sunday at 19:00 UTC. A player joins a division of their tier with
+their first scoring game of the week. Trophies come from quick-pairing rooms (`pool-…` and
+`vpchess960-…`: rapid 15, blitz 9, bullet 3 for a win; a third of that for a draw), read from the room
+and only against players with social on, at most four scoring games against one opponent a day;
+arena games score double when the server scores them. A finished week's divisions are settled the
+next time one of their players looks: the top of each (by its tier's share of 50 places, at least
+one, with trophies) moves up a tier.
+
+Blocking (`GET /blocks`, `POST /block {id | code}`, `POST /unblock {id}`): ends the friendship,
+refuses friend requests and move nudges either way, and hides the blocked player's forum topics and
+replies, blog posts, coach listing and club chat from the blocker. Profiles also carry `country`
+and `about`, sent with the heartbeat.
 
 Web push: the Worker makes a VAPID key pair once and keeps it in D1 (`social_config`); `GET
 /push/key` publishes the public half. `POST /push/subscribe {endpoint}` accepts only the browsers'
