@@ -412,6 +412,7 @@ export class OnlineGame extends BaseGame {
     }
     if (r.winner === this.myColor) unlock("online-win");
     if (this.kind === "pool" && this.cfg.rated !== false && Social.registered()) this._reportLeague();
+    if (rated && cls) Social.rateGame(this.room);
     return { rated, delta, deltaFor: delta !== null ? { [this.myColor]: delta } : null };
   }
 

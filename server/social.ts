@@ -18,7 +18,12 @@ export interface SocialStatement {
 export interface RoomState {
   status: string;
   seats: string[];
-  result: { winner?: string; draw?: boolean; reason?: string } | null;
+  result: { winner?: string; winners?: string[]; ranking?: string[]; points?: number[]; draw?: boolean; reason?: string } | null;
+  // what the game was (rooms report these from their state; older rooms don't)
+  tc?: string | null;
+  variant?: string | null;
+  rules?: string | null;
+  plies?: number;
 }
 export interface SocialHooks {
   roomState?: (room: string) => Promise<RoomState | null>;
@@ -28,6 +33,8 @@ export interface SocialHooks {
   pushFetch?: (url: string, init: RequestInit) => Promise<Response>;
   // how news/video/streamer feeds are fetched (tests swap it out)
   feedFetch?: (url: string) => Promise<Response>;
+  // how the site's puzzle data is read (path under /data/puzzles/; tests swap it out)
+  puzzleFetch?: (file: string) => Promise<Response>;
   // Vote Chess: seat a player in a room (action null) or act for them; the room referees as usual
   roomAct?: (room: string, playerId: string, action: unknown) => Promise<{ ok: boolean; error?: string; status?: string; result?: RoomState["result"] }>;
 }
@@ -111,6 +118,12 @@ const SCHEMA = [
      id TEXT PRIMARY KEY, a_club TEXT NOT NULL, b_club TEXT NOT NULL, room TEXT NOT NULL DEFAULT '', a_pid TEXT NOT NULL DEFAULT '',
      b_pid TEXT NOT NULL DEFAULT '', tc TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'challenge', created INTEGER NOT NULL,
      deadline INTEGER NOT NULL DEFAULT 0, ply INTEGER NOT NULL DEFAULT 0, result TEXT, token TEXT)`,
+  // rated puzzle attempts: each puzzle is rated once per player
+  `CREATE TABLE IF NOT EXISTS social_puzzle_attempts (uid TEXT NOT NULL, pid TEXT NOT NULL, created INTEGER NOT NULL, solved INTEGER NOT NULL, token TEXT NOT NULL, PRIMARY KEY (uid, pid))`,
+  // Puzzle Rush runs, timed by the server
+  `CREATE TABLE IF NOT EXISTS social_rush_runs (id TEXT PRIMARY KEY, uid TEXT NOT NULL, mode TEXT NOT NULL, started INTEGER NOT NULL, score INTEGER, token TEXT)`,
+  // games the server has rated, each once (from its room's result)
+  `CREATE TABLE IF NOT EXISTS social_rated_games (room TEXT PRIMARY KEY, cat TEXT NOT NULL, created INTEGER NOT NULL, token TEXT NOT NULL)`,
   // daily tournaments: rounds of groups, each a double round robin of daily games; group winners go through
   `CREATE TABLE IF NOT EXISTS social_dtours (
      id TEXT PRIMARY KEY, name TEXT NOT NULL, owner TEXT NOT NULL, tc TEXT NOT NULL, size INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'signup',
@@ -255,6 +268,8 @@ const MIGRATIONS = [
   `ALTER TABLE social_users ADD COLUMN about TEXT NOT NULL DEFAULT ''`,        // a line about yourself
   `ALTER TABLE social_users ADD COLUMN r_daily INTEGER NOT NULL DEFAULT 1200`, // daily (correspondence) rating
   `ALTER TABLE social_users ADD COLUMN n_daily INTEGER NOT NULL DEFAULT 0`,
+  // games the server has rated per category ({blitz: 3, atomic: 1}): from the first one, it owns that rating
+  `ALTER TABLE social_users ADD COLUMN rated TEXT NOT NULL DEFAULT '{}'`,
 ];
 
 // variants with their own rating (and leaderboard)
@@ -388,6 +403,50 @@ export function leagueRoomClass(room: string): string | null {
 // the friend code a player id carries when its player has social on ("p-x1y2z3.Name.1500.K7M2QX9P")
 function codeOfPid(pid: string): string | null { return /\.([0-9A-Z]{8})$/.exec(pid)?.[1] ?? null; }
 
+// ---- server-checked ratings ----
+// Ratings from games against other players are worked out here, from each game's result in its room, so no
+// device can set them. Rated rooms: quick pairing ("pool-…"; variants "vp<variant>-…", "zpcrazyhouse-…",
+// "fp-pffa-…" / "fp-pteams-…"), timed daily games ("daily-…"), and the server's own arena, Swiss, club match
+// and daily tournament rooms ("ar…", "sw…", "cm…", "dt…", which must be in its tables).
+const RATED_ROOM_RE = /^(?:pool-|vp[a-z0-9]+-|zpcrazyhouse-|fp-p(?:ffa|teams)-|daily-[a-z0-9]+$|(?:ar|sw|cm|dt)[a-z0-9]{10}$)/;
+const RATED_START_CAP = 1500;
+const SERVER_ROOMS: Record<string, string> = { ar: "social_arena_games", sw: "social_swiss_games", cm: "social_club_match_games", dt: "social_dtour_games" };
+// the same formula the app uses: K 40 for a player's first 10 games, 32 to 30, then 20
+export function eloDelta(r: number, opp: number, score: number, n: number): number {
+  const k = n < 10 ? 40 : n < 30 ? 32 : 20;
+  return Math.round(k * (score - 1 / (1 + Math.pow(10, (opp - r) / 400))));
+}
+// a game's rating category: a variant's key, or bullet / blitz / rapid / daily from its clock (null: unrated)
+export function ratingCategory(st: { tc?: string | null; variant?: string | null; rules?: string | null }, room: string): string | null {
+  if (st.rules) return st.rules === "teams" ? "fourteams" : "fourplayer";
+  if (st.variant) return VARIANT_KEYS.includes(st.variant) ? st.variant : null;
+  const tc = st.tc || "";
+  if (/^\d+d$/.test(tc)) return "daily";
+  if (room.startsWith("daily-")) return null;          // a daily game without a time limit
+  const m = /^(\d+(?:\.\d+)?)\+(\d+)$/.exec(tc);
+  if (!m) return null;
+  const est = Number(m[1]) * 60 + Number(m[2]) * 40;
+  return est < 180 ? "bullet" : est < 600 ? "blitz" : "rapid";
+}
+// puzzles: the app's rating formula, and where the published puzzle data lives
+const PUZZLE_SITE = "https://chess3d-five.vercel.app/data/puzzles/";
+export function puzzleRatingUpdate(player: number, puzzle: number, solved: boolean, n: number): number {
+  const K = Math.max(16, 60 - (44 * n) / 50);
+  const next = player + K * ((solved ? 1 : 0) - 1 / (1 + Math.pow(10, (puzzle - player) / 400)));
+  return Math.round(Math.min(3500, Math.max(100, next)));
+}
+type PuzzleRow = [string, string, string, number, number[]];
+// Puzzle Rush: the time each mode allows (survival has none), and the difficulty ladder the app climbs
+// (puzzle i of 120 is near 600 + 2000 * (i / 119)^1.25)
+const RUSH_MS: Record<string, number | null> = { "3": 180_000, "5": 300_000, survival: null };
+export const rushTarget = (i: number) => Math.round(600 + 2000 * Math.pow(Math.min(i, 119) / 119, 1.25));
+const puzzleShards = new Map<string, Promise<Map<string, PuzzleRow>>>();
+type PuzzleIndex = { themes: string[]; shards: { file: string; from: number; to: number }[] };
+let puzzleIndex: Promise<PuzzleIndex> | null = null;
+function ratedOf(u: { rated?: string | null }): Record<string, number> {
+  try { const o = JSON.parse(u.rated || "{}"); return o && typeof o === "object" ? o : {}; } catch { return {}; }
+}
+
 const CATS = ["bullet", "blitz", "rapid", "daily", "puzzle", "bots"] as const;
 type Cat = (typeof CATS)[number];
 const ONLINE_MS = 90_000;
@@ -405,6 +464,7 @@ interface UserRow {
   vratings?: string | null;
   country?: string | null;
   about?: string | null;
+  rated?: string | null;
   r_bullet: number; n_bullet: number; r_blitz: number; n_blitz: number; r_rapid: number; n_rapid: number; r_daily: number; n_daily: number;
   r_puzzle: number; n_puzzle: number; r_bots: number; n_bots: number;
 }
@@ -460,7 +520,7 @@ function publicUser(u: UserRow, now: number) {
   return {
     id: u.id, name: u.name, code: u.code, avatar, online,
     status: online ? u.status : "offline", lastSeen: u.last_seen, games: u.games, rush: u.rush ?? 0, variants: variantRatingsOf(u),
-    country: u.country ?? "", about: u.about ?? "",
+    country: u.country ?? "", about: u.about ?? "", rated: ratedOf(u),
     ratings: Object.fromEntries(CATS.map((c) => [c, { r: u[`r_${c}`], n: u[`n_${c}`] }])),
   };
 }
@@ -632,6 +692,18 @@ export class Social {
     return null;
   }
 
+  // you can write to friends, to a listed coach (a lesson enquiry), and back to anyone who wrote to you;
+  // never across a block. Returns whether you can, and whether you're friends
+  private async canMessage(me: string, other: string): Promise<{ ok: boolean; friend: boolean }> {
+    const [f, c, w, k] = await this.many(
+      this.q("SELECT 1 AS x FROM social_friends WHERE a = ? AND b = ? AND state = 'accepted'", me, other),
+      this.q("SELECT 1 AS x FROM social_coaches WHERE uid = ? AND hidden = 0", other),
+      this.q("SELECT 1 AS x FROM social_messages WHERE sender = ? AND recipient = ? LIMIT 1", other, me),
+      this.q("SELECT 1 AS x FROM social_blocks WHERE (uid = ? AND blocked = ?) OR (uid = ? AND blocked = ?)", me, other, other, me));
+    const friend = !!f?.length;
+    return { ok: !k?.length && (friend || !!c?.length || !!w?.length), friend };
+  }
+
   private async blockedEitherWay(a: string, b: string): Promise<boolean> {
     return !!(await this.q("SELECT 1 AS x FROM social_blocks WHERE (uid = ? AND blocked = ?) OR (uid = ? AND blocked = ?)", a, b, b, a).first());
   }
@@ -797,7 +869,10 @@ export class Social {
       const avatar = b["avatar"] ? cleanAvatar(b["avatar"]) : me.avatar;
       const ratings = (b["ratings"] && typeof b["ratings"] === "object" ? b["ratings"] : {}) as Record<string, unknown>;
       const vals: Record<string, number> = {};
+      // a category the server has rated a game in is its own from then on: the device's number is ignored
+      const owned = ratedOf(me);
       for (const c of CATS) {
+        if (owned[c]) { vals[`r_${c}`] = me[`r_${c}` as `r_${Cat}`]; vals[`n_${c}`] = me[`n_${c}` as `n_${Cat}`]; continue; }
         const slot = ratings[c] as Record<string, unknown> | undefined;
         const r = Number(slot && slot["r"]), n = Number(slot && slot["n"]);
         vals[`r_${c}`] = Number.isFinite(r) ? Math.max(100, Math.min(3500, Math.round(r))) : me[`r_${c}` as `r_${Cat}`];
@@ -806,8 +881,14 @@ export class Social {
       const games = Number.isFinite(Number(b["games"])) ? Math.max(0, Math.min(1_000_000, Math.round(Number(b["games"])))) : me.games;
       const room = typeof b["room"] === "string" && ROOM_RE.test(b["room"]) && status === "playing" ? b["room"] : null;
       const rushIn = Number(b["rush"]);
-      const rush = Number.isFinite(rushIn) ? Math.max(0, Math.min(300, Math.round(rushIn))) : (me.rush ?? 0);
-      const vratings = b["vratings"] !== undefined ? JSON.stringify(cleanVariantRatings(b["vratings"])) : (me.vratings ?? "{}");
+      // the best 5-minute Puzzle Rush is the server's once it has scored a run
+      const rush = owned["rush"] ? (me.rush ?? 0) : Number.isFinite(rushIn) ? Math.max(0, Math.min(300, Math.round(rushIn))) : (me.rush ?? 0);
+      let vratings = me.vratings ?? "{}";
+      if (b["vratings"] !== undefined) {
+        const sent = cleanVariantRatings(b["vratings"]), have = variantRatingsOf(me);
+        for (const k of Object.keys(owned)) if (have[k]) sent[k] = have[k];     // the server's own stay as they are
+        vratings = JSON.stringify(sent);
+      }
       const country = b["country"] === undefined ? (me.country ?? "") : /^[A-Z]{2}$/.test(String(b["country"])) ? String(b["country"]) : "";
       const about = b["about"] === undefined ? (me.about ?? "") : cleanText(b["about"], 160).replace(/\s+/g, " ").trim();
       const [, unread, reqs, latest, updated] = await this.many(
@@ -912,12 +993,15 @@ export class Social {
       type Row = UserRow & { m_id: number | null; m_sender: string; m_kind: string; m_body: string; m_created: number; unread_n: number };
       const r = await this.q(`SELECT u.*, lm.id AS m_id, lm.sender AS m_sender, lm.kind AS m_kind, lm.body AS m_body, lm.created AS m_created,
             (SELECT COUNT(*) FROM social_messages x WHERE x.sender = u.id AND x.recipient = ? AND x.seen = 0) AS unread_n
-          FROM social_friends f JOIN social_users u ON u.id = f.b
+            , EXISTS (SELECT 1 FROM social_friends f WHERE f.a = ? AND f.b = u.id AND f.state = 'accepted') AS friend_n
+          FROM social_users u
           LEFT JOIN social_messages lm ON lm.id = (SELECT m.id FROM social_messages m
             WHERE (m.sender = ? AND m.recipient = u.id) OR (m.sender = u.id AND m.recipient = ?) ORDER BY m.id DESC LIMIT 1)
-          WHERE f.a = ? AND f.state = 'accepted'`, me.id, me.id, me.id, me.id).all<Row>();
+          WHERE u.id IN (SELECT b FROM social_friends WHERE a = ? AND state = 'accepted'
+              UNION SELECT sender FROM social_messages WHERE recipient = ? UNION SELECT recipient FROM social_messages WHERE sender = ? AND recipient IS NOT NULL)
+            AND ${HIDE_BLOCKED("u.id")} AND u.id <> ?`, me.id, me.id, me.id, me.id, me.id, me.id, me.id, me.id, me.id).all<Row & { friend_n: number }>();
       const out = r.results.map((x) => ({
-        user: publicUser(x, now),
+        user: publicUser(x, now), friend: !!x.friend_n,
         last: x.m_id ? { id: x.m_id, sender: x.m_sender, kind: x.m_kind, body: x.m_body, created: x.m_created } : null,
         unread: x.unread_n,
       }));
@@ -927,26 +1011,29 @@ export class Social {
     if (method === "GET" && path === "/messages") {
       const other = str(url.searchParams.get("with"), 32);
       const after = Math.max(0, Number(url.searchParams.get("after")) || 0);
-      // polled every few seconds, so the friendship check rides in the same round trip
-      const [friend, rows] = await this.many(
-        this.q("SELECT 1 AS x FROM social_friends WHERE a = ? AND b = ? AND state = 'accepted'", me.id, other),
+      const can = await this.canMessage(me.id, other);
+      if (!can.ok) throw new HttpError(403, "you can only message friends and coaches");
+      const [rows] = await this.many(
         this.q(`SELECT id, sender, recipient, kind, body, created FROM social_messages
             WHERE ((sender = ? AND recipient = ?) OR (sender = ? AND recipient = ?)) AND id > ? ORDER BY id DESC LIMIT 100`,
           me.id, other, other, me.id, after),
         this.q("UPDATE social_messages SET seen = 1 WHERE sender = ? AND recipient = ? AND seen = 0", other, me.id));
-      if (!friend?.length) throw new HttpError(403, "you can only message friends");
-      return { messages: (rows ?? []).reverse() };
+      return { messages: (rows ?? []).reverse(), friend: can.friend };
     }
     if (method === "POST" && path === "/messages") {
       const b = await body(request);
       const to = str(b["to"], 32);
-      const [friend, recent] = await this.many(
-        this.q("SELECT 1 AS x FROM social_friends WHERE a = ? AND b = ? AND state = 'accepted'", me.id, to),
-        this.q("SELECT COUNT(*) AS n FROM social_messages WHERE sender = ? AND created > ?", me.id, now - 60_000));
-      if (!friend?.length) throw new HttpError(403, "you can only message friends");
+      const can = await this.canMessage(me.id, to);
+      const [recent, strangers] = await this.many(
+        this.q("SELECT COUNT(*) AS n FROM social_messages WHERE sender = ? AND created > ?", me.id, now - 60_000),
+        this.q(`SELECT COUNT(*) AS n FROM social_messages m WHERE m.sender = ? AND m.created > ? AND m.recipient IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM social_friends f WHERE f.a = ? AND f.b = m.recipient AND f.state = 'accepted')`, me.id, now - 3_600_000, me.id));
+      if (!can.ok) throw new HttpError(403, "you can only message friends and coaches");
       if (Number(recent?.[0]?.["n"] ?? 0) >= 30) throw new HttpError(429, "too many messages; slow down");
+      if (!can.friend && Number(strangers?.[0]?.["n"] ?? 0) >= 20) throw new HttpError(429, "too many messages to players who aren't your friends; slow down");
       let kind = "text", text = "";
       if (b["kind"] === "challenge") {
+        if (!can.friend) throw new HttpError(403, "you can challenge friends");
         const room = str(b["room"], 64), tc = str(b["tc"], 8), mode = b["mode"] === "daily" ? "daily" : "live";
         if (!ROOM_RE.test(room) || !TC_RE.test(tc)) throw new HttpError(400, "bad challenge");
         kind = "challenge";
@@ -1008,6 +1095,10 @@ export class Social {
     // club team matches (before the club routes, which would take /clubs/:id/matches)
     if (seg0 === "matches" || (seg0 === "clubs" && seg2 === "matches")) return this.clubMatches(request, me, seg, now);
     if (seg0 === "league") return this.league(request, me, seg, now);
+    if (method === "POST" && path === "/rated") return this.rateGame(me, str((await body(request))["room"], 64), now);
+    if (method === "POST" && path === "/puzzles/attempt") return this.puzzleAttempt(me, await body(request), now);
+    if (method === "POST" && path === "/rush/start") return this.rushStart(me, await body(request), now);
+    if (method === "POST" && path === "/rush/finish") return this.rushFinish(me, await body(request), now);
     if (seg0 === "dailytours") return this.dailyTours(request, me, seg, now);
     if (seg0 === "votechess" || (seg0 === "clubs" && seg2 === "votechess")) return this.voteChess(request, me, seg, now);
     if (seg0 === "clubs" && seg1 && !["create", "join", "leave"].includes(seg1)) {
@@ -1061,12 +1152,13 @@ export class Social {
 
     // ---- leaderboard ----
     if (method === "GET" && path === "/leaderboard" && url.searchParams.get("cat") === "rush") {
-      // best 5-minute Puzzle Rush scores
-      const since = now - 30 * 86_400_000, mine = me.rush ?? 0;
+      // best 5-minute Puzzle Rush scores, from runs the server timed and checked
+      const since = now - 30 * 86_400_000, mine = ratedOf(me)["rush"] ? me.rush ?? 0 : 0;
+      const scored = "COALESCE(json_extract(rated, '$.rush'), 0) > 0";
       const [top, rank, total] = await this.many(
-        this.q("SELECT * FROM social_users WHERE rush > 0 AND last_seen > ? ORDER BY rush DESC, last_seen DESC LIMIT 50", since),
-        this.q("SELECT COUNT(*) AS n FROM social_users WHERE rush > ? AND last_seen > ?", mine, since),
-        this.q("SELECT COUNT(*) AS n FROM social_users WHERE rush > 0 AND last_seen > ?", since));
+        this.q(`SELECT * FROM social_users WHERE rush > 0 AND ${scored} AND last_seen > ? ORDER BY rush DESC, last_seen DESC LIMIT 50`, since),
+        this.q(`SELECT COUNT(*) AS n FROM social_users WHERE rush > ? AND ${scored} AND last_seen > ?`, mine, since),
+        this.q(`SELECT COUNT(*) AS n FROM social_users WHERE rush > 0 AND ${scored} AND last_seen > ?`, since));
       return {
         cat: "rush", minGames: 1, top: (top ?? []).map((u) => publicUser(u as unknown as UserRow, now)),
         me: { rank: mine > 0 ? Number(rank?.[0]?.["n"] ?? 0) + 1 : null, rating: mine, games: null },
@@ -1077,14 +1169,16 @@ export class Social {
       // a variant's top players (the JSON path comes from the fixed list above, never from input)
       const key = VARIANT_KEYS.find((k) => k === url.searchParams.get("cat"))!;
       const since = now - 30 * 86_400_000, mine = variantRatingsOf(me)[key];
-      const r = `json_extract(vratings, '$.${key}.r')`, n = `json_extract(vratings, '$.${key}.n')`;
+      // only ratings the server has worked out (from at least one game it rated) are listed
+      const r = `json_extract(vratings, '$.${key}.r')`, n = `json_extract(vratings, '$.${key}.n')`, rated = `COALESCE(json_extract(rated, '$.${key}'), 0)`;
       const [top, rank, total] = await this.many(
-        this.q(`SELECT * FROM social_users WHERE ${n} >= 1 AND last_seen > ? ORDER BY ${r} DESC, ${n} DESC LIMIT 50`, since),
-        this.q(`SELECT COUNT(*) AS n FROM social_users WHERE ${n} >= 1 AND last_seen > ? AND ${r} > ?`, since, mine ? mine.r : 0),
-        this.q(`SELECT COUNT(*) AS n FROM social_users WHERE ${n} >= 1 AND last_seen > ?`, since));
+        this.q(`SELECT * FROM social_users WHERE ${rated} >= 1 AND last_seen > ? ORDER BY ${r} DESC, ${n} DESC LIMIT 50`, since),
+        this.q(`SELECT COUNT(*) AS n FROM social_users WHERE ${rated} >= 1 AND last_seen > ? AND ${r} > ?`, since, mine ? mine.r : 0),
+        this.q(`SELECT COUNT(*) AS n FROM social_users WHERE ${rated} >= 1 AND last_seen > ?`, since));
+      const mineRated = (ratedOf(me)[key] ?? 0) >= 1;
       return {
         cat: key, minGames: 1, top: (top ?? []).map((u) => publicUser(u as unknown as UserRow, now)),
-        me: { rank: mine ? Number(rank?.[0]?.["n"] ?? 0) + 1 : null, rating: mine ? mine.r : null, games: mine ? mine.n : 0 },
+        me: { rank: mine && mineRated ? Number(rank?.[0]?.["n"] ?? 0) + 1 : null, rating: mine ? mine.r : null, games: mineRated ? ratedOf(me)[key] : 0 },
         total: Number(total?.[0]?.["n"] ?? 0),
       };
     }
@@ -1092,15 +1186,18 @@ export class Social {
       const cat = (CATS as readonly string[]).includes(url.searchParams.get("cat") || "") ? (url.searchParams.get("cat") as Cat) : "blitz";
       const minGames = cat === "puzzle" ? 10 : cat === "daily" ? 3 : 5;
       const since = now - 30 * 86_400_000;
-      // the column name comes from the fixed CATS list above, never from input
+      // the column name comes from the fixed CATS list above, never from input. Ratings the server works out
+      // (everything but the bots ladder, which is played offline) count only games it rated
+      const games = cat === "bots" ? `n_${cat}` : `COALESCE(json_extract(rated, '$.${cat}'), 0)`;
       const [top, rank, total] = await this.many(
-        this.q(`SELECT * FROM social_users WHERE n_${cat} >= ? AND last_seen > ? ORDER BY r_${cat} DESC, n_${cat} DESC LIMIT 50`, minGames, since),
-        this.q(`SELECT COUNT(*) AS n FROM social_users WHERE n_${cat} >= ? AND last_seen > ? AND r_${cat} > ?`, minGames, since, me[`r_${cat}`]),
-        this.q(`SELECT COUNT(*) AS n FROM social_users WHERE n_${cat} >= ? AND last_seen > ?`, minGames, since));
-      const eligible = me[`n_${cat}`] >= minGames;
+        this.q(`SELECT * FROM social_users WHERE ${games} >= ? AND last_seen > ? ORDER BY r_${cat} DESC, n_${cat} DESC LIMIT 50`, minGames, since),
+        this.q(`SELECT COUNT(*) AS n FROM social_users WHERE ${games} >= ? AND last_seen > ? AND r_${cat} > ?`, minGames, since, me[`r_${cat}`]),
+        this.q(`SELECT COUNT(*) AS n FROM social_users WHERE ${games} >= ? AND last_seen > ?`, minGames, since));
+      const myGames = cat === "bots" ? me[`n_${cat}`] : ratedOf(me)[cat] ?? 0;
+      const eligible = myGames >= minGames;
       return {
         cat, minGames, top: (top ?? []).map((u) => publicUser(u as unknown as UserRow, now)),
-        me: { rank: eligible ? Number(rank?.[0]?.["n"] ?? 0) + 1 : null, rating: me[`r_${cat}`], games: me[`n_${cat}`] },
+        me: { rank: eligible ? Number(rank?.[0]?.["n"] ?? 0) + 1 : null, rating: me[`r_${cat}`], games: myGames },
         total: Number(total?.[0]?.["n"] ?? 0),
       };
     }
@@ -1547,6 +1644,184 @@ export class Social {
       tournament: tour, now, players: [...people.values()], groups, games,
       me: { joined: !!my, out: my ? my["out_round"] ?? null : null, owner: t["owner"] === me.id },
     };
+  }
+
+  // POST /puzzles/attempt {id, rating, moves, solved}: rate a puzzle attempt, once per puzzle. The puzzle's own
+  // rating comes from the published data (the app's `rating` only says which file it's in); "solved" has to
+  // follow the stored line (any final move is fine in a mate puzzle, where another mate also ends it)
+  // a puzzle from the published data (`rating` says which file it's in), and whether `moves` solve it: they
+  // follow the stored line, and in a mate puzzle any final move does (another mate ends it too)
+  private async puzzleCheck(id: string, rating: number, moves: string[]): Promise<{ row: PuzzleRow; follows: boolean }> {
+    const fetchData = (file: string) => (this.hooks.puzzleFetch ? this.hooks.puzzleFetch(file) : fetch(PUZZLE_SITE + file));
+    if (!puzzleIndex) {
+      const p = fetchData("index.json").then(async (r) => { if (!r.ok) throw new Error("index"); return (await r.json()) as PuzzleIndex; });
+      p.catch(() => { puzzleIndex = null; });
+      puzzleIndex = p;
+    }
+    let index;
+    try { index = await puzzleIndex!; } catch { throw new HttpError(503, "puzzles can't be checked right now"); }
+    const shard = index.shards.find((x) => rating >= x.from && rating <= x.to);
+    if (!shard) throw new HttpError(404, "no such puzzle");
+    if (!puzzleShards.has(shard.file)) {
+      const p = fetchData(shard.file).then(async (r) => {
+        if (!r.ok) throw new Error("shard");
+        const d = (await r.json()) as { p: PuzzleRow[] };
+        return new Map(d.p.map((row) => [row[0], row]));
+      });
+      p.catch(() => puzzleShards.delete(shard.file));
+      puzzleShards.set(shard.file, p);
+    }
+    let row: PuzzleRow | undefined;
+    try { row = (await puzzleShards.get(shard.file)!).get(id); } catch { throw new HttpError(503, "puzzles can't be checked right now"); }
+    if (!row) throw new HttpError(404, "no such puzzle");
+    const line = row[2].split(" ").filter((_, i) => i % 2 === 1);      // the solver's moves (the first is the opponent's)
+    const mate = row[4].some((t) => /^mate/.test(index.themes[t] ?? ""));
+    return { row, follows: moves.length === line.length && moves.every((m, i) => m === line[i] || (mate && i === line.length - 1)) };
+  }
+
+  private async puzzleAttempt(me: UserRow, b: Record<string, unknown>, now: number): Promise<unknown> {
+    const id = str(b["id"], 16);
+    const moves = Array.isArray(b["moves"]) ? (b["moves"] as unknown[]).map((m) => String(m)).slice(0, 40) : [];
+    const { row, follows } = await this.puzzleCheck(id, Number(b["rating"]), moves);
+    const won = b["solved"] === true && follows;
+    const token = randomString(12);
+    await this.q("INSERT OR IGNORE INTO social_puzzle_attempts (uid, pid, created, solved, token) VALUES (?, ?, ?, ?, ?)", me.id, id, now, won ? 1 : 0, token).run();
+    const fresh = await this.q("SELECT token FROM social_puzzle_attempts WHERE uid = ? AND pid = ?", me.id, id).first<{ token: string }>();
+    if (!fresh || fresh.token !== token) {
+      const u = await this.user(me.id);
+      return { counted: false, why: "this puzzle was rated before", solved: won, me: u ? publicUser(u, now) : null };
+    }
+    // the first puzzle the server rates starts from the device's number, capped, as a provisional rating
+    const first = !ratedOf(me)["puzzle"];
+    const base = first ? Math.min(me.r_puzzle, RATED_START_CAP) : me.r_puzzle;
+    const next = puzzleRatingUpdate(base, row[3], won, first ? 0 : me.n_puzzle);
+    await (first
+      ? this.q(`UPDATE social_users SET r_puzzle = ?, n_puzzle = 1, rated = json_set(COALESCE(rated, '{}'), '$.puzzle', 1) WHERE id = ?`, next, me.id)
+      : this.q(`UPDATE social_users SET r_puzzle = MAX(100, MIN(3500, r_puzzle + ?)), n_puzzle = n_puzzle + 1,
+          rated = json_set(COALESCE(rated, '{}'), '$.puzzle', COALESCE(json_extract(rated, '$.puzzle'), 0) + 1) WHERE id = ?`, next - base, me.id)).run();
+    const u = await this.user(me.id);
+    return { counted: true, why: null, solved: won, puzzleRating: row[3], me: u ? publicUser(u, now) : null };
+  }
+
+  // POST /rush/start {mode}: the server starts the clock on a Puzzle Rush run
+  private async rushStart(me: UserRow, b: Record<string, unknown>, now: number): Promise<unknown> {
+    const mode = String(b["mode"]);
+    if (!(mode in RUSH_MS)) throw new HttpError(400, "which Puzzle Rush?");
+    await this.rateLimit("SELECT COUNT(*) AS n FROM social_rush_runs WHERE uid = ? AND started > ?", [me.id, now - 3_600_000], 60, "Puzzle Rush runs");
+    const id = "ru_" + randomString(10).toLowerCase();
+    await this.many(
+      this.q("DELETE FROM social_rush_runs WHERE uid = ? AND started < ?", me.id, now - 7 * 86_400_000),
+      this.q("INSERT INTO social_rush_runs (id, uid, mode, started) VALUES (?, ?, ?, ?)", id, me.id, mode, now));
+    return { id, started: now };
+  }
+
+  // POST /rush/finish {id, attempts: [{id, rating, moves, ok}]}: score a run. Every attempt is checked against the
+  // published puzzles and the Rush ladder, the run against its time limit (and three misses at most); the score
+  // is the solves that hold up. The best 5-minute score is the leaderboard's
+  private async rushFinish(me: UserRow, b: Record<string, unknown>, now: number): Promise<unknown> {
+    const run = await this.q("SELECT * FROM social_rush_runs WHERE id = ? AND uid = ?", str(b["id"], 32), me.id).first<{ id: string; mode: string; started: number; score: number | null }>();
+    if (!run) throw new HttpError(404, "no such run");
+    if (run.score !== null) throw new HttpError(409, "this run has been scored");
+    const limit = RUSH_MS[run.mode] ?? null;
+    const elapsed = now - run.started;
+    const attempts = (Array.isArray(b["attempts"]) ? (b["attempts"] as Record<string, unknown>[]) : []).slice(0, 130);
+    let score = 0, misses = 0, why: string | null = null;
+    if (limit !== null && elapsed > limit + 20_000) why = "the run went past its time";
+    if (new Set(attempts.map((a) => String(a["id"]))).size !== attempts.length) why = "a puzzle came up twice";
+    for (const [i, a] of attempts.entries()) {
+      if (why) break;
+      const moves = Array.isArray(a["moves"]) ? (a["moves"] as unknown[]).map((m) => String(m)).slice(0, 40) : [];
+      let checked;
+      try { checked = await this.puzzleCheck(str(a["id"], 16), Number(a["rating"]), moves); } catch { why = "a puzzle that isn't in Puzzle Rush"; break; }
+      if (Math.abs(checked.row[3] - rushTarget(i)) > 300) { why = "a puzzle that isn't in Puzzle Rush"; break; }
+      if (a["ok"] === true && checked.follows) score++;
+      else if (++misses > 3) { why = "more than three misses"; break; }
+    }
+    if (!why && score > 0 && elapsed < score * 1500) why = "faster than anyone can solve";
+    const token = randomString(12);
+    await this.q("UPDATE social_rush_runs SET score = ?, token = ? WHERE id = ? AND score IS NULL", why ? 0 : score, token, run.id).run();
+    const claim = await this.q("SELECT token FROM social_rush_runs WHERE id = ?", run.id).first<{ token: string }>();
+    if (!claim || claim.token !== token) throw new HttpError(409, "this run has been scored");
+    if (!why && run.mode === "5") {
+      await this.q(`UPDATE social_users SET rush = CASE WHEN COALESCE(json_extract(rated, '$.rush'), 0) = 0 THEN ? ELSE MAX(rush, ?) END,
+          rated = json_set(COALESCE(rated, '{}'), '$.rush', COALESCE(json_extract(rated, '$.rush'), 0) + 1) WHERE id = ?`, score, score, me.id).run();
+    }
+    const u = await this.user(me.id);
+    return { score: why ? 0 : score, counted: !why, why, me: u ? publicUser(u, now) : null };
+  }
+
+  // POST /rated {room}: rate a finished game from its room, once; any of its players can ask. Answers with
+  // the asker's ratings as the server now has them
+  private async rateGame(me: UserRow, room: string, now: number): Promise<unknown> {
+    const mine = async (counted: boolean, why: string | null) => {
+      const u = await this.user(me.id);
+      return { counted, why, me: u ? publicUser(u, now) : null };
+    };
+    if (!RATED_ROOM_RE.test(room)) return mine(false, "this game isn't rated");
+    if (await this.q("SELECT 1 AS x FROM social_rated_games WHERE room = ?", room).first()) return mine(false, "already rated");
+    if (!this.hooks.roomState) throw new HttpError(503, "results can't be checked right now");
+    const st = await this.hooks.roomState(room);
+    if (!st || st.status !== "over" || !st.result) throw new HttpError(409, "the game isn't over yet");
+    const r = st.result;
+    if (r.reason === "aborted") return mine(false, "aborted games aren't rated");
+    const cat = ratingCategory(st, room);
+    if (!cat) return mine(false, "this game isn't rated");
+    // the server's own tournament rooms must be ones it paired
+    const table = SERVER_ROOMS[room.slice(0, 2)];
+    if (table && !(await this.q(`SELECT 1 AS x FROM ${table} WHERE room = ?`, room).first())) return mine(false, "this game isn't rated");
+    // every seat must be a different player with social on, and you one of them
+    const codes = st.seats.map(codeOfPid);
+    if (codes.some((c) => !c) || new Set(codes).size !== codes.length || ![2, 4].includes(codes.length)) return mine(false, "rated games are between players with Social on");
+    const rows = (await this.q(`SELECT * FROM social_users WHERE code IN (${codes.map(() => "?").join(",")})`, ...codes).all<UserRow>()).results;
+    const byCode = new Map(rows.map((u) => [u.code, u]));
+    const players = codes.map((c) => byCode.get(c!));
+    if (players.some((u) => !u)) return mine(false, "rated games are between players with Social on");
+    if (!players.some((u) => u!.id === me.id)) throw new HttpError(403, "that isn't your game");
+    // each player's score against the others (4-player: by finishing points or team), and their rating then
+    const variant = !CATS.includes(cat as Cat);
+    // a player's first game the server rates in a category starts from their device's number, capped, as a
+    // provisional rating (it moves fast for the first games)
+    const first = (u: UserRow) => !ratedOf(u)[cat];
+    const ratingOf = (u: UserRow) => {
+      const r = variant ? variantRatingsOf(u)[cat]?.r ?? 1500 : u[`r_${cat}` as `r_${Cat}`];
+      return first(u) ? Math.min(r, RATED_START_CAP) : r;
+    };
+    const gamesOf = (u: UserRow) => (first(u) ? 0 : variant ? variantRatingsOf(u)[cat]?.n ?? 0 : u[`n_${cat}` as `n_${Cat}`]);
+    const seats = st.seats;
+    const scoreOf = (i: number, j: number): number => {
+      if (seats.length === 2) return r.draw ? 0.5 : r.winner === seats[i] ? 1 : 0;
+      if (cat === "fourteams") return r.draw || !r.winners ? 0.5 : r.winners.includes(seats[i]!) ? 1 : 0;
+      const pts = r.points ?? [];
+      return (pts[i] ?? 0) > (pts[j] ?? 0) ? 1 : (pts[i] ?? 0) === (pts[j] ?? 0) ? 0.5 : 0;
+    };
+    const deltas = players.map((u, i) => {
+      // in Teams your partner sits opposite (seats 0+2 against 1+3)
+      const foes = seats.map((_, j) => j).filter((j) => j !== i && !(cat === "fourteams" && j === (i + 2) % 4));
+      const opp = foes.reduce((t, j) => t + ratingOf(players[j]!), 0) / foes.length;
+      const score = cat === "fourteams" ? scoreOf(i, foes[0]!) : foes.reduce((t, j) => t + scoreOf(i, j), 0) / foes.length;
+      return eloDelta(ratingOf(u!), opp, score, gamesOf(u!));
+    });
+    // claim the game, then move every player's rating (relative updates, so concurrent games don't clash)
+    const token = randomString(12);
+    await this.q("INSERT OR IGNORE INTO social_rated_games (room, cat, created, token) VALUES (?, ?, ?, ?)", room, cat, now, token).run();
+    const claim = await this.q("SELECT token FROM social_rated_games WHERE room = ?", room).first<{ token: string }>();
+    if (!claim || claim.token !== token) return mine(false, "already rated");
+    const owned = `rated = json_set(COALESCE(rated, '{}'), '$.' || ?, COALESCE(json_extract(rated, '$.' || ?), 0) + 1)`;
+    await this.many(...players.map((u, i) => {
+      if (first(u!)) {
+        // set outright: the provisional start plus this game
+        const r = Math.max(100, ratingOf(u!) + deltas[i]!);
+        return variant
+          ? this.q(`UPDATE social_users SET vratings = json_set(COALESCE(vratings, '{}'), '$.' || ?, json_object('r', ?, 'n', 1)), ${owned} WHERE id = ?`, cat, r, cat, cat, u!.id)
+          : this.q(`UPDATE social_users SET r_${cat} = ?, n_${cat} = 1, ${owned} WHERE id = ?`, r, cat, cat, u!.id);
+      }
+      return variant
+        ? this.q(`UPDATE social_users SET vratings = json_set(COALESCE(vratings, '{}'), '$.' || ?, json_object(
+              'r', MAX(100, COALESCE(json_extract(vratings, '$.' || ? || '.r'), 1500) + ?), 'n', COALESCE(json_extract(vratings, '$.' || ? || '.n'), 0) + 1)), ${owned} WHERE id = ?`,
+          cat, cat, deltas[i], cat, cat, cat, u!.id)
+        : this.q(`UPDATE social_users SET r_${cat} = MAX(100, r_${cat} + ?), n_${cat} = n_${cat} + 1, ${owned} WHERE id = ?`, deltas[i], cat, cat, u!.id);
+    }));
+    return mine(true, null);
   }
 
   // ---- Leagues ----

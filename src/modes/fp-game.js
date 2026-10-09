@@ -260,6 +260,7 @@ export class FourPlayerGame {
       const ratings = foes.map((c) => (v && v.fourSeats[c] ? parsePlayerId(v.fourSeats[c]).rating : 0) || 1500);
       delta = applyVariantRating(this.ratingKey, ratings.reduce((a, b) => a + b, 0) / ratings.length, score);
       rating = variantRating(this.ratingKey);
+      Social.rateGame(this.room);
     }
     const place = order.indexOf(my) + 1;
     saveVariantGame({

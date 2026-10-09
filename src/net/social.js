@@ -236,9 +236,41 @@ export async function beat() {
     if (firstBeat && !(m.kind === "challenge" && Date.now() - m.created < LIVE_CHALLENGE_MS)) continue;
     if (notifier) { try { notifier(m); } catch (e) { console.error(e); } }
   }
+  if (r.me) adoptRatings(r.me);
   if (firstBeat) loadBlocked().catch(() => {});
   firstBeat = false;
   emit();
+}
+
+// ---------- server-checked ratings ----------
+// The server works out ratings from games against other players (read from each game's room) and from
+// puzzle attempts; once it has rated a category, its number is the one this device shows
+export function adoptRatings(me) {
+  const owned = (me && me.rated) || {};
+  if (!Object.keys(owned).length) return;
+  updateProfile((p) => {
+    for (const cat of Object.keys(owned)) {
+      // the best 5-minute Puzzle Rush the server checked
+      if (cat === "rush") { if (p.rush) p.rush["5"] = me.rush || 0; continue; }
+      const server = (me.ratings && me.ratings[cat]) || (me.variants && me.variants[cat]);
+      const slot = p.ratings[cat] || (p.variants && (p.variants[cat] || (p.variants[cat] = { r: 1500, n: 0, hist: [] })));
+      if (!server || !slot || (slot.r === server.r && slot.n === server.n)) continue;
+      slot.r = server.r;
+      slot.n = server.n;
+      if (Array.isArray(slot.hist)) { slot.hist.push([Date.now(), server.r]); if (slot.hist.length > 300) slot.hist.shift(); }
+    }
+  });
+}
+// after a rated game against another player: the server reads the result from the room and rates it
+export function rateGame(room, tries = 0) {
+  if (!registered() || !room) return;
+  api("POST", "/rated", { room }).then((r) => { if (r.me) adoptRatings(r.me); })
+    .catch((e) => { if (tries < 4 && [0, 409, 503].includes(e.status)) setTimeout(() => rateGame(room, tries + 1), 1500 * (tries + 1)); });
+}
+// a rated puzzle attempt (once per puzzle): the server rates it from the puzzle's published rating
+export function ratePuzzle(attempt) {
+  if (!registered()) return;
+  api("POST", "/puzzles/attempt", attempt).then((r) => { if (r.me) adoptRatings(r.me); }).catch(() => {});
 }
 
 // ---------- blocking ----------

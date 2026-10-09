@@ -6,6 +6,7 @@ import { h, icon, todayStr } from "../ui/dom.js";
 import { openModal, toast, segmented, announceMove, announce, confirmModal } from "../ui/components.js";
 import { loadPuzzles, nextPuzzle, dailyPuzzle, rushSequence, puzzleRatingUpdate, isCorrectMove, themesAvailable, THEME_INFO } from "../puzzles.js";
 import { getProfile, updateProfile, unlock } from "../store.js";
+import * as Social from "../net/social.js";
 import { moveSound, SFX } from "../audio.js";
 
 const GOOD = "rgba(82,179,106,.6)", BAD = "rgba(224,55,42,.55)", HINT = "rgba(91,143,214,.55)";
@@ -30,6 +31,7 @@ export class PuzzleRunner {
     this.idx = 1;
     this.failed = false;
     this.hints = 0;
+    this.played = [];      // the player's moves that were right, in order (a rated attempt sends them)
     this.state = "intro";
     this.chess = new Chess(p.fen);
     this.input.clear();   // a selection from the previous puzzle
@@ -67,6 +69,7 @@ export class PuzzleRunner {
     announceMove(mv);
     b.setArrows([]);
     if (isCorrectMove(this.p, this.chess, uci, this.idx)) {
+      this.played.push(uci);
       moveSound(mv, this.chess);
       b.setMarks([{ sq: mv.to, color: GOOD }]);
       this._decorate(mv);
@@ -219,6 +222,8 @@ export class PuzzleScreen {
       const slot = pr.ratings.puzzle;
       const before = slot.r;
       slot.r = puzzleRatingUpdate(slot.r, this.puzzle.rating, won, slot.n);
+      // the server rates it too (its number is the one shown once it has rated one)
+      Social.ratePuzzle({ id: this.puzzle.id, rating: this.puzzle.rating, moves: won ? this.runner.played : [], solved: won });
       slot.n++;
       slot.hist.push([Date.now(), slot.r]);
       if (slot.hist.length > 300) slot.hist.shift();
@@ -349,6 +354,11 @@ export class RushScreen {
     this.score = 0;
     this.strikes = 0;
     this.log = [];
+    // with a profile, the server times the run and checks every puzzle (for the leaderboard)
+    this.attempts = [];
+    this.runId = null;
+    const run = this.run;
+    if (Social.registered()) Social.api("POST", "/rush/start", { mode: rushMode }).then((r) => { if (this.run === run) this.runId = r.id; }).catch(() => {});
     this.seq = rushSequence(Date.now() % 100000, 120);
     this.i = 0;
     const cfg = RUSH_MODES[rushMode];
@@ -376,12 +386,14 @@ export class RushScreen {
     if (this.state !== "playing") return;
     if (clean) this.score++;
     this.log.push({ ok: clean, r: this.runner.p.rating });
+    this.attempts.push({ id: this.runner.p.id, rating: this.runner.p.rating, moves: this.runner.played.slice(), ok: clean });
     this._later(350);
   }
   wrong() {
     if (this.state !== "playing") return;
     this.strikes++;
     this.log.push({ ok: false, r: this.runner.p.rating });
+    this.attempts.push({ id: this.runner.p.id, rating: this.runner.p.rating, moves: [], ok: false });
     if (this.strikes >= RUSH_MODES[rushMode].strikes) { this.end(); return; }
     // a missed puzzle is skipped in Rush
     this._later(250);
@@ -399,6 +411,10 @@ export class RushScreen {
     this.runner.stop();
     let best = false;
     updateProfile(p => { if (this.score > (p.rush[rushMode] || 0)) { p.rush[rushMode] = this.score; best = true; } });
+    if (this.runId) {
+      Social.api("POST", "/rush/finish", { id: this.runId, attempts: this.attempts })
+        .then((r) => { if (r.me) Social.adoptRatings(r.me); }).catch(() => {});
+    }
     if (this.score >= 15) unlock("rush-15");
     if (this.score >= 30) unlock("rush-30");
     SFX.end();

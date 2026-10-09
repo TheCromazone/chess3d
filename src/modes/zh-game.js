@@ -233,6 +233,7 @@ export class ZhGame {
     if (this.mode === "pool" && my) {
       delta = applyVariantRating("crazyhouse", (this.oppInfo && this.oppInfo.rating) || 1500, myResult === "win" ? 1 : myResult === "loss" ? 0 : 0.5);
       rating = variantRating("crazyhouse");
+      Social.rateGame(this.room);
     }
     const who = (c) => { const p = this.player(c); return { name: p.name, rating: p.rating || null }; };
     saveVariantGame({

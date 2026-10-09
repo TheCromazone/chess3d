@@ -434,7 +434,7 @@ export class SocialScreen {
         }
         return h("a.row.convo", { href: `#/social/chat/${c.user.id}` },
           userAvatar(c.user),
-          h("span.rt", h("b", c.user.name), h("small", preview)),
+          h("span.rt", h("b", c.user.name, c.friend === false ? h("span.muted", " (not a friend)") : null), h("small", preview)),
           h("span.convo-meta", last ? h("small.muted", timeAgo(last.created)) : null, c.unread ? h("span.count", String(c.unread)) : null));
       }));
     };
@@ -448,11 +448,14 @@ export class SocialScreen {
     try { user = (await S.api("GET", `/users/${uid}`)).user; } catch (e) { this.body.replaceChildren(errorLine(e, () => this.render())); return; }
     if (!this._live(tok)) return;
     const list = h("div.thread", { role: "log", "aria-label": `Messages with ${user.name}` });
+    // challenges are between friends; a lesson enquiry with a coach is messages only
+    const challengeBtn = h("button.btn.small.primary", { onclick: () => challengeModal(this.app, user), hidden: true }, icon("bolt", 16), "Challenge");
     const input = h("input.input", { placeholder: `Message ${user.name}`, maxlength: "500", "aria-label": "Message", autocomplete: "off" });
     let last = 0, sending = false;
     const pull = async () => {
       let d;
       try { d = await S.api("GET", `/messages?with=${encodeURIComponent(uid)}&after=${last}`); } catch (e) { if (this._live(tok) && !last) list.replaceChildren(errorLine(e, pull)); return; }
+      challengeBtn.hidden = d.friend === false;
       // a poll and a send can overlap: only append what's newer than what's shown
       const fresh = d.messages.filter(m => m.id > last);
       if (!this._live(tok) || !fresh.length) return;
@@ -481,7 +484,7 @@ export class SocialScreen {
       h("div.thread-head",
         h("a.btn.small.ghost", { href: "#/social/messages", "aria-label": "All messages" }, icon("back", 16)),
         userAvatar(user), h("span.rt", h("b", user.name), h("small", presenceText(user))),
-        h("button.btn.small.primary", { onclick: () => challengeModal(this.app, user) }, icon("bolt", 16), "Challenge")),
+        challengeBtn),
       list,
       h("div.composer", input, h("button.btn.primary", { onclick: send, "aria-label": "Send" }, "Send"))));
     await pull();
@@ -893,7 +896,7 @@ export class SocialScreen {
     const box = h("div.coach-list", h("p.note", "Loading coaches…"));
     const mineBox = h("div");
     this.body.replaceChildren(
-      h("p.note.coach-intro", "Players who give lessons. To book one, add them as a friend and message them; lessons and payment are arranged between you and the coach."),
+      h("p.note.coach-intro", "Players who give lessons. Message a coach to ask about lessons (you don't need to be friends); times and rates are arranged between you, as on chess.com."),
       mineBox, box);
     let d, friends;
     try { [d, friends] = await Promise.all([S.api("GET", "/coaches"), S.api("GET", "/friends")]); }
@@ -917,9 +920,7 @@ export class SocialScreen {
         facts.length ? h("div.coach-facts", ...facts.map((f) => h("span", f))) : null,
         h("p.coach-bio", c.bio),
         c.mine ? null : h("div.btn-row",
-          friendIds.has(u.id)
-            ? h("button.btn.primary", { onclick: () => this.app.go(`#/social/chat/${u.id}`) }, icon("chat", 18), "Message")
-            : h("button.btn.primary", { onclick: async (e) => { if (await this._addByCode(u.code)) e.target.closest("button").replaceChildren(icon("check", 18), "Request sent"); } }, icon("plus", 18), "Add friend to message"),
+          h("button.btn.primary", { onclick: () => this.app.go(`#/social/chat/${u.id}`) }, icon("chat", 18), friendIds.has(u.id) ? "Message" : "Ask about lessons"),
           h("button.btn", { onclick: () => this._profile(u, friendIds.has(u.id)) }, "Profile"),
           h("button.btn.ghost", {
             "aria-label": `Report ${u.name}'s listing`,
@@ -1015,9 +1016,10 @@ export class SocialScreen {
         h("thead", h("tr", h("th", "#"), h("th", "Player"), h("th", rush ? "Best (5 min)" : "Rating"), h("th.wide-only", rush ? "" : unit[0].toUpperCase() + unit.slice(1)), h("th", ""))),
         h("tbody", ...rows)))
         : h("p.note", "Nobody is ranked here yet. Be the first."),
-      h("p.note", rush ? "Best 5-minute Puzzle Rush scores, as reported by each player's device, from players active in the last 30 days."
-        : lbScope === "friends" ? "Ratings come from each player's own device and aren't verified by the server."
-        : `Ratings come from each player's own device and aren't verified by the server. Players need ${d.minGames}+ rated ${unit} and a visit in the last 30 days to be listed.`));
+      h("p.note", rush ? "Best 5-minute Puzzle Rush scores from runs the server timed and checked, from players active in the last 30 days."
+        : lbCat === "bots" ? `Ratings against the bots, which are played on each device. Players need ${d.minGames}+ games and a visit in the last 30 days to be listed.`
+        : lbScope === "friends" ? "Ratings are worked out by the server from each game's result (puzzles: from each attempt)."
+        : `Ratings are worked out by the server from each game's result (puzzles: from each attempt). Players need ${d.minGames}+ ${unit} the server has rated and a visit in the last 30 days to be listed.`));
   }
 }
 

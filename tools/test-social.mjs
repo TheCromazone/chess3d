@@ -1,7 +1,7 @@
 // Tests the social API (server/social.ts) against SQLite through a small D1-compatible shim.
 import { build } from "esbuild";
 import { DatabaseSync } from "node:sqlite";
-import { writeFileSync, mkdtempSync } from "node:fs";
+import { writeFileSync, mkdtempSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -64,6 +64,12 @@ const api = new Social(d1(sqlite), () => clock, {
   },
   waitUntil: (p) => pending.push(p),
   pushFetch: async (url, init) => { pushes.push({ url, init }); return new Response(null, { status: pushStatus }); },
+  // the site's puzzle files, read from public/ (shards are named with a hash; find them by their prefix)
+  puzzleFetch: async (file) => {
+    const dir = new URL("../public/data/puzzles/", import.meta.url);
+    const real = file === "index.json" ? file : readdirSync(dir).find((f) => f === file);
+    return real ? new Response(readFileSync(new URL(real, dir))) : new Response("missing", { status: 404 });
+  },
   feedFetch: async (url) => {
     feedCalls++;
     if (url.includes("fide")) return new Response(`<rss><channel><item><title>Candidates &amp; more</title><link>https://www.fide.com/news/1</link><pubDate>Wed, 07 Oct 2026 08:00:00 GMT</pubDate></item></channel></rss>`);
@@ -159,11 +165,16 @@ for (const [name, r] of [["Carol", 1900], ["Dan", 1400], ["Eve", 2100]]) {
   await call("POST", "/heartbeat", { secret: u.secret, body: { ratings: { blitz: { r, n: 20 } } } });
 }
 await call("POST", "/heartbeat", { secret: a.secret, body: { ratings: { blitz: { r: 1600, n: 12 } } } });
+ok((await call("GET", "/leaderboard", { secret: a.secret, query: "?cat=blitz" })).data.top.length === 0, "ratings only a device has reported aren't listed");
+// (as if the server had rated enough of their games; how it rates them is tested further down)
+sqlite.prepare("UPDATE social_users SET rated = json_set(rated, '$.blitz', 6) WHERE name IN ('Carol', 'Dan', 'Eve', 'Alice')").run();
 const lb = (await call("GET", "/leaderboard", { secret: a.secret, query: "?cat=blitz" })).data;
-ok(lb.top.map((u) => u.name).join(",") === "Eve,Carol,Alice,Dan" && lb.me.rank === 3, "leaderboard ranks active players with enough games");
+ok(lb.top.map((u) => u.name).join(",") === "Eve,Carol,Alice,Dan" && lb.me.rank === 3, "leaderboard ranks active players with enough rated games");
 ok((await call("GET", "/leaderboard", { secret: b.secret, query: "?cat=blitz" })).data.me.rank === null, "players without enough games aren't ranked");
 ok((await call("GET", "/leaderboard", { secret: a.secret, query: "?cat=hacker'--" })).data.cat === "blitz", "unknown categories fall back safely");
 await call("POST", "/heartbeat", { secret: a.secret, body: { rush: 27 } });
+ok((await call("GET", "/leaderboard", { secret: a.secret, query: "?cat=rush" })).data.top.length === 0, "a Puzzle Rush score only a device reported isn't listed");
+sqlite.prepare("UPDATE social_users SET rated = json_set(rated, '$.rush', 1) WHERE name = 'Alice'").run();   // as if a run had been checked
 const rushLb = (await call("GET", "/leaderboard", { secret: a.secret, query: "?cat=rush" })).data;
 ok(rushLb.top[0].name === "Alice" && rushLb.top[0].rush === 27 && rushLb.me.rank === 1, "Puzzle Rush has its own leaderboard");
 
@@ -450,6 +461,7 @@ await call("POST", "/delete", { secret: rep3.secret });
 // variant ratings and leaderboards
 await call("POST", "/heartbeat", { secret: ann.secret, body: { status: "online", vratings: { atomic: { r: 1620, n: 4 }, duck: { r: 1490, n: 2 }, bogus: { r: 9999, n: 9 } } } });
 await call("POST", "/heartbeat", { secret: cid.secret, body: { status: "online", vratings: { atomic: { r: 1550, n: 1 }, crazyhouse: { r: 99999, n: 3 } } } });
+sqlite.prepare("UPDATE social_users SET rated = json_set(json_set(rated, '$.atomic', 1), '$.crazyhouse', 1) WHERE name IN ('Ann', 'Cid')").run();
 let vlb = (await call("GET", "/leaderboard", { secret: dee.secret, query: "?cat=atomic" })).data;
 ok(vlb.cat === "atomic" && vlb.top.length === 2 && vlb.top[0].name === "Ann" && vlb.top[0].variants.atomic.r === 1620 && vlb.me.rank === null, "a variant has its own leaderboard");
 ok(!("bogus" in vlb.top[0].variants), "only known variants are kept");
@@ -573,9 +585,140 @@ clock += 4 * 60_000;
 const again = (await call("POST", "/battles/find", { secret: ann.secret })).data.battle;
 ok(again && again.id !== o1.id && !again.opponent, "after a battle ends, searching opens a new one");
 
+// server-checked ratings
+{
+  const us = [];
+  for (let i = 0; i < 5; i++) us.push((await call("POST", "/register", { body: { name: "Rt" + i }, ip: `10.4.4.${i + 1}` })).data);
+  const pid = (u) => `p-rt${u.name.toLowerCase()}.${u.name}.1500.${u.code}`;
+  const [r1, r2, r3, r4, r5] = us;
+  for (const u of us) await call("POST", "/heartbeat", { secret: u.secret, body: { ratings: { blitz: { r: 1500, n: 40 }, bullet: { r: 1400, n: 40 } } } });
+  const over = (seats, result, extra) => ({ status: "over", seats, result, ...extra });
+  rooms.set("pool-3p2-77-1", over([pid(r1), pid(r2)], { winner: pid(r1), reason: "checkmate" }, { tc: "3+2", variant: null }));
+  let rr = (await call("POST", "/rated", { secret: r1.secret, body: { room: "pool-3p2-77-1" } })).data;
+  ok(rr.counted && rr.me.ratings.blitz.r === 1520 && rr.me.ratings.blitz.n === 1 && rr.me.rated.blitz === 1, "the server rates a finished game from its room (a first rated game is provisional: 1500 v 1500, a win, +20)");
+  ok((await call("GET", `/users/${r2.id}`, { secret: r1.secret })).data.user.ratings.blitz.r === 1480, "and the loser's rating moves too");
+  ok((await call("POST", "/rated", { secret: r2.secret, body: { room: "pool-3p2-77-1" } })).data.why === "already rated", "a game is rated once");
+  await call("POST", "/heartbeat", { secret: r1.secret, body: { ratings: { blitz: { r: 2400, n: 99 }, bullet: { r: 1450, n: 41 } } } });
+  const u1 = (await call("GET", `/users/${r1.id}`, { secret: r2.secret })).data.user;
+  ok(u1.ratings.blitz.r === 1520 && u1.ratings.bullet.r === 1450, "once the server has rated a category, a device can't change it (others still seed from the device)");
+  await call("POST", "/heartbeat", { secret: r3.secret, body: { ratings: { blitz: { r: 2400, n: 300 } } } });
+  rooms.set("pool-3p2-77-6", over([pid(r3), pid(r4)], { winner: pid(r3), reason: "checkmate" }, { tc: "3+2" }));
+  rr = (await call("POST", "/rated", { secret: r3.secret, body: { room: "pool-3p2-77-6" } })).data;
+  ok(rr.counted && rr.me.ratings.blitz.r === 1520, "a rating a device claimed (2400) is capped at 1500 when the server starts rating that player");
+  rooms.set("upool-3p2-77-2", over([pid(r1), pid(r2)], { winner: pid(r1), reason: "checkmate" }, { tc: "3+2" }));
+  ok((await call("POST", "/rated", { secret: r1.secret, body: { room: "upool-3p2-77-2" } })).data.counted === false, "unrated games aren't rated");
+  rooms.set("pool-3p2-77-3", over([pid(r1), pid(r2)], { draw: true, reason: "aborted" }, { tc: "3+2" }));
+  ok((await call("POST", "/rated", { secret: r1.secret, body: { room: "pool-3p2-77-3" } })).data.counted === false, "nor aborted ones");
+  rooms.set("pool-3p2-77-4", over([pid(r1), "p-guest.Guest.1200"], { winner: pid(r1), reason: "checkmate" }, { tc: "3+2" }));
+  ok((await call("POST", "/rated", { secret: r1.secret, body: { room: "pool-3p2-77-4" } })).data.counted === false, "nor games against players without Social");
+  rooms.set("pool-3p2-77-5", over([pid(r3), pid(r4)], { winner: pid(r3), reason: "checkmate" }, { tc: "3+2" }));
+  ok((await call("POST", "/rated", { secret: r1.secret, body: { room: "pool-3p2-77-5" } })).status === 403, "only a game's players can have it rated");
+  rooms.set("arzzzzzzzzzz", over([pid(r1), pid(r2)], { winner: pid(r1), reason: "checkmate" }, { tc: "3+0" }));
+  ok((await call("POST", "/rated", { secret: r1.secret, body: { room: "arzzzzzzzzzz" } })).data.counted === false, "an arena room the server didn't pair isn't rated");
+  rooms.set("daily-rt1", over([pid(r1), pid(r2)], { winner: pid(r2), reason: "resignation" }, { tc: "3d" }));
+  rr = (await call("POST", "/rated", { secret: r2.secret, body: { room: "daily-rt1" } })).data;
+  ok(rr.counted && rr.me.ratings.daily.r === 1220 && rr.me.rated.daily === 1, "timed daily games are rated (first games move 20)");
+  rooms.set("daily-rt2", over([pid(r1), pid(r2)], { winner: pid(r2), reason: "resignation" }, { tc: "inf" }));
+  ok((await call("POST", "/rated", { secret: r2.secret, body: { room: "daily-rt2" } })).data.counted === false, "daily games without a time limit aren't");
+  rooms.set("vpatomic-3p0-77-1", over([pid(r1), pid(r2)], { winner: pid(r2), reason: "explosion" }, { tc: "3+0", variant: "atomic" }));
+  rr = (await call("POST", "/rated", { secret: r2.secret, body: { room: "vpatomic-3p0-77-1" } })).data;
+  ok(rr.counted && rr.me.variants.atomic.r === 1520 && rr.me.variants.atomic.n === 1 && rr.me.rated.atomic === 1, "variant games are rated in the variant (from 1500)");
+  await call("POST", "/heartbeat", { secret: r2.secret, body: { vratings: { atomic: { r: 2500, n: 50 }, duck: { r: 1600, n: 3 } } } });
+  const u2 = (await call("GET", `/users/${r2.id}`, { secret: r1.secret })).data.user;
+  ok(u2.variants.atomic.r === 1520 && u2.variants.duck.r === 1600, "a device can't change a variant rating the server owns");
+  // 4-player free-for-all: rated by finishing points against the other three
+  const four = [r2, r3, r4, r5].map(pid);
+  rooms.set("fp-pffa-5p0-77-1", over(four, { winner: four[1], ranking: [four[1], four[0], four[2], four[3]], points: [20, 40, 10, 0], reason: "checkmate" }, { tc: "5+0", rules: "ffa" }));
+  rr = (await call("POST", "/rated", { secret: r3.secret, body: { room: "fp-pffa-5p0-77-1" } })).data;
+  const fp = async (u) => (await call("GET", `/users/${u.id}`, { secret: r1.secret })).data.user.variants.fourplayer.r;
+  ok(rr.counted && (await fp(r3)) === 1520 && (await fp(r5)) === 1480 && (await fp(r2)) > 1500 && (await fp(r4)) < 1500, "4-player games are rated by finishing points");
+  for (const u of us) await call("POST", "/delete", { secret: u.secret });
+}
+
+// puzzle ratings are worked out by the server from the published puzzle data
+{
+  const pz = (await call("POST", "/register", { body: { name: "Pz" }, ip: "10.5.5.1" })).data;
+  const shard = JSON.parse(readFileSync(new URL("../public/data/puzzles/index.json", import.meta.url), "utf8")).shards.find((x) => x.from === 1200);
+  const rows = JSON.parse(readFileSync(new URL(`../public/data/puzzles/${shard.file}`, import.meta.url), "utf8")).p;
+  const themes = JSON.parse(readFileSync(new URL("../public/data/puzzles/index.json", import.meta.url), "utf8")).themes;
+  const solverMoves = (row) => row[2].split(" ").filter((_, i) => i % 2 === 1);
+  const plain = rows.find((r) => !r[4].some((t) => /^mate/.test(themes[t])) && solverMoves(r).length >= 2);
+  const mateOne = rows.find((r) => r[4].some((t) => themes[t] === "mateIn1"));
+  let a = (await call("POST", "/puzzles/attempt", { secret: pz.secret, body: { id: plain[0], rating: plain[3], moves: solverMoves(plain), solved: true } })).data;
+  const expect = Math.round(1200 + 60 * (1 - 1 / (1 + Math.pow(10, (plain[3] - 1200) / 400))));
+  ok(a.counted && a.solved && a.me.ratings.puzzle.r === expect && a.me.rated.puzzle === 1, "a solved puzzle is rated by the server, from the puzzle's published rating");
+  ok((await call("POST", "/puzzles/attempt", { secret: pz.secret, body: { id: plain[0], rating: plain[3], moves: solverMoves(plain), solved: true } })).data.counted === false, "each puzzle is rated once");
+  const before = a.me.ratings.puzzle.r;
+  a = (await call("POST", "/puzzles/attempt", { secret: pz.secret, body: { id: mateOne[0], rating: mateOne[3], moves: ["a1a2"], solved: true } })).data;
+  ok(a.counted && a.solved && a.me.ratings.puzzle.r > before, "in a mate puzzle another final move (another mate) still counts");
+  const other = rows.find((r) => r !== plain && !r[4].some((t) => /^mate/.test(themes[t])));
+  a = (await call("POST", "/puzzles/attempt", { secret: pz.secret, body: { id: other[0], rating: other[3], moves: ["a1a2"], solved: true } })).data;
+  ok(a.counted && !a.solved && a.me.ratings.puzzle.r < before + 30, "a claimed solve that doesn't follow the line counts as a miss");
+  await call("POST", "/heartbeat", { secret: pz.secret, body: { ratings: { puzzle: { r: 3000, n: 900 } } } });
+  ok((await call("GET", `/users/${pz.id}`, { secret: ann.secret })).data.user.ratings.puzzle.r === a.me.ratings.puzzle.r, "and a device can't set the puzzle rating after that");
+  ok((await call("POST", "/puzzles/attempt", { secret: pz.secret, body: { id: "nope1", rating: 1300, moves: [], solved: false } })).status === 404, "unknown puzzles are refused");
+  await call("POST", "/delete", { secret: pz.secret });
+}
+
+// Puzzle Rush runs are timed and checked by the server
+{
+  const ru = (await call("POST", "/register", { body: { name: "Rusher" }, ip: "10.5.5.2" })).data;
+  const index = JSON.parse(readFileSync(new URL("../public/data/puzzles/index.json", import.meta.url), "utf8"));
+  const all = index.shards.flatMap((sh) => JSON.parse(readFileSync(new URL(`../public/data/puzzles/${sh.file}`, import.meta.url), "utf8")).p);
+  const target = (i) => Math.round(600 + 2000 * Math.pow(Math.min(i, 119) / 119, 1.25));
+  const used = new Set();
+  const ladder = (k) => Array.from({ length: k }, (_, i) => { const r = all.find((x) => !used.has(x[0]) && Math.abs(x[3] - target(i)) <= 50); used.add(r[0]); return r; });
+  const attempt = (r, ok = true) => ({ id: r[0], rating: r[3], moves: ok ? r[2].split(" ").filter((_, i) => i % 2 === 1) : [], ok });
+  const saved = clock;
+  let run = (await call("POST", "/rush/start", { secret: ru.secret, body: { mode: "5" } })).data;
+  const twelve = ladder(12);
+  clock += 120_000;
+  let fin = (await call("POST", "/rush/finish", { secret: ru.secret, body: { id: run.id, attempts: [...twelve.slice(0, 10).map((r) => attempt(r)), attempt(twelve[10], false), attempt(twelve[11])] } })).data;
+  ok(fin.counted && fin.score === 11 && fin.me.rush === 11 && fin.me.rated.rush === 1, "a checked 5-minute run scores its solves (a miss doesn't count)");
+  ok((await call("POST", "/rush/finish", { secret: ru.secret, body: { id: run.id, attempts: [] } })).status === 409, "a run is scored once");
+  run = (await call("POST", "/rush/start", { secret: ru.secret, body: { mode: "5" } })).data;
+  clock += 400_000;
+  fin = (await call("POST", "/rush/finish", { secret: ru.secret, body: { id: run.id, attempts: ladder(20).map((r) => attempt(r)) } })).data;
+  ok(!fin.counted && /time/.test(fin.why) && fin.me.rush === 11, "a run that went past its time doesn't count");
+  run = (await call("POST", "/rush/start", { secret: ru.secret, body: { mode: "5" } })).data;
+  clock += 200_000;
+  const hard = all.filter((x) => x[3] > 2400).slice(0, 15);
+  fin = (await call("POST", "/rush/finish", { secret: ru.secret, body: { id: run.id, attempts: hard.map((r) => attempt(r)) } })).data;
+  ok(!fin.counted && /Puzzle Rush/.test(fin.why), "puzzles off the Rush ladder don't count");
+  run = (await call("POST", "/rush/start", { secret: ru.secret, body: { mode: "5" } })).data;
+  clock += 100_000;
+  const again = ladder(3);
+  fin = (await call("POST", "/rush/finish", { secret: ru.secret, body: { id: run.id, attempts: [attempt(again[0]), attempt(again[0]), attempt(again[1])] } })).data;
+  ok(!fin.counted && /twice/.test(fin.why), "nor does a run with a puzzle twice");
+  await call("POST", "/heartbeat", { secret: ru.secret, body: { rush: 90 } });
+  ok((await call("GET", `/users/${ru.id}`, { secret: ann.secret })).data.user.rush === 11, "and a device can't set the best score once the server has one");
+  clock = saved;
+  await call("POST", "/delete", { secret: ru.secret });
+}
+
+// lesson enquiries: message a listed coach without being friends
+{
+  const coach = (await call("POST", "/register", { body: { name: "CoachKim" }, ip: "10.6.6.1" })).data;
+  const student = (await call("POST", "/register", { body: { name: "Learner" }, ip: "10.6.6.2" })).data;
+  ok((await call("POST", "/messages", { secret: student.secret, body: { to: coach.id, text: "Hi!" } })).status === 403, "strangers can't message each other");
+  await call("POST", "/coaches", { secret: coach.secret, body: { title: "Coach Kim", bio: "Openings and endgames for club players, online." } });
+  ok((await call("POST", "/messages", { secret: student.secret, body: { to: coach.id, text: "Do you teach the Caro-Kann?" } })).data.ok, "anyone can message a listed coach about lessons");
+  const convo = (await call("GET", "/conversations", { secret: coach.secret })).data.conversations;
+  ok(convo.some((c) => c.user.id === student.id && !c.friend && c.unread === 1), "the coach sees the enquiry among their messages");
+  ok((await call("POST", "/messages", { secret: coach.secret, body: { to: student.id, text: "Yes, Tuesdays." } })).data.ok, "and can answer it");
+  const thread = (await call("GET", "/messages", { secret: student.secret, query: `?with=${coach.id}` })).data;
+  ok(thread.messages.length === 2 && thread.friend === false, "both sides see the thread");
+  ok((await call("POST", "/messages", { secret: student.secret, body: { to: coach.id, kind: "challenge", room: "c-abc123", tc: "3+2" } })).status === 403, "challenges are still for friends");
+  await call("POST", "/block", { secret: coach.secret, body: { id: student.id } });
+  ok((await call("POST", "/messages", { secret: student.secret, body: { to: coach.id, text: "Hello?" } })).status === 403, "a block stops enquiries too");
+  await call("POST", "/delete", { secret: coach.secret });
+  await call("POST", "/delete", { secret: student.secret });
+}
+
 // the daily (correspondence) rating
 {
   await call("POST", "/heartbeat", { secret: cid.secret, body: { ratings: { daily: { r: 1640, n: 4 } } } });
+  sqlite.prepare("UPDATE social_users SET rated = json_set(rated, '$.daily', 3) WHERE id = ?").run(cid.id);
   const u = (await call("GET", `/users/${cid.id}`, { secret: ann.secret })).data.user;
   ok(u.ratings.daily.r === 1640 && u.ratings.daily.n === 4, "profiles carry a daily rating");
   const lb = (await call("GET", "/leaderboard", { secret: cid.secret, query: "?cat=daily" })).data;
