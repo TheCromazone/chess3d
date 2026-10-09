@@ -13,7 +13,7 @@ lessons, Stockfish game review, and analysis. There's no sign-up: your device ho
 - **Daily chess:** correspondence games with friends, with 1, 3 or 7 days per move (or no limit) and a "your move" list.
 - **Bots:** 16 personalities from 250 to 3200, backed by Stockfish 18, with hints, takebacks, resumable games, and a rating vs bots.
 - **Pass and play:** two players on one screen, with optional auto-flip.
-- **Variants:** Chess960, King of the Hill, and Three-check, against bots or a friend on one screen.
+- **Variants:** Crazyhouse, Bughouse, 4-Player Chess (free-for-all and teams), Duck Chess, Fog of War, Giveaway, Atomic, Horde, Chess960, King of the Hill and Three-check. Each has bots, pass and play, friend invites and rated games against random opponents (Bughouse: a four-player lobby), with a rating and leaderboard per variant.
 - **Arenas:** live tournaments against real players every 30 minutes (blitz and bullet), with instant re-pairing, live standings and win-streak bonuses; or a Bot Arena against the bots nearest your rating.
 - Clocks with increment and custom time controls, premoves, drag-and-drop or click-to-move, auto-queen, keyboard move entry, move-list navigation (← → keys), material count, and opening names.
 
@@ -22,21 +22,22 @@ lessons, Stockfish game review, and analysis. There's no sign-up: your device ho
 - **Analysis board:** move tree with variations, live multi-line Stockfish evaluation, eval bar, best-move arrows, opening explorer, PGN/FEN import and export, a board editor, and "play a bot from here".
 - **Share:** a link that opens the game in analysis, an animated GIF, or a PNG of any position.
 - **Puzzles:** 17,000+ rated puzzles (with your own puzzle rating, theme and difficulty filters), a daily puzzle with streaks, Puzzle Rush (3 min, 5 min, survival), and Puzzle Battle against another player or a bot.
-- **Learn:** interactive lessons, endgame drills against Stockfish, and an opening trainer.
-- **Watch:** 40 famous games replayed move by move, plus Bot TV.
+- **Learn:** interactive lessons, endgame drills against Stockfish, an opening trainer, and video lessons (whole series from chess teachers, played in the page).
+- **Watch:** top tournaments live (games relayed by Lichess broadcasts), chess streamers live now, the latest videos and news, 40 famous games replayed move by move, and Bot TV.
 
 **Social**
 - **Friends:** share your friend code or an invite link, accept requests, and see who's online or playing.
 - **Challenges and messages:** challenge a friend to a live or daily game and they get a pop-up with Accept / Decline; message friends one to one.
 - **Clubs:** public or invite-only clubs with their own chat and member list.
-- **Forums:** topics and replies in five forums, with reporting.
+- **Forums and blogs:** topics and replies in five forums; players' blog posts with likes; both with reporting.
+- **Coaches:** players who teach list themselves with a description, languages, topics and rate; students add them as a friend to arrange lessons.
 - **Notifications:** pop-ups in the app, and optional browser notifications when it's closed (challenges, messages, friend requests, your move in daily games).
-- **Leaderboards:** global top 50 for blitz, bullet, rapid, puzzles and bots (ratings are reported by each player's device).
+- **Leaderboards:** global top 50 for blitz, bullet, rapid, puzzles, bots, Puzzle Rush and every variant, or just your friends (ratings are reported by each player's device).
 - **Account, no password:** your profile key is the account. Sign in on your other devices with a one-time code or your recovery key; your profile, ratings, settings and games back up automatically and follow you. Sign out of a device, or of all the others, from Settings.
 - Social is off until you turn it on; you can delete your profile from Settings at any time.
 
 **You**
-- Local profile with ratings per category, rating history, stats, Insights (accuracy by phase, colour and time control), a game archive (review or download any game as PGN), and achievements. Export and import your data.
+- Local profile with ratings per category and per variant, rating history, stats, Insights (accuracy by phase, colour and time control), a game archive (review or download any game as PGN), variant games to replay, and achievements. Export and import your data.
 - Settings: dark or light appearance, 3D or 2D board, board and piece themes, top-down 3D camera, coordinates, animation speed, legal-move hints, sound.
 - Installable as an app (PWA); bots, puzzles, analysis and review work offline.
 - Right-click to draw arrows and circles (Shift, Alt, Ctrl change the color).
@@ -51,9 +52,11 @@ lessons, Stockfish game review, and analysis. There's no sign-up: your device ho
     node tools/test-engine.mjs   # Stockfish wrapper, bots, review (slow)
     npm run test:social          # social API (server/social.ts) against SQLite
 
-`src/logic-src.js` is the online referee. It's bundled with chess.js into `dist/logic.js` for the
-room server. Version 2 of the rules adds chat, takeback requests, abort, and custom time controls;
-the client turns those features on automatically once the server runs v2.
+`src/logic-src.js` is the online referee. It's bundled with chess.js and the variant rules
+(`src/core/zh.js`, `vx.js`, `fp.js`) into `dist/logic.js` for the room server, now at version 6:
+v2 chat, takebacks, abort and custom clocks; v3 daily games; v4 Crazyhouse and Bughouse; v5 the
+other 8x8 variants; v6 4-Player Chess in four-seat rooms. See `docs/online-server.md`.
+`node tools/test-vx.mjs`, `test-zh.mjs` and `test-fp.mjs` cover the variant rules and bots.
 
 `server/social.ts` is the social API (friends, messages, clubs, leaderboard). It runs in the game
 server's Worker at `/api/social/*` on a D1 database; see `docs/online-server.md`.

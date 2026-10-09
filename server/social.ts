@@ -76,6 +76,18 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS social_arena_games (
      room TEXT PRIMARY KEY, arena TEXT NOT NULL, a_uid TEXT NOT NULL, a_pid TEXT NOT NULL, b_uid TEXT NOT NULL, b_pid TEXT NOT NULL,
      created INTEGER NOT NULL, outcome TEXT, token TEXT)`,
+  // Swiss tournaments: fixed rounds, each paired by score once the previous round is decided
+  `CREATE TABLE IF NOT EXISTS social_swiss (
+     id TEXT PRIMARY KEY, name TEXT NOT NULL, tc TEXT NOT NULL, cat TEXT NOT NULL, rounds INTEGER NOT NULL, starts INTEGER NOT NULL,
+     status TEXT NOT NULL DEFAULT 'open', round INTEGER NOT NULL DEFAULT 0, round_started INTEGER NOT NULL DEFAULT 0, token TEXT)`,
+  `CREATE TABLE IF NOT EXISTS social_swiss_players (
+     sid TEXT NOT NULL, uid TEXT NOT NULL, joined INTEGER NOT NULL, seen INTEGER NOT NULL DEFAULT 0, pid TEXT NOT NULL DEFAULT '',
+     score2 INTEGER NOT NULL DEFAULT 0, opps TEXT NOT NULL DEFAULT '', colors TEXT NOT NULL DEFAULT '', byes INTEGER NOT NULL DEFAULT 0,
+     withdrawn INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (sid, uid))`,
+  `CREATE TABLE IF NOT EXISTS social_swiss_games (
+     room TEXT PRIMARY KEY, sid TEXT NOT NULL, round INTEGER NOT NULL, w_uid TEXT NOT NULL, w_pid TEXT NOT NULL, b_uid TEXT NOT NULL, b_pid TEXT NOT NULL,
+     created INTEGER NOT NULL, outcome TEXT, token TEXT)`,
+  `CREATE INDEX IF NOT EXISTS social_swiss_games_round ON social_swiss_games (sid, round)`,
   `CREATE TABLE IF NOT EXISTS social_battles (
      id TEXT PRIMARY KEY, seed INTEGER NOT NULL, created INTEGER NOT NULL, starts INTEGER NOT NULL DEFAULT 0,
      a_uid TEXT NOT NULL, a_score INTEGER NOT NULL DEFAULT 0, a_strikes INTEGER NOT NULL DEFAULT 0, a_done INTEGER NOT NULL DEFAULT 0, a_seen INTEGER NOT NULL DEFAULT 0,
@@ -217,6 +229,49 @@ function arenaForSlot(slot: number) {
   const starts = slot * ARENA_SLOT_MS;
   const blitz = slot % 2 === 0;
   return { id: `ar-${slot}`, name: blitz ? "Blitz Arena" : "Bullet Arena", tc: blitz ? "3+0" : "1+0", cat: blitz ? "blitz" : "bullet", starts, ends: starts + ARENA_LEN_MS };
+}
+
+// Swiss tournaments every two hours at a quarter past: Blitz (3+2, 5 rounds) and Rapid (10+0,
+// 4 rounds) in turn. Joining opens two hours ahead.
+const SWISS_SLOT_MS = 2 * 60 * 60_000;
+const SWISS_OFFSET_MS = 15 * 60_000;
+const SWISS_PRESENT_MS = 60_000;     // a player counts as here if their screen asked this recently
+const SWISS_NO_SHOW_MS = 90_000;     // a room still missing a player this long after the round started is a forfeit
+const SWISS_GRACE_MS = 5 * 60_000;   // a round waits this long for at least two players to be here
+function swissForSlot(slot: number) {
+  const blitz = slot % 2 === 0;
+  return { id: `sw-${slot}`, name: blitz ? "Blitz Swiss" : "Rapid Swiss", tc: blitz ? "3+2" : "10+0", cat: blitz ? "blitz" : "rapid", rounds: blitz ? 5 : 4, starts: slot * SWISS_SLOT_MS + SWISS_OFFSET_MS };
+}
+// how long a round may run before an unfinished game is scored a draw
+function swissRoundCap(tc: string) {
+  const [m, inc] = tc.split("+").map(Number);
+  return ((m ?? 3) * 60 * 2 + (inc ?? 0) * 80 + 120) * 1000;
+}
+
+export interface SwissEntrant { uid: string; score2: number; rating: number; opps: string[]; colors: string; byes: number }
+// Pairs a round: players in order of score then rating; each takes the next player they haven't
+// met (or the next one at all, if they've met everyone left); an odd player out gets a bye (the
+// lowest-placed who hasn't had one). Colours go to whoever has had White less, else alternate.
+export function swissPairings(players: SwissEntrant[]): { pairs: [string, string][]; bye: string | null } {
+  const order = [...players].sort((a, b) => b.score2 - a.score2 || b.rating - a.rating || (a.uid < b.uid ? -1 : 1));
+  let bye: string | null = null;
+  if (order.length % 2 === 1) {
+    const pick = [...order].reverse().find((p) => p.byes === 0) ?? order[order.length - 1]!;
+    bye = pick.uid;
+    order.splice(order.indexOf(pick), 1);
+  }
+  const pairs: [string, string][] = [];
+  const left = [...order];
+  while (left.length >= 2) {
+    const a = left.shift()!;
+    let j = left.findIndex((b) => !a.opps.includes(b.uid));
+    if (j < 0) j = 0;
+    const b = left.splice(j, 1)[0]!;
+    const whites = (p: SwissEntrant) => [...p.colors].filter((c) => c === "w").length - [...p.colors].filter((c) => c === "b").length;
+    const aWhite = whites(a) !== whites(b) ? whites(a) < whites(b) : a.colors.slice(-1) !== "w";
+    pairs.push(aWhite ? [a.uid, b.uid] : [b.uid, a.uid]);
+  }
+  return { pairs, bye };
 }
 
 const CATS = ["bullet", "blitz", "rapid", "puzzle", "bots"] as const;
@@ -879,6 +934,7 @@ export class Social {
 
     // ---- live arenas and puzzle battles ----
     if (seg0 === "arenas") return this.arenas(request, me, seg, now);
+    if (seg0 === "swiss") return this.swiss(request, me, seg, now);
     if (seg0 === "battles") return this.battles(request, me, seg, now);
 
     // POST /games {game}: share a finished game on your profile (the last 30 are kept)
@@ -951,6 +1007,7 @@ export class Social {
         this.q("DELETE FROM social_club_members WHERE member = ?", me.id),
         this.q("DELETE FROM social_club_bans WHERE member = ?", me.id),
         this.q("DELETE FROM social_arena_players WHERE uid = ?", me.id),
+        this.q("UPDATE social_swiss_players SET withdrawn = 1 WHERE uid = ?", me.id),
         this.q("DELETE FROM social_games WHERE uid = ?", me.id),
         this.q("DELETE FROM social_keys WHERE uid = ?", me.id),
         this.q("DELETE FROM social_links WHERE uid = ?", me.id),
@@ -1123,6 +1180,157 @@ export class Social {
       return { outcome: final?.outcome ?? outcome, you: game.a_uid === me.id ? "a" : "b" };
     }
     throw new HttpError(404, "not found");
+  }
+
+  // ---- Swiss tournaments ----
+  private async swiss(request: Request, me: UserRow, seg: string[], now: number): Promise<unknown> {
+    const method = request.method;
+    // GET /swiss: the tournament running now (or just finished) and the next one
+    if (method === "GET" && seg.length === 1) {
+      const slot = Math.floor((now - SWISS_OFFSET_MS) / SWISS_SLOT_MS);
+      const list = [slot, slot + 1].map(swissForSlot);
+      const out = await this.many(
+        ...list.map((t) => this.q("INSERT OR IGNORE INTO social_swiss (id, name, tc, cat, rounds, starts) VALUES (?, ?, ?, ?, ?, ?)", t.id, t.name, t.tc, t.cat, t.rounds, t.starts)),
+        this.q(`SELECT t.*, (SELECT COUNT(*) FROM social_swiss_players p WHERE p.sid = t.id AND p.withdrawn = 0) AS players,
+            EXISTS (SELECT 1 FROM social_swiss_players p WHERE p.sid = t.id AND p.uid = ? AND p.withdrawn = 0) AS joined
+            FROM social_swiss t WHERE t.id IN (?, ?) ORDER BY t.starts`, me.id, list[0]!.id, list[1]!.id));
+      return { tournaments: out[out.length - 1] ?? [], now };
+    }
+    const id = str(seg[1], 32);
+    type T = { id: string; name: string; tc: string; cat: string; rounds: number; starts: number; status: string; round: number; round_started: number };
+    let t = await this.q("SELECT * FROM social_swiss WHERE id = ?", id).first<T>();
+    if (!t) {
+      // a tournament the schedule has reached but nobody listed yet
+      const m = /^sw-(\d+)$/.exec(id);
+      const slot = m ? Number(m[1]) : NaN;
+      if (!Number.isFinite(slot) || Math.abs(slot * SWISS_SLOT_MS - now) > 3 * SWISS_SLOT_MS) throw new HttpError(404, "no such tournament");
+      const d = swissForSlot(slot);
+      await this.q("INSERT OR IGNORE INTO social_swiss (id, name, tc, cat, rounds, starts) VALUES (?, ?, ?, ?, ?, ?)", d.id, d.name, d.tc, d.cat, d.rounds, d.starts).run();
+      t = await this.q("SELECT * FROM social_swiss WHERE id = ?", id).first<T>();
+      if (!t) throw new HttpError(404, "no such tournament");
+    }
+    const action = seg[2] ?? "";
+    if (method === "POST" && action === "join") {
+      const b = await body(request);
+      const pid = str(b["pid"], 64);
+      if (!PID_RE.test(pid)) throw new HttpError(400, "bad player id");
+      if (t.status === "done" || (t.status === "running" && t.round >= t.rounds)) throw new HttpError(409, "this tournament has finished");
+      await this.q(`INSERT INTO social_swiss_players (sid, uid, joined, seen, pid) VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT (sid, uid) DO UPDATE SET withdrawn = 0, seen = excluded.seen, pid = excluded.pid`, id, me.id, now, now, pid).run();
+    } else if (method === "POST" && action === "withdraw") {
+      await this.q("UPDATE social_swiss_players SET withdrawn = 1 WHERE sid = ? AND uid = ?", id, me.id).run();
+    } else if (method === "POST" && action === "ping") {
+      // the tournament screen (or your game) is open: you count as present for the next pairing
+      const b = await body(request);
+      const pid = str(b["pid"], 64);
+      await this.q("UPDATE social_swiss_players SET seen = ?, pid = CASE WHEN ? = 1 THEN ? ELSE pid END WHERE sid = ? AND uid = ?", now, PID_RE.test(pid) ? 1 : 0, pid, id, me.id).run();
+    } else if (!(method === "GET" && seg.length === 2)) throw new HttpError(404, "not found");
+    await this.swissTick(t, now);
+    return this.swissView(id, me, now);
+  }
+
+  // Move a tournament along: start it, score finished games, pair the next round, finish it.
+  // Runs whenever a player looks at it, and every step is safe to race (tokens, as in arenas).
+  private async swissTick(t: { id: string; tc: string; cat: string; rounds: number; starts: number; status: string; round: number; round_started: number }, now: number) {
+    if (t.status === "open") {
+      if (now < t.starts) return;
+      await this.swissPair(t, 1, now);
+      return;
+    }
+    if (t.status !== "running") return;
+    const open = (await this.q("SELECT * FROM social_swiss_games WHERE sid = ? AND round = ? AND outcome IS NULL", t.id, t.round).all<{ room: string; w_uid: string; w_pid: string; b_uid: string; b_pid: string; created: number }>()).results;
+    for (const g of open.slice(0, 8)) {
+      let outcome: string | null = null;
+      const st = this.hooks.roomState ? await this.hooks.roomState(g.room) : null;
+      if (st && st.status === "over" && st.result) {
+        const r = st.result;
+        outcome = r.reason === "aborted" ? "draw" : r.draw ? "draw" : r.winner === g.w_pid ? "w" : r.winner === g.b_pid ? "b" : "draw";
+      } else if ((!st || st.status === "waiting") && now - g.created > SWISS_NO_SHOW_MS) {
+        // a no-show: whoever came wins; nobody came, nobody scores
+        const seated = st ? st.seats : [];
+        outcome = seated.includes(g.w_pid) ? "w-forfeit" : seated.includes(g.b_pid) ? "b-forfeit" : "double-forfeit";
+      } else if (now - g.created > swissRoundCap(t.tc)) outcome = "draw";
+      if (!outcome) continue;
+      const token = randomString(12);
+      const w = outcome.startsWith("w") ? 2 : outcome === "draw" ? 1 : 0, b = outcome.startsWith("b") ? 2 : outcome === "draw" ? 1 : 0;
+      const ok = "EXISTS (SELECT 1 FROM social_swiss_games WHERE room = ? AND token = ?)";
+      await this.many(
+        this.q("UPDATE social_swiss_games SET outcome = ?, token = ? WHERE room = ? AND outcome IS NULL", outcome, token, g.room),
+        this.q(`UPDATE social_swiss_players SET score2 = score2 + ? WHERE sid = ? AND uid = ? AND ${ok}`, w, t.id, g.w_uid, g.room, token),
+        this.q(`UPDATE social_swiss_players SET score2 = score2 + ? WHERE sid = ? AND uid = ? AND ${ok}`, b, t.id, g.b_uid, g.room, token));
+    }
+    const left = await this.q("SELECT COUNT(*) AS n FROM social_swiss_games WHERE sid = ? AND round = ? AND outcome IS NULL", t.id, t.round).first<{ n: number }>();
+    if (left && left.n > 0) return;
+    if (t.round >= t.rounds) await this.q("UPDATE social_swiss SET status = 'done' WHERE id = ? AND status = 'running'", t.id).run();
+    else await this.swissPair(t, t.round + 1, now);
+  }
+
+  private async swissPair(t: { id: string; tc: string; cat: string; round: number; starts: number; round_started: number }, round: number, now: number) {
+    // fewer than two players here: wait a while for them, then call it a day
+    const here = await this.q("SELECT COUNT(*) AS n FROM social_swiss_players WHERE sid = ? AND withdrawn = 0 AND seen > ?", t.id, now - SWISS_PRESENT_MS).first<{ n: number }>();
+    if (!here || here.n < 2) {
+      const since = round === 1 ? t.starts : t.round_started + swissRoundCap(t.tc);
+      if (now - since < SWISS_GRACE_MS) return;
+    }
+    // claim the pairing of this round (only one request does it)
+    const token = randomString(12);
+    await this.q("UPDATE social_swiss SET status = 'running', round = ?, round_started = ?, token = ? WHERE id = ? AND round = ? AND status IN ('open', 'running')", round, now, token, t.id, round - 1).run();
+    const mine = await this.q("SELECT token FROM social_swiss WHERE id = ?", t.id).first<{ token: string }>();
+    if (!mine || mine.token !== token) return;
+    const col = t.cat === "rapid" ? "r_rapid" : "r_blitz";   // fixed names, never input
+    const rows = (await this.q(`SELECT p.*, u.${col} AS rating FROM social_swiss_players p JOIN social_users u ON u.id = p.uid
+        WHERE p.sid = ? AND p.withdrawn = 0 AND p.seen > ?`, t.id, now - SWISS_PRESENT_MS).all<{ uid: string; pid: string; score2: number; opps: string; colors: string; byes: number; rating: number }>()).results;
+    if (rows.length < 2) {
+      // not enough players here to play a round: the tournament ends (a lone player takes the bye)
+      const stmts = rows.map((p) => this.q("UPDATE social_swiss_players SET score2 = score2 + 2, byes = byes + 1 WHERE sid = ? AND uid = ?", t.id, p.uid));
+      await this.many(...stmts, this.q("UPDATE social_swiss SET status = 'done' WHERE id = ?", t.id));
+      return;
+    }
+    const byUid = new Map(rows.map((p) => [p.uid, p]));
+    const { pairs, bye } = swissPairings(rows.map((p) => ({ uid: p.uid, score2: p.score2, rating: Number(p.rating) || 1200, opps: p.opps ? p.opps.split(",") : [], colors: p.colors, byes: p.byes })));
+    const stmts = [];
+    for (const [w, b] of pairs) {
+      const room = "sw" + randomString(10).toLowerCase();
+      const pw = byUid.get(w)!, pb = byUid.get(b)!;
+      stmts.push(
+        this.q("INSERT INTO social_swiss_games (room, sid, round, w_uid, w_pid, b_uid, b_pid, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", room, t.id, round, w, pw.pid, b, pb.pid, now),
+        this.q("UPDATE social_swiss_players SET opps = opps || CASE WHEN opps = '' THEN '' ELSE ',' END || ?, colors = colors || 'w' WHERE sid = ? AND uid = ?", b, t.id, w),
+        this.q("UPDATE social_swiss_players SET opps = opps || CASE WHEN opps = '' THEN '' ELSE ',' END || ?, colors = colors || 'b' WHERE sid = ? AND uid = ?", w, t.id, b));
+    }
+    if (bye) stmts.push(this.q("UPDATE social_swiss_players SET score2 = score2 + 2, byes = byes + 1 WHERE sid = ? AND uid = ?", t.id, bye));
+    await this.many(...stmts);
+  }
+
+  private async swissView(id: string, me: UserRow, now: number) {
+    const [tr, players, games] = await this.many(
+      this.q("SELECT id, name, tc, cat, rounds, starts, status, round, round_started FROM social_swiss WHERE id = ?", id),
+      this.q(`SELECT p.uid, p.score2, p.opps, p.byes, p.withdrawn, p.seen, u.name, u.avatar, u.r_blitz, u.r_rapid FROM social_swiss_players p
+          LEFT JOIN social_users u ON u.id = p.uid WHERE p.sid = ?`, id),
+      this.q(`SELECT g.room, g.round, g.w_uid, g.b_uid, g.outcome, g.created, w.name AS w_name, b.name AS b_name FROM social_swiss_games g
+          LEFT JOIN social_users w ON w.id = g.w_uid LEFT JOIN social_users b ON b.id = g.b_uid WHERE g.sid = ? ORDER BY g.round, g.created`, id));
+    const t = tr?.[0] as { cat: string; round: number; status: string } | undefined;
+    if (!t) throw new HttpError(404, "no such tournament");
+    const list = (players ?? []) as Record<string, unknown>[];
+    const score = new Map(list.map((p) => [String(p["uid"]), Number(p["score2"]) / 2]));
+    // tie-break: Buchholz, the sum of your opponents' scores
+    const standings = list.map((p) => {
+      const opps = String(p["opps"] || "").split(",").filter(Boolean);
+      let avatar: unknown = null;
+      try { avatar = p["avatar"] ? JSON.parse(String(p["avatar"])) : null; } catch { avatar = null; }
+      return {
+        uid: p["uid"], name: p["name"] ?? "Deleted player", avatar, rating: t.cat === "rapid" ? p["r_rapid"] : p["r_blitz"],
+        score: Number(p["score2"]) / 2, buchholz: opps.reduce((s, o) => s + (score.get(o) ?? 0), 0), games: opps.length, byes: p["byes"],
+        withdrawn: !!p["withdrawn"], here: now - Number(p["seen"]) < SWISS_PRESENT_MS,
+      };
+    }).sort((a, b) => b.score - a.score || b.buchholz - a.buchholz || Number(b.rating) - Number(a.rating));
+    const all = ((games ?? []) as Record<string, unknown>[]).map((g) => ({ room: g["room"], round: g["round"], white: { uid: g["w_uid"], name: g["w_name"] ?? "Deleted player" }, black: { uid: g["b_uid"], name: g["b_name"] ?? "Deleted player" }, outcome: g["outcome"] ?? null }));
+    const current = all.filter((g) => g.round === t.round);
+    const myGame = current.find((g) => g.white.uid === me.id || g.black.uid === me.id) ?? null;
+    const meRow = list.find((p) => p["uid"] === me.id);
+    return {
+      tournament: tr![0], standings, round: current, games: all, now,
+      me: meRow ? { joined: !meRow["withdrawn"], score: Number(meRow["score2"]) / 2, game: myGame && !myGame.outcome ? { room: myGame.room, color: myGame.white.uid === me.id ? "w" : "b", opponent: myGame.white.uid === me.id ? myGame.black : myGame.white } : null } : null,
+    };
   }
 
   // Puzzle battles. Scores are reported by each player's device (like ratings), so a battle is a

@@ -8,7 +8,7 @@ import { join } from "node:path";
 const out = await build({ entryPoints: [new URL("../server/social.ts", import.meta.url).pathname], bundle: true, format: "esm", platform: "neutral", write: false });
 const dir = mkdtempSync(join(tmpdir(), "social-"));
 writeFileSync(join(dir, "social.mjs"), out.outputFiles[0].text);
-const { Social } = await import(join(dir, "social.mjs"));
+const { Social, swissPairings } = await import(join(dir, "social.mjs"));
 
 function d1(db) {
   return {
@@ -267,6 +267,63 @@ const rep3 = (await call("POST", "/register", { body: { name: "Rex" }, ip: "5.5.
 await call("POST", "/report", { secret: rep3.secret, body: { kind: "topic", id: t1.id } });
 ok((await call("GET", `/forums/${t1.id}`, { secret: ann.secret })).status === 404, "three reports hide it");
 await call("POST", "/delete", { secret: rep3.secret });
+
+// Swiss pairing on its own
+{
+  const P = (uid, score2, rating, opps = [], colors = "", byes = 0) => ({ uid, score2, rating, opps, colors, byes });
+  let r = swissPairings([P("a", 0, 1500), P("b", 0, 1400), P("c", 0, 1300), P("d", 0, 1200)]);
+  ok(r.pairs.length === 2 && r.bye === null && r.pairs.flat().length === 4, "Swiss: four players make two games");
+  r = swissPairings([P("a", 2, 1500, ["b"], "w"), P("b", 0, 1400, ["a"], "b"), P("c", 2, 1300, ["d"], "w"), P("d", 0, 1200, ["c"], "b")]);
+  const met = (x, y) => r.pairs.some(([w, b]) => (w === x && b === y) || (w === y && b === x));
+  ok(met("a", "c") && met("b", "d"), "Swiss: winners meet winners, and nobody meets the same player twice");
+  ok(r.pairs.some(([w, b]) => w === "b" && b === "d") || r.pairs.some(([w, b]) => w === "d"), "Swiss: colours balance (a Black last time gets White)");
+  r = swissPairings([P("a", 2, 1500), P("b", 2, 1400), P("c", 0, 1300, [], "", 1), P("d", 0, 1200), P("e", 0, 1100, [], "", 1)]);
+  ok(r.bye === "d" && r.pairs.length === 2, "Swiss: the odd player out is the lowest placed without a bye");
+}
+
+// a whole Swiss tournament, through the API
+{
+  const SLOT = 2 * 3600_000, OFF = 15 * 60_000;
+  const saved = clock;
+  const slot = Math.floor((clock - OFF) / SLOT) + 1;
+  const id = `sw-${slot}`;
+  let list = (await call("GET", "/swiss", { secret: ann.secret })).data.tournaments;
+  ok(list.some((t) => t.id === id && t.status === "open" && t.rounds >= 4), "the next Swiss tournament is listed and open");
+  const pid = (n) => `p-x${n.toLowerCase()}.${n}.1500`;
+  const players = [ann, cid, dee];
+  for (const [i, u] of players.entries()) await call("POST", `/swiss/${id}/join`, { secret: u.secret, body: { pid: pid("P" + i) } });
+  ok((await call("GET", `/swiss/${id}`, { secret: ann.secret })).data.standings.length === 3, "three players join");
+  const t0 = (await call("GET", `/swiss/${id}`, { secret: ann.secret })).data.tournament;
+  clock = t0.starts + 1000;
+  for (const [i, u] of players.entries()) await call("POST", `/swiss/${id}/ping`, { secret: u.secret, body: { pid: pid("P" + i) } });
+  let v = (await call("GET", `/swiss/${id}`, { secret: cid.secret })).data;
+  ok(v.tournament.status === "running" && v.tournament.round === 1 && v.round.length === 1, "at the start, round 1 is paired (one game; the third player has a bye)");
+  const byeOne = v.standings.find((p) => p.score === 1);
+  ok(byeOne && byeOne.byes === 1, "the bye scores a point");
+  // the game ends: White wins
+  const g1 = v.round[0];
+  const pidOf = (uid) => pid("P" + players.findIndex((u) => u.id === uid));
+  rooms.set(g1.room, { status: "over", seats: [pidOf(g1.white.uid), pidOf(g1.black.uid)], result: { winner: pidOf(g1.white.uid), reason: "checkmate" } });
+  clock += 20_000;
+  for (const [i, u] of players.entries()) await call("POST", `/swiss/${id}/ping`, { secret: u.secret, body: { pid: pid("P" + i) } });
+  v = (await call("GET", `/swiss/${id}`, { secret: dee.secret })).data;
+  ok(v.tournament.round === 2 && v.round.length === 1 && v.games[0].outcome === "w", "round 1 is scored from the room, and round 2 is paired");
+  const r2 = v.round[0];
+  ok(r2.white.uid !== g1.white.uid || r2.black.uid !== g1.black.uid, "round 2 isn't a rematch");
+  const mineView = (await call("GET", `/swiss/${id}`, { secret: r2.white.uid === ann.id ? ann.secret : r2.white.uid === cid.id ? cid.secret : dee.secret })).data.me;
+  ok(mineView.game && mineView.game.color === "w" && mineView.game.room === r2.room, "a player sees their game, colour and room");
+  // nobody turns up for round 2: a double forfeit once the no-show time passes
+  for (let k = 0; k < 5; k++) { clock += 20_000; for (const [i, u] of players.entries()) await call("POST", `/swiss/${id}/ping`, { secret: u.secret, body: { pid: pid("P" + i) } }); }
+  v = (await call("GET", `/swiss/${id}`, { secret: ann.secret })).data;
+  ok(v.games.find((g) => g.room === r2.room).outcome === "double-forfeit" && v.tournament.round === 3, "a game nobody joined is a double forfeit, and play moves on");
+  // the rest: players stop coming; after a grace period the tournament ends
+  clock += 30 * 60_000;
+  v = (await call("GET", `/swiss/${id}`, { secret: ann.secret })).data;
+  for (let k = 0; k < 6 && v.tournament.status !== "done"; k++) { clock += 200_000; v = (await call("GET", `/swiss/${id}`, { secret: ann.secret })).data; }
+  ok(v.tournament.status === "done" && v.standings[0].score >= v.standings[2].score, "with nobody left to pair, the tournament ends with final standings");
+  ok(typeof v.standings[0].buchholz === "number", "standings carry a Buchholz tie-break");
+  clock = saved;
+}
 
 // variant ratings and leaderboards
 await call("POST", "/heartbeat", { secret: ann.secret, body: { status: "online", vratings: { atomic: { r: 1620, n: 4 }, duck: { r: 1490, n: 2 }, bogus: { r: 9999, n: 9 } } } });

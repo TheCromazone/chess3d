@@ -23,6 +23,9 @@ arrives with the site closed, and added Crazyhouse and Bughouse (rules v4) and t
 live streamers, videos and news. Loop 8 added the rest of chess.com's variants: Duck Chess, Fog of
 War, Giveaway, Atomic and Horde on one perft-checked move generator (rules v5), and 4-Player Chess,
 free-for-all and teams, in four-seat rooms (rules v6), each with bots, pass and play and online play.
+Loop 9 took Chess960, King of the Hill and Three-check online, gave every variant rated games
+against random opponents with its own rating, leaderboard and replayable history, and added live
+events (top tournaments relayed move by move), video lessons, blogs and a coach directory.
 Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don't have (alternative noted)
 
 ## Play
@@ -51,11 +54,12 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | "Your move" alert in a background tab | ✅ | online games |
 | New-player onboarding (skill level seeds ratings) | ✅ | |
 | In-game chat (online) | ✅ | rules v2 live on the room server; quick phrases + free text |
-| Variants (Chess960, 3-check, KOTH) | ✅ | vs bots and pass and play; Chess960 castling verified against Stockfish perft |
-| Crazyhouse | ✅ | drops from a pocket; own bots (Stockfish doesn't play it), pass and play, friends online (rules v4) |
+| Variants (Chess960, 3-check, KOTH) | ✅ | Stockfish bots and pass and play; friends online and rated random opponents (rules v5); Chess960 castling checked against Stockfish perft |
+| Crazyhouse | ✅ | drops from a pocket; own bots (Stockfish doesn't play it), pass and play, friends online and rated random opponents (rules v4) |
 | Bughouse | ✅ | two linked rooms, four players: captures go to your partner, either board ending ends the match; verified with four live players |
-| Duck Chess, Fog of War, Giveaway, Atomic, Horde | ✅ | one move generator (matches standard perft) with each variant's rules; bots for all five, pass and play (Fog of War hides the board between turns), friends online (rules v5; in Fog of War the server sends each player only what they can see) |
-| 4-Player Chess | ✅ | free-for-all (points, grey armies, wandering kings, claim win) and teams; 14x14 board, three bots or pass and play or four friends online in a four-seat room (rules v6) |
+| Duck Chess, Fog of War, Giveaway, Atomic, Horde | ✅ | one move generator (matches standard perft) with each variant's rules; bots for all five, pass and play (Fog of War hides the board between turns), friends online and rated random opponents (rules v5; in Fog of War the server sends each player only what they can see) |
+| 4-Player Chess | ✅ | free-for-all (points, grey armies, wandering kings, claim win) and teams; 14x14 board, three bots, pass and play, four friends online in a four-seat room, or four random players, rated by finishing place (rules v6) |
+| Variant ratings, leaderboards and history | ✅ | a rating per variant from rated games (from 1500), a leaderboard per variant, ratings on player profiles, and every variant game replayable from the profile |
 | Daily / correspondence chess | ✅ | 1, 3 or 7 days per move (or no limit), lose on time when a deadline passes (rules v3); persistent rooms, "your move" list with time left, daily challenges to friends |
 | Tournaments / arenas | ✅ | live arenas against real players every 30 minutes (blitz on the hour, bullet on the half hour): instant re-pairing, streak bonuses, live standings, results read by the server from the game room; Bot Arena for practice |
 
@@ -95,12 +99,14 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Lessons (rules, tactics, strategy) | ✅ | 23 interactive lessons |
 | Endgame practice vs engine | ✅ | 15 drills |
 | Opening trainer | ✅ | 32 openings |
+| Video lessons | ✅ | 23 whole series from chess teachers (Hanging Pawns, IM John Bartholomew, GM Daniel Naroditsky, Chess Talk, Chessbrah) by topic, played in the page |
 
 ## Watch
 
 | chess.com feature | Status | Notes |
 |---|---|---|
 | Watch games | ✅ | 40 classic games replayed + Bot TV (live bot vs bot) |
+| Events (top tournaments live) | ✅ | the main over-the-board events running now (Lichess broadcasts): rounds, every game on a small board, and any game on the main board with clocks, following each new move |
 | Spectate a live game | ✅ | Watch button on friends who are in a live game, or open any game link |
 | Live streamers | ✅ | who's streaming chess right now (Chess.com and Lichess streamer lists), linking to the stream |
 | Chess videos | ✅ | latest videos from GothamChess, Chess.com, Saint Louis Chess Club, Daniel Naroditsky and Hanging Pawns, played on the page |
@@ -119,6 +125,8 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Player profiles | ✅ | any player's ratings and recent games (the last 30 online and bot games), each opening on the analysis board |
 | Member search | ✅ | find players by name (or add them by friend code) and open their profile; names are unique |
 | Forums | ✅ | five forums (general, openings, tactics, endgames, help): topics, replies, delete your own, anything three players report is hidden |
+| Blogs | ✅ | players publish posts (likes, delete your own, reporting) |
+| Coaches | ✅ | a directory of players who teach (description, languages, topics, rate); students add a coach as a friend to arrange lessons |
 | Challenges | ✅ | challenge a friend to a live game (any time control) or a daily game; pop-up notice with Accept / Decline wherever they are in the app; challenge friends from the invite lobby |
 | Direct messages | ✅ | threads with friends, unread counts on the nav, notices for new messages |
 | Notifications | ✅ | in-app notices while open; opt-in browser notifications when closed (web push) for challenges, messages, friend requests and daily moves; verified end to end in Chrome with the site closed |
@@ -143,11 +151,15 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 
 ## Still different from chess.com
 
-Everything above is built, deployed and verified with two live players. What chess.com has that
-this doesn't, and why:
+Everything above is built, deployed, and checked against the live servers. What chess.com still
+has that this doesn't, and why:
 
-- **Editorial and paid content:** news, articles, video lessons, streamers, the coach marketplace
-  and membership tiers. These are content and business features, not software ones.
-- **More variants:** Crazyhouse, Bughouse, 4-player and Duck chess. Stockfish doesn't play them, so
-  they'd have no bots, review or analysis here.
-
+- **Paid membership tiers.** Nothing here is behind a paywall, and charging players would need a
+  payment provider and the owner's decision, so it isn't built.
+- **Booking and paying coaches.** The coach directory connects students and coaches; lessons and
+  payment are arranged between them, not through the site.
+- **A newsroom and original video lessons.** chess.com employs editors and titled coaches. Here
+  the news, videos, streamers, lessons and live events come from outside sources (FIDE, Lichess,
+  Chess.com and YouTube feeds, Lichess broadcasts), credited and linked.
+- **Server-verified ratings.** There's no password account, so ratings are kept and reported by
+  each player's device, and leaderboards say so.

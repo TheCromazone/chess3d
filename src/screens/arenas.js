@@ -11,6 +11,7 @@ import { arenaActive } from "../modes/arena.js";
 import { makePlayerId } from "../net/room.js";
 import { SFX } from "../audio.js";
 import * as S from "../net/social.js";
+import { swissStatus } from "./swiss.js";
 
 const PAIR_MS = 2500;
 const autoPair = new Set();      // arenas to pair in again straight away (back from a game)
@@ -66,12 +67,15 @@ export class ArenasScreen {
 
   async load() {
     if (!S.registered()) return;
-    try { const d = await S.api("GET", "/arenas"); if (!this.dead) this.render(d); }
+    try {
+      const [d, sw] = await Promise.all([S.api("GET", "/arenas"), S.api("GET", "/swiss").catch(() => null)]);
+      if (!this.dead) this.render({ ...d, swiss: sw ? sw.tournaments : [] });
+    }
     catch (e) { if (!this.dead) this.render(null, e); }
   }
 
   render(d, err) {
-    const body = [h("p", { style: { color: "var(--ink-2)" } }, "Timed tournaments against real players. You're paired again as soon as a game ends. A win scores 2 and a draw 1; after two wins in a row, each win scores 4.")];
+    const body = [h("p", { style: { color: "var(--ink-2)" } }, "Tournaments against real players. Arenas run on the clock: you're paired again as soon as a game ends (a win scores 2, a draw 1, and after two wins in a row each win scores 4). Swiss tournaments have fixed rounds, each paired by score.")];
     if (!S.registered()) body.push(needsSocial(this.app));
     else if (err) body.push(h("div.status-line.bad", icon("close", 16), h("span", err.message)));
     else if (!d) body.push(h("p.note", "Loading arenas…"));
@@ -86,6 +90,13 @@ export class ArenasScreen {
           h("span.rt", h("b", `${a.name}, ${tcLabel(a.tc)}`), h("small", `${status}. ${a.players} player${a.players === 1 ? "" : "s"}`)),
           a.joined ? h("span.badge", "Joined") : h("span.rv", icon("chevron", 18)));
       })));
+      if (d.swiss && d.swiss.length) {
+        body.push(h("div.lbl.note", { style: { marginTop: "6px" } }, "Swiss"));
+        body.push(h("div.rows", ...d.swiss.filter((s) => s.status !== "done" || s.players).map((s) => h("button.row", { onclick: () => this.app.go(`#/swiss/${s.id}`) },
+          h(`span.ri${s.status === "running" ? ".live" : ""}`, icon("trophy", 20)),
+          h("span.rt", h("b", `${s.name}, ${tcLabel(s.tc)}`), h("small", `${swissStatus(s, t)}. ${s.rounds} rounds, ${s.players} player${s.players === 1 ? "" : "s"}`)),
+          s.joined ? h("span.badge", "Joined") : h("span.rv", icon("chevron", 18))))));
+      }
     }
     body.push(h("div.lbl.note", { style: { marginTop: "6px" } }, "Practice"));
     body.push(h("button.row", { onclick: () => this.app.go("#/arena") },
@@ -93,7 +104,7 @@ export class ArenasScreen {
       h("span.rt", h("b", "Bot Arena"), h("small", arenaActive() ? "In progress" : "An arena against the bots, any time")),
       h("span.rv", icon("chevron", 18))));
     this.app.strips(null, null);
-    this.app.panel({ title: "Arenas", back: "#/", body });
+    this.app.panel({ title: "Tournaments", back: "#/", body });
   }
 }
 

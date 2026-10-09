@@ -20,6 +20,11 @@ which is being retired; its rooms are separate and aren't used any more.)
 Names and ratings travel inside the player ID (`p-<random>.<name>.<rating>`), so opponents see
 each other without any account system.
 
+Variants have their own pools with the same sweep: `vp<variant>-…` (Duck Chess, Fog of War,
+Giveaway, Atomic, Horde, Chess960, King of the Hill, Three-check), `zpcrazyhouse-…`, and
+`fp-p<ffa|teams>-…` for 4-Player Chess, which waits for four players. In those games the player
+ID carries the player's rating in that variant, and the result is rated on the device.
+
 ## Rules v2
 
 `src/logic-src.js` now reports `view.v = 2` and adds:
@@ -37,6 +42,29 @@ Rules v3 (`view.v = 3`) adds daily time controls: `"1d"`, `"2d"`, `"3d"`, `"5d"`
 (`tc.perMove` is set), but a move resets the mover's allowance instead of adding an increment, and
 `flag` claims the win once the opponent's deadline has passed. Clients send `"inf"` to servers
 older than v3.
+
+Rules v4 (`view.v = 4`) adds Crazyhouse and Bughouse: `config` takes `variant: "crazyhouse" |
+"bughouse"`, the position lives in `state.zh` (FEN plus pockets), and moves are text (`"e2e4"`,
+`"N@f3"`). A Bughouse board is configured with `link`, the room of the other board: captures and
+the board's result are queued in `state.outbox`, and the room relays them to the linked room
+through the Durable Object's internal `/__link` path, which applies them as `__link` actions
+(players can't send those). `GET /api/room/<room>` (CORS open) reads a room's seats and status
+without joining, which the Bughouse lobby uses.
+
+Rules v5 adds Duck Chess, Fog of War, Giveaway, Atomic, Horde, Chess960 (with `start`, the
+position's number 0-959), King of the Hill and Three-check. They share one move generator
+(`src/core/vx.js`, inlined into `logic.js`) and keep the position in `state.vx`. In Fog of War
+`viewFor` sends each player only the squares their pieces can see, their own moves (the others'
+are `null`), and their legal moves; spectators see an empty board; everything is revealed once
+the game ends.
+
+Rules v6 adds 4-Player Chess. A room whose name starts with `fp-` seats four (the room code reads
+the name from the `/ws/<room>` request and keeps a `four` flag); its state has `fourSeats` (Red,
+Blue, Yellow, Green in join order) and `four`, the game from `src/core/fp.js`. Red sends `config`
+with `rules: "ffa" | "teams"`; each colour has a clock; `flag` on the player to move works like a
+resignation (in free-for-all their king wanders on); `claim` ends a free-for-all game for a player
+21 points ahead with two left. The result names the `winner`, plus the full `ranking` (or the
+`winners` in Teams).
 
 To update the rules: copy `dist/logic.js` to the project's `app/src/logic.js`, run
 `bun run build` and `bun run test` in `app/`, then deploy. Because the project was migrated,
@@ -57,7 +85,7 @@ and an 8-character friend code; the client keeps the secret in localStorage and 
 - `GET /friends`, `POST /friends/request {code}`, `/friends/respond {id, accept}`, `/friends/remove {id}`.
 - `GET /conversations`, `GET /messages?with=&after=` (marks them read), `POST /messages {to, text}` or `{to, kind: "challenge", room, tc, mode}`. Only friends can message each other.
 - `GET /clubs`, `POST /clubs/create|join|leave`, `GET /clubs/:id`, `GET|POST /clubs/:id/messages`.
-- `GET /leaderboard?cat=blitz|bullet|rapid|puzzle|bots`: players active in the last 30 days with at least 5 rated games (10 puzzles).
+- `GET /leaderboard?cat=blitz|bullet|rapid|puzzle|bots`: players active in the last 30 days with at least 5 rated games (10 puzzles). `cat=rush` ranks best Puzzle Rush scores, and `cat=<variant>` a variant's ratings (sent with the heartbeat as `vratings`, kept as a JSON column and read with `json_extract`).
 - `GET /users/:id`, `GET /me`, `POST /delete` (removes the player, friendships, messages and memberships).
 - The heartbeat may carry `room` (the live game you're seated in); `GET /friends` returns it to your
   friends only, as `watch`, so they can spectate.
@@ -76,6 +104,15 @@ Names are unique ignoring case: registering a taken name adds a number, a rename
 doesn't go through, and `GET /names?n=` checks one. Forums: `GET|POST /forums`, `GET|POST
 /forums/:id`, `POST /forums/:id/delete`, `POST /forums/:id/posts/:pid/delete`, and `POST /report
 {kind, id}`; three reports from different players hide a topic or reply.
+
+Blogs: `GET /blogs` (`?by=` one player), `POST /blogs {title, body}` (five a day), `GET /blogs/:id`,
+`POST /blogs/:id/like` (toggles), `POST /blogs/:id/delete`. Coaches: `GET /coaches`, `POST /coaches
+{title, bio, langs, rate, topics}` to list yourself (or update), `POST /coaches/remove`. `POST /report`
+also takes `kind: "blog" | "coach"`.
+
+`GET /feeds` (no key needed) returns the Watch page's news (FIDE, Lichess and Chess.com feeds),
+videos (YouTube channel feeds, three per channel) and live streamers (Lichess and Chess.com
+streamer lists), fetched by the Worker at most every 15 minutes and cached in `social_config`.
 
 Web push: the Worker makes a VAPID key pair once and keeps it in D1 (`social_config`); `GET
 /push/key` publishes the public half. `POST /push/subscribe {endpoint}` accepts only the browsers'

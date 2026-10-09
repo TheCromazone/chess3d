@@ -52,7 +52,7 @@ export class HomeScreen {
       }, h("span.badge", "Saved")) : null,
       row("robot", "Play bots", "16 personalities from 250 to 3200", () => app.go("#/bots")),
       row("link", "Play a friend", "Send an invite link", () => app.go("#/friend")),
-      row("trophy", "Arenas", "Live tournaments every 30 minutes, or against the bots", () => app.go("#/arenas")),
+      row("trophy", "Tournaments", "Arenas every 30 minutes, Swiss every two hours, or against the bots", () => app.go("#/arenas")),
       row("cube", "Variants", "Crazyhouse, Bughouse, Chess960 and more", () => app.go("#/variants")),
       row("calendar", "Daily chess", dailyLine(), () => app.go("#/daily")),
       row("users", "Pass and play", "Two players, one screen", () => app.go("#/local")),

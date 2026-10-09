@@ -10,6 +10,7 @@ import { PuzzleScreen, RushScreen } from "./modes/puzzles.js";
 import { LearnPage, LessonScreen, DrillScreen, OpeningTrainer } from "./modes/learn.js";
 import { WatchPage, ReplayScreen, BotTV } from "./modes/watch.js";
 import { EventScreen, BroadcastGame } from "./modes/events.js";
+import { SwissLobby } from "./screens/swiss.js";
 import { VariantReplay } from "./modes/variant-replay.js";
 import { ArenaScreen } from "./modes/arena.js";
 import { DailyScreen, watchDaily } from "./modes/daily.js";
@@ -53,6 +54,7 @@ const routes = [
   { pattern: /^#\/puzzles\/battle$/, nav: "puzzles", make: (app) => new BattleScreen(app) },
   { pattern: /^#\/arena$/, nav: "play", make: (app) => new ArenaScreen(app) },
   { pattern: /^#\/arenas$/, nav: "play", make: (app) => new ArenasScreen(app) },
+  { pattern: /^#\/swiss\/(sw-\d+)$/, nav: "play", make: (app, m) => new SwissLobby(app, m[1]) },
   { pattern: /^#\/variants$/, nav: "play", make: (app) => new VariantsScreen(app) },
   { pattern: /^#\/crazyhouse(?:\/play)?$/, nav: "play", make: (app) => new ZhSetup(app) },
   {

@@ -42,6 +42,7 @@ export class OnlineGame extends BaseGame {
 
   title() {
     if (this.cfg.arena) return this.cfg.arena.name;
+    if (this.cfg.swiss) return `${this.cfg.swiss.name}, round ${this.cfg.swiss.round}`;
     return this.kind === "pool" ? `Online ${tcLabel(this.tcKey)}` : this.kind === "daily" ? "Daily game" : "Play a friend";
   }
   bottomColor() { return this.myColor || "w"; }
@@ -53,6 +54,7 @@ export class OnlineGame extends BaseGame {
     live.busy = false;     // searching or waiting isn't playing yet
     if (this.kind === "pool" && !this.client) this._search();
     else this._join();
+    if (this.cfg.swiss) this._swissPing = setInterval(() => Social.api("POST", `/swiss/${this.cfg.swiss.id}/ping`, { pid: this.playerId }).catch(() => {}), 20000);
     this.app.leaveGuard = async () => {
       if (this.kind === "daily") return true;   // correspondence: come back any time
       if (this.result || !this.myColor || this.phase !== "playing") return true;
@@ -66,7 +68,7 @@ export class OnlineGame extends BaseGame {
     super.destroy();
     this.dead = true;
     if (this._onVis) document.removeEventListener("visibilitychange", this._onVis);
-    clearTimeout(this._noShowT); clearTimeout(this._arenaNextT);
+    clearTimeout(this._noShowT); clearTimeout(this._arenaNextT); clearInterval(this._swissPing);
     if (live.room === this.room) live.room = null;
     document.title = "Chess 3D";
     clearInterval(this._lobbyTimer);
@@ -348,7 +350,13 @@ export class OnlineGame extends BaseGame {
     // arena games are scored by the server from the room, aborted ones included (they don't count)
     if (this.cfg.arena && this.myColor) this._reportArena();
     if (r.reason === "aborted" || !this.myColor) return {};
-    const rated = this.kind === "pool" || !!this.cfg.arena;
+    // Swiss games: the server scores them from the room; a ping moves the tournament along
+    if (this.cfg.swiss && this.myColor) {
+      const sw = this.cfg.swiss;
+      Social.api("POST", `/swiss/${sw.id}/ping`, { pid: this.playerId }).catch(() => {});
+      this._arenaNextT = setTimeout(() => { if (!this._destroyed && this.app.controller === this) { closeAllModals(); sw.back(); } }, 8000);
+    }
+    const rated = this.kind === "pool" || !!this.cfg.arena || !!this.cfg.swiss;
     const cls = timeClass(this.tcKey);
     let delta = null;
     if (rated && cls) {
@@ -376,6 +384,10 @@ export class OnlineGame extends BaseGame {
 
   postGameButtons(close = () => {}) {
     const btns = [];
+    if (this.cfg.swiss) {
+      btns.push(h("button.btn.primary", { onclick: () => { close(); clearTimeout(this._arenaNextT); this.cfg.swiss.back(); } }, icon("trophy", 18), "Back to the tournament"));
+      return btns.concat(this._addFriendButton());
+    }
     if (this.cfg.arena) {
       const a = this.cfg.arena;
       btns.push(h("button.btn.primary", { onclick: () => { close(); clearTimeout(this._arenaNextT); a.next(); } }, icon("bolt", 18), "Next game"));
