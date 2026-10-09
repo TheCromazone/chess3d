@@ -38,7 +38,7 @@ export class ProfilePage {
           h("button.btn.small", { onclick: () => this.editProfile() }, icon("edit", 16), "Edit profile"))));
     const stat = (ic, label, slot, extra) => h("div.stat", h("div.lbl", icon(ic, 16), label), h("div.val", String(slot.r)), extra || h("div.note", plural(slot.n, label === "Puzzles" ? "puzzle" : "game")), sparkline(slot.hist));
     page.append(h("section", h("h2", "Ratings"), h("div.stat-grid",
-      stat("bolt", "Bullet", R.bullet), stat("fire", "Blitz", R.blitz), stat("clock", "Rapid", R.rapid),
+      stat("bolt", "Bullet", R.bullet), stat("fire", "Blitz", R.blitz), stat("clock", "Rapid", R.rapid), stat("calendar", "Daily", R.daily),
       stat("robot", "Vs bots", R.bots), stat("puzzle", "Puzzles", R.puzzle),
       h("div.stat", h("div.lbl", icon("bolt", 16), "Puzzle Rush"), h("div.val", String(Math.max(p.rush["3"], p.rush["5"], p.rush.survival))), h("div.note", `3 min ${p.rush["3"]} · 5 min ${p.rush["5"]} · Survival ${p.rush.survival}`)))));
     // variants: ratings from games against random opponents, and recent games of every variant

@@ -62,6 +62,7 @@ const DEFAULT_PROFILE = () => ({
     bullet: { r: 1200, n: 0, hist: [] },
     blitz: { r: 1200, n: 0, hist: [] },
     rapid: { r: 1200, n: 0, hist: [] },
+    daily: { r: 1200, n: 0, hist: [] },
   },
   rush: { "3": 0, "5": 0, survival: 0 },
   puzzles: { solved: 0, failed: 0, streak: 0, bestStreak: 0, seen: [] },

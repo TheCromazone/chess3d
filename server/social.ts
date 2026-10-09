@@ -253,6 +253,8 @@ const MIGRATIONS = [
   `ALTER TABLE social_users ADD COLUMN vratings TEXT NOT NULL DEFAULT '{}'`,   // variant ratings, {variant: {r, n}}
   `ALTER TABLE social_users ADD COLUMN country TEXT NOT NULL DEFAULT ''`,      // ISO 3166 code, for the flag on a profile
   `ALTER TABLE social_users ADD COLUMN about TEXT NOT NULL DEFAULT ''`,        // a line about yourself
+  `ALTER TABLE social_users ADD COLUMN r_daily INTEGER NOT NULL DEFAULT 1200`, // daily (correspondence) rating
+  `ALTER TABLE social_users ADD COLUMN n_daily INTEGER NOT NULL DEFAULT 0`,
 ];
 
 // variants with their own rating (and leaderboard)
@@ -386,7 +388,7 @@ export function leagueRoomClass(room: string): string | null {
 // the friend code a player id carries when its player has social on ("p-x1y2z3.Name.1500.K7M2QX9P")
 function codeOfPid(pid: string): string | null { return /\.([0-9A-Z]{8})$/.exec(pid)?.[1] ?? null; }
 
-const CATS = ["bullet", "blitz", "rapid", "puzzle", "bots"] as const;
+const CATS = ["bullet", "blitz", "rapid", "daily", "puzzle", "bots"] as const;
 type Cat = (typeof CATS)[number];
 const ONLINE_MS = 90_000;
 const CODE_ABC = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
@@ -403,7 +405,7 @@ interface UserRow {
   vratings?: string | null;
   country?: string | null;
   about?: string | null;
-  r_bullet: number; n_bullet: number; r_blitz: number; n_blitz: number; r_rapid: number; n_rapid: number;
+  r_bullet: number; n_bullet: number; r_blitz: number; n_blitz: number; r_rapid: number; n_rapid: number; r_daily: number; n_daily: number;
   r_puzzle: number; n_puzzle: number; r_bots: number; n_bots: number;
 }
 
@@ -810,10 +812,10 @@ export class Social {
       const about = b["about"] === undefined ? (me.about ?? "") : cleanText(b["about"], 160).replace(/\s+/g, " ").trim();
       const [, unread, reqs, latest, updated] = await this.many(
         this.q(`UPDATE social_users SET last_seen = ?, status = ?, name = ?, avatar = ?, games = ?, room = ?, rush = ?, vratings = ?, country = ?, about = ?,
-            r_bullet = ?, n_bullet = ?, r_blitz = ?, n_blitz = ?, r_rapid = ?, n_rapid = ?,
+            r_bullet = ?, n_bullet = ?, r_blitz = ?, n_blitz = ?, r_rapid = ?, n_rapid = ?, r_daily = ?, n_daily = ?,
             r_puzzle = ?, n_puzzle = ?, r_bots = ?, n_bots = ? WHERE id = ?`,
           now, status, name, avatar, games, room, rush, vratings, country, about,
-          vals["r_bullet"], vals["n_bullet"], vals["r_blitz"], vals["n_blitz"], vals["r_rapid"], vals["n_rapid"],
+          vals["r_bullet"], vals["n_bullet"], vals["r_blitz"], vals["n_blitz"], vals["r_rapid"], vals["n_rapid"], vals["r_daily"], vals["n_daily"],
           vals["r_puzzle"], vals["n_puzzle"], vals["r_bots"], vals["n_bots"], me.id),
         this.q("SELECT COUNT(*) AS n FROM social_messages WHERE recipient = ? AND seen = 0", me.id),
         this.q("SELECT COUNT(*) AS n FROM social_friends WHERE b = ? AND state = 'pending'", me.id),
@@ -1088,7 +1090,7 @@ export class Social {
     }
     if (method === "GET" && path === "/leaderboard") {
       const cat = (CATS as readonly string[]).includes(url.searchParams.get("cat") || "") ? (url.searchParams.get("cat") as Cat) : "blitz";
-      const minGames = cat === "puzzle" ? 10 : 5;
+      const minGames = cat === "puzzle" ? 10 : cat === "daily" ? 3 : 5;
       const since = now - 30 * 86_400_000;
       // the column name comes from the fixed CATS list above, never from input
       const [top, rank, total] = await this.many(

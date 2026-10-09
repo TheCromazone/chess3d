@@ -8,7 +8,7 @@ const HOST = "https://timely-ibis-513.higgsfield.app";
 const BASE = (/(^|\.)higgsfield\.app$/.test(location.hostname) ? "" : HOST) + "/api/social";
 const BEAT_VISIBLE_MS = 20000;
 const BEAT_HIDDEN_MS = 60000;
-export const CATS = ["blitz", "bullet", "rapid", "puzzle", "bots"];
+export const CATS = ["blitz", "bullet", "rapid", "daily", "puzzle", "bots"];
 export const LIVE_CHALLENGE_MS = 15 * 60000;   // a live challenge nobody answered is stale after this
 
 // news, videos and live streamers for the Watch page (public; no profile needed)

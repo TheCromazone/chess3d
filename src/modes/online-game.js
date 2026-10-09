@@ -12,7 +12,7 @@ import * as Social from "../net/social.js";
 import { userAvatar, presenceText } from "../ui/people.js";
 
 function myRatingFor(tcKey) {
-  const cls = timeClass(tcKey) || "rapid";
+  const cls = /^\d+d$/.test(tcKey || "") ? "daily" : timeClass(tcKey) || "rapid";
   return getProfile().ratings[cls].r;
 }
 
@@ -393,8 +393,10 @@ export class OnlineGame extends BaseGame {
       Social.api("POST", `/swiss/${sw.id}/ping`, { pid: this.playerId }).catch(() => {});
       this._arenaNextT = setTimeout(() => { if (!this._destroyed && this.app.controller === this) { closeAllModals(); sw.back(); } }, 8000);
     }
-    const rated = this.kind === "pool" || !!this.cfg.arena || !!this.cfg.swiss;
-    const cls = timeClass(this.tcKey);
+    // daily games with a time limit are rated too (chess.com's Daily rating); unlimited ones aren't
+    const daily = this.kind === "daily" && /^\d+d$/.test(this.tcKey || "");
+    const rated = this.kind === "pool" || !!this.cfg.arena || !!this.cfg.swiss || daily;
+    const cls = daily ? "daily" : timeClass(this.tcKey);
     let delta = null;
     if (rated && cls) {
       const score = !r.winner ? 0.5 : r.winner === this.myColor ? 1 : 0;

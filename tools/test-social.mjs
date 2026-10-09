@@ -573,6 +573,15 @@ clock += 4 * 60_000;
 const again = (await call("POST", "/battles/find", { secret: ann.secret })).data.battle;
 ok(again && again.id !== o1.id && !again.opponent, "after a battle ends, searching opens a new one");
 
+// the daily (correspondence) rating
+{
+  await call("POST", "/heartbeat", { secret: cid.secret, body: { ratings: { daily: { r: 1640, n: 4 } } } });
+  const u = (await call("GET", `/users/${cid.id}`, { secret: ann.secret })).data.user;
+  ok(u.ratings.daily.r === 1640 && u.ratings.daily.n === 4, "profiles carry a daily rating");
+  const lb = (await call("GET", "/leaderboard", { secret: cid.secret, query: "?cat=daily" })).data;
+  ok(lb.cat === "daily" && lb.minGames === 3 && lb.top.some((x) => x.id === cid.id) && lb.me.rank === 1, "and there's a daily leaderboard (3 games to be ranked)");
+}
+
 // country and a line about yourself on your profile
 {
   await call("POST", "/heartbeat", { secret: dee.secret, body: { country: "NO", about: "  Endgames   and long walks.\n" } });

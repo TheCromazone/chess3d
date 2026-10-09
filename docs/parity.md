@@ -128,7 +128,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 
 | chess.com feature | Status | Notes |
 |---|---|---|
-| Profile with ratings per category | ✅ | bullet / blitz / rapid / bots / puzzles / rush, kept on the device |
+| Profile with ratings per category | ✅ | bullet / blitz / rapid / daily / bots / puzzles / rush, kept on the device; timed daily games are rated |
 | Game archive, replay, review, PGN download | ✅ | |
 | Stats (W/L/D, rating trend, openings) | ✅ | |
 | Insights (accuracy trend, by phase, by colour / time control, mistakes per game) | ✅ | from your archive and reviews |
@@ -146,7 +146,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Clubs | ✅ | create (public or invite-only), join by code or from the public list, club chat, member list with presence |
 | Club team matches | ✅ | owners challenge other clubs; members sign up; boards pair by rating and each pair plays two daily games, one with each colour; scores from the rooms; checked live |
 | Vote Chess | ✅ | two clubs play one daily game, each move the one most members voted for, played at the deadline or early by the owner; checked live, with the server seating both clubs in a real room |
-| Leaderboards | ✅ | global top 50 per category (blitz, bullet, rapid, puzzles, bots, Puzzle Rush) with your rank, or just your friends; ratings are self-reported by devices and labelled so; bot ladder on the profile |
+| Leaderboards | ✅ | global top 50 per category (blitz, bullet, rapid, daily, puzzles, bots, Puzzle Rush) with your rank, or just your friends; ratings are self-reported by devices and labelled so; bot ladder on the profile |
 | Accounts | ✅ | passwordless by the user's choice: your profile key is the account, with a unique name; sign in on other devices with a one-time code or your recovery key; profile, ratings, settings and games back up to the cloud and follow you; sign out of this or all other devices; delete the profile |
 | Data portability | ✅ | automatic cloud backup with a profile, plus export / import of a backup file |
 
@@ -177,4 +177,10 @@ has that this doesn't, and why:
   the news, videos, streamers, lessons and live events come from outside sources (FIDE, Lichess,
   Chess.com and YouTube feeds, Lichess broadcasts), credited and linked.
 - **Server-verified ratings.** There's no password account, so ratings are kept and reported by
-  each player's device, and leaderboards say so.
+  each player's device, and leaderboards say so. (League trophies are the exception: the server
+  reads every result from the game room.)
+- **Other languages.** chess.com is translated into dozens of languages; this is in English only
+  (country names follow the browser's language).
+- **A masters game database.** The opening explorer has statistics from about a million games
+  between players rated 1800 and up; chess.com also has a masters database. The free masters
+  explorer we could use now needs a Lichess login, so it isn't wired in.

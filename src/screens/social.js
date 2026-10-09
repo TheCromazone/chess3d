@@ -26,7 +26,7 @@ const TABS = [
 ];
 const FORUM_LABEL = { general: "General", openings: "Openings", tactics: "Tactics", endgames: "Endgames", help: "Help and feedback" };
 let forumCat = null;
-const CAT_LABEL = { blitz: "Blitz", bullet: "Bullet", rapid: "Rapid", puzzle: "Puzzles", bots: "Vs bots", rush: "Puzzle Rush" };
+const CAT_LABEL = { blitz: "Blitz", bullet: "Bullet", rapid: "Rapid", daily: "Daily", puzzle: "Puzzles", bots: "Vs bots", rush: "Puzzle Rush" };
 const LB_CATS = [...S.CATS, "rush", "variants"];
 CAT_LABEL.variants = "Variants";
 // the variant boards, in the order of the Variants page
