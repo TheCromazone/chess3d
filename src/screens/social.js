@@ -6,6 +6,7 @@ import { userAvatar, presenceText, notice } from "../ui/people.js";
 import { getProfile } from "../store.js";
 import { OnlineGame } from "../modes/online-game.js";
 import { DAILY_PACES } from "../modes/daily.js";
+import { gamePgn } from "./pages.js";
 import { SFX } from "../audio.js";
 import * as S from "../net/social.js";
 
@@ -190,7 +191,7 @@ export class SocialScreen {
         h("li", icon("chat", 18), h("span", "Message friends and challenge them to live or daily games")),
         h("li", icon("star", 18), h("span", "Create or join clubs, each with its own chat")),
         h("li", icon("trophy", 18), h("span", "See where you rank on the global leaderboard"))),
-      h("p.note", `Other players will see your name (${S.socialName(p.name)}), avatar, ratings and whether you're online. There's no email or password: a key saved in this browser identifies you. To use it on another device, export a backup in Settings and import it there.`),
+      h("p.note", `Other players will see your name (${S.socialName(p.name)}), avatar, ratings, your recent online and bot games, and whether you're online. There's no email or password: a key saved in this browser identifies you. To use it on another device, export a backup in Settings and import it there.`),
       btn);
   }
 
@@ -302,11 +303,25 @@ export class SocialScreen {
         extra.onRemove();
       },
     }, "Remove from club") : null;
+    // recent games, newest first; each opens on the analysis board
+    const games = h("div.profile-games", h("p.note", "Loading recent games…"));
     const m = openModal({
       title: u.name,
       sub: `${presenceText(u)}${u.games ? `, ${u.games} games played` : ""}`,
-      body: [h("div.profile-pop", userAvatar(u, ".lg"), grid), actions, remove, kick],
+      body: [h("div.profile-pop", userAvatar(u, ".lg"), grid), actions, remove, kick, h("div.lbl.note", "Recent games"), games],
     });
+    S.api("GET", `/users/${u.id}/games`).then((d) => {
+      if (!d.games.length) { games.replaceChildren(h("p.note", `${u.name} hasn't finished a game since turning on Social.`)); return; }
+      games.replaceChildren(...d.games.slice(0, 10).map((g) => {
+        const me = g.myColor, winner = g.result === "1-0" ? "w" : g.result === "0-1" ? "b" : null;
+        const res = !me ? "draw" : !winner ? "draw" : winner === me ? "win" : "loss";
+        const opp = me === "b" ? g.white : g.black;
+        return h("button.pg-row", { onclick: () => { m.close(); this.app.go("#/analysis/pgn/" + encodeURIComponent(gamePgn(g))); } },
+          h(`span.res.${res}`, res === "win" ? "+" : res === "loss" ? "−" : "½"),
+          h("span.rt", h("b", `vs ${opp.name}${opp.rating ? ` (${opp.rating})` : ""}`), h("small", `${g.mode === "bot" ? "Bot game" : "Online"}, ${tcLabel(g.tc)}, ${Math.ceil(g.moves.length / 2)} moves, ${timeAgo(g.date)}`)),
+          icon("analysis", 16));
+      }));
+    }).catch(() => games.replaceChildren(h("p.note", "Couldn't load recent games.")));
   }
 
   // ---------- messages ----------

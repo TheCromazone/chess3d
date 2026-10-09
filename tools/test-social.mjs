@@ -192,6 +192,15 @@ ok(v.outcome === "void" && row("Cid").games === 1 && row("Dee").state === "idle"
 const notYet = (await call("POST", `/arenas/${later.id}/pair`, { secret: ann.secret, body: { pid: pidA } }));
 ok(notYet.status === 403 || notYet.data.running === false, "an arena that hasn't started doesn't pair");
 
+// recent games on profiles
+const game = (i) => ({ id: "g" + i, white: { name: "Ann", rating: 1500 }, black: { name: "Stockfish", rating: 2000 }, result: "0-1", reason: "checkmate",
+  tc: "5+0", mode: "bot", myColor: "w", moves: ["e2e4", "e7e5", "<script>", "g1f3"], date: clock });
+ok((await call("POST", "/games", { secret: ann.secret, body: { game: game(0) } })).data.ok, "a finished game can be shared");
+ok((await call("POST", "/games", { secret: ann.secret, body: { game: { ...game(1), moves: [] } } })).status === 400, "a game needs moves");
+for (let i = 1; i <= 33; i++) { clock += 1000; await call("POST", "/games", { secret: ann.secret, body: { game: game(i) } }); }
+const g = (await call("GET", `/users/${ann.id}/games`, { secret: cid.secret })).data.games;
+ok(g.length === 30 && g[0].id === "g33" && g[0].moves.join(" ") === "e2e4 e7e5 g1f3", "profiles keep the last 30 games, newest first, moves cleaned");
+
 // puzzle battles against real players
 let fa = (await call("POST", "/battles/find", { secret: ann.secret })).data.battle;
 ok(fa && !fa.opponent && !fa.starts, "the first searcher opens a battle and waits");

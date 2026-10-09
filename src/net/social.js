@@ -127,6 +127,16 @@ export function startHeartbeat() {
   beat().finally(schedule);
 }
 
+// finished games go on your profile (online and bot games; the server keeps the last 30)
+export function shareGame(rec) {
+  if (!registered() || !rec || !["online", "bot"].includes(rec.mode) || !rec.moves || !rec.moves.length) return;
+  const side = (p) => ({ name: p.name, rating: p.rating });
+  api("POST", "/games", { game: {
+    id: rec.id, white: side(rec.white), black: side(rec.black), result: rec.result, reason: rec.reason, tc: rec.tc, mode: rec.mode,
+    variant: rec.variant, myColor: rec.myColor, startFen: rec.startFen, opening: rec.opening, date: rec.date, moves: rec.moves,
+  } }).catch(() => {});
+}
+
 // a challenge message body is JSON: { room, tc, mode }
 export function parseChallenge(m) {
   try { const c = JSON.parse(m.body); return c && c.room ? c : null; } catch { return null; }

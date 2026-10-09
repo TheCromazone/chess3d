@@ -75,7 +75,13 @@ const SCHEMA = [
      a_uid TEXT NOT NULL, a_score INTEGER NOT NULL DEFAULT 0, a_strikes INTEGER NOT NULL DEFAULT 0, a_done INTEGER NOT NULL DEFAULT 0, a_seen INTEGER NOT NULL DEFAULT 0,
      b_uid TEXT, b_score INTEGER NOT NULL DEFAULT 0, b_strikes INTEGER NOT NULL DEFAULT 0, b_done INTEGER NOT NULL DEFAULT 0, b_seen INTEGER NOT NULL DEFAULT 0)`,
   `CREATE INDEX IF NOT EXISTS social_battles_open ON social_battles (b_uid, a_seen)`,
+  `CREATE TABLE IF NOT EXISTS social_games (id TEXT PRIMARY KEY, uid TEXT NOT NULL, created INTEGER NOT NULL, data TEXT NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS social_games_uid ON social_games (uid, created)`,
 ];
+
+const GAMES_KEPT = 30;              // recent games shown on a profile
+const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
+const RESULTS = ["1-0", "0-1", "1/2-1/2", "*"];
 
 // Puzzle Battle: two players race through the same seeded puzzles for three minutes
 const BATTLE_MS = 180_000;
@@ -521,6 +527,40 @@ export class Social {
     if (seg0 === "arenas") return this.arenas(request, me, seg, now);
     if (seg0 === "battles") return this.battles(request, me, seg, now);
 
+    // POST /games {game}: share a finished game on your profile (the last 30 are kept)
+    if (method === "POST" && path === "/games") {
+      const b = await body(request);
+      const g = (b["game"] && typeof b["game"] === "object" ? b["game"] : {}) as Record<string, unknown>;
+      const side = (v: unknown) => {
+        const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+        const r = Number(o["rating"]);
+        return { name: cleanText(o["name"], 24) || "?", rating: Number.isFinite(r) ? Math.round(r) : null };
+      };
+      const moves = Array.isArray(g["moves"]) ? (g["moves"] as unknown[]).slice(0, 600).filter((m): m is string => typeof m === "string" && UCI_RE.test(m)) : [];
+      const result = RESULTS.includes(String(g["result"])) ? String(g["result"]) : "*";
+      if (!moves.length) throw new HttpError(400, "a game needs moves");
+      const gid = str(g["id"], 24).replace(/[^A-Za-z0-9]/g, "") || randomString(10);
+      const data = {
+        id: gid, white: side(g["white"]), black: side(g["black"]), result, reason: cleanText(g["reason"], 24),
+        tc: str(g["tc"], 8), mode: ["bot", "online", "local"].includes(String(g["mode"])) ? String(g["mode"]) : "online",
+        variant: cleanText(g["variant"], 16), myColor: g["myColor"] === "b" ? "b" : g["myColor"] === "w" ? "w" : null,
+        startFen: cleanText(g["startFen"], 100) || null, opening: cleanText(g["opening"], 80) || null,
+        date: Number.isFinite(Number(g["date"])) ? Number(g["date"]) : now, moves,
+      };
+      await this.many(
+        this.q("INSERT OR REPLACE INTO social_games (id, uid, created, data) VALUES (?, ?, ?, ?)", `${me.id}:${gid}`, me.id, now, JSON.stringify(data)),
+        this.q(`DELETE FROM social_games WHERE uid = ? AND id NOT IN (
+            SELECT id FROM social_games WHERE uid = ? ORDER BY created DESC LIMIT ?)`, me.id, me.id, GAMES_KEPT));
+      return { ok: true };
+    }
+
+    // GET /users/:id/games: a player's recent games
+    if (method === "GET" && seg0 === "users" && seg1 && seg2 === "games") {
+      const r = await this.q("SELECT data FROM social_games WHERE uid = ? ORDER BY created DESC LIMIT ?", seg1, GAMES_KEPT).all<{ data: string }>();
+      const games = r.results.map((x) => { try { return JSON.parse(x.data); } catch { return null; } }).filter(Boolean);
+      return { games };
+    }
+
     // GET /users/:id — a friend's or club-mate's public profile
     if (method === "GET" && seg0 === "users" && seg1) {
       const u = await this.user(seg1);
@@ -537,6 +577,7 @@ export class Social {
         this.q("DELETE FROM social_club_members WHERE member = ?", me.id),
         this.q("DELETE FROM social_club_bans WHERE member = ?", me.id),
         this.q("DELETE FROM social_arena_players WHERE uid = ?", me.id),
+        this.q("DELETE FROM social_games WHERE uid = ?", me.id),
         this.q("DELETE FROM social_battles WHERE a_uid = ? AND b_uid IS NULL", me.id),
         this.q("DELETE FROM social_users WHERE id = ?", me.id));
       for (const c of clubs ?? []) {

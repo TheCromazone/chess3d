@@ -222,7 +222,7 @@ export class SettingsPage {
         switchRow("Sound effects", null, s.sound, (v) => setSettings({ sound: v }))),
       h("section.settings-sec", h("h2", "Social"),
         socialOn()
-          ? [h("p.note", `Social is on. Your friend code is ${fmtCode(myCode())}. Your name, avatar, ratings and online status are visible to other players.`),
+          ? [h("p.note", `Social is on. Your friend code is ${fmtCode(myCode())}. Your name, avatar, ratings, recent games and online status are visible to other players.`),
             h("button.btn.danger", {
               onclick: async () => {
                 if (!(await confirmModal({ title: "Delete your social profile?", sub: "Your friends, messages and club memberships are deleted from the server, and you leave the leaderboard. Games and ratings on this device stay.", yes: "Delete", danger: true }))) return;

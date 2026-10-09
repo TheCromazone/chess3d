@@ -8,6 +8,7 @@ import { MoveList, openModal, updateClock, parseTc, tcLabel, toast, moveEntry, a
 import { getSettings, saveGame, newGameId, updateProfile, unlock } from "../store.js";
 import { moveSound, SFX } from "../audio.js";
 import { openingForGame, loadOpenings } from "../openings.js";
+import { shareGame } from "../net/social.js";
 
 export const VARIANTS = [
   { value: "standard", label: "Standard", desc: "" },
@@ -342,6 +343,7 @@ export class BaseGame {
     const rec = this.record(extra);
     if (rec) {
       saveGame(rec);
+      shareGame(rec);
       this._stats(rec);
     }
     this.redraw(false);
