@@ -169,7 +169,7 @@ export async function beat() {
   const playing = !!live.room || live.busy;
   let r;
   try {
-    r = await api("POST", "/heartbeat", { status: playing ? "playing" : "online", room: live.room, name: socialName(p.name), avatar: p.avatar, ratings, games: p.stats.games });
+    r = await api("POST", "/heartbeat", { status: playing ? "playing" : "online", room: live.room, name: socialName(p.name), avatar: p.avatar, ratings, games: p.stats.games, rush: (p.rush && p.rush["5"]) || 0 });
   } catch {
     state.offline = true;
     emit();

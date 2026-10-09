@@ -20,7 +20,8 @@ const TABS = [
 ];
 const FORUM_LABEL = { general: "General", openings: "Openings", tactics: "Tactics", endgames: "Endgames", help: "Help and feedback" };
 let forumCat = null;
-const CAT_LABEL = { blitz: "Blitz", bullet: "Bullet", rapid: "Rapid", puzzle: "Puzzles", bots: "Vs bots" };
+const CAT_LABEL = { blitz: "Blitz", bullet: "Bullet", rapid: "Rapid", puzzle: "Puzzles", bots: "Vs bots", rush: "Puzzle Rush" };
+const LB_CATS = [...S.CATS, "rush"];
 let lastTc = "10+0";
 let lastPace = "3d";
 const isDailyKey = (k) => k === "inf" || /^\d+d$/.test(k || "");
@@ -147,6 +148,7 @@ export class SocialScreen {
   destroy() { this.dead = true; this.tok++; clearInterval(this.poll); if (this.off) this.off(); }
 
   render() {
+    if (this.dead) return;     // a late async callback after the user moved on
     this.tok++;
     clearInterval(this.poll);
     const page = h("div.page.social");
@@ -665,7 +667,7 @@ export class SocialScreen {
 
   // ---------- leaderboard ----------
   async _leaderboard(tok) {
-    const seg = segmented(S.CATS.map(c => ({ value: c, label: CAT_LABEL[c] })), lbCat, (v) => { lbCat = v; this._leaderboard(++this.tok); });
+    const seg = segmented(LB_CATS.map(c => ({ value: c, label: CAT_LABEL[c] })), lbCat, (v) => { lbCat = v; this._leaderboard(++this.tok); });
     const scope = segmented([{ value: "all", label: "Everyone" }, { value: "friends", label: "Friends" }], lbScope, (v) => { lbScope = v; this._leaderboard(++this.tok); });
     const box = h("div.lb-box", h("p.note", "Loading the leaderboard…"));
     this.body.replaceChildren(h("div.lb-controls", scope, seg), box);
@@ -682,15 +684,21 @@ export class SocialScreen {
     const friendIds = new Set(friends.friends.map(u => u.id));
     const pendingIds = new Set(friends.outgoing.map(u => u.id));
     const unit = lbCat === "puzzle" ? "puzzles" : "games";
+    const rush = lbCat === "rush";
+    const score = (u) => (rush ? u.rush || 0 : u.ratings[lbCat].r);
     let list = d.top, meLine;
     if (lbScope === "friends") {
       // you and your friends, whatever the number of games
       const me = S.socialState().me;
-      list = [...friends.friends, ...(me ? [me] : [])].sort((a, b) => b.ratings[lbCat].r - a.ratings[lbCat].r);
+      list = [...friends.friends, ...(me ? [me] : [])].sort((a, b) => score(b) - score(a));
       const rank = list.findIndex(u => u.id === S.myId()) + 1;
       meLine = friends.friends.length
         ? h("div.status-line.good", icon("trophy", 18), h("span", `You're #${rank} of ${list.length} among your friends.`))
         : h("div.status-line", icon("users", 18), h("span", "Add friends to compare your ratings with theirs."));
+    } else if (rush) {
+      meLine = d.me.rank
+        ? h("div.status-line.good", icon("trophy", 18), h("span", `You're #${d.me.rank} of ${d.total} with ${d.me.rating} puzzles.`))
+        : h("div.status-line", icon("bolt", 18), h("span", "Play a 5-minute Puzzle Rush to get on this board."));
     } else {
       meLine = d.me.rank
         ? h("div.status-line.good", icon("trophy", 18), h("span", `You're #${d.me.rank} of ${d.total} with ${d.me.rating}.`))
@@ -704,16 +712,17 @@ export class SocialScreen {
       return h(`tr${me ? ".me" : ""}`,
         h("td.rank", String(i + 1)),
         h("td", h("button.lb-player", { onclick: () => this._profile(u, friendIds.has(u.id)) }, userAvatar(u, ".sm"), h("b", u.name))),
-        h("td.num", String(u.ratings[lbCat].r)),
-        h("td.num.wide-only", String(u.ratings[lbCat].n)),
+        h("td.num", String(score(u))),
+        h("td.num.wide-only", rush ? "" : String(u.ratings[lbCat].n)),
         h("td", action));
     });
     box.replaceChildren(meLine,
       list.length ? h("div.table-wrap", h("table.table.lb-table",
-        h("thead", h("tr", h("th", "#"), h("th", "Player"), h("th", "Rating"), h("th.wide-only", unit[0].toUpperCase() + unit.slice(1)), h("th", ""))),
+        h("thead", h("tr", h("th", "#"), h("th", "Player"), h("th", rush ? "Best (5 min)" : "Rating"), h("th.wide-only", rush ? "" : unit[0].toUpperCase() + unit.slice(1)), h("th", ""))),
         h("tbody", ...rows)))
         : h("p.note", "Nobody is ranked here yet. Be the first."),
-      h("p.note", lbScope === "friends" ? "Ratings come from each player's own device and aren't verified by the server."
+      h("p.note", rush ? "Best 5-minute Puzzle Rush scores, as reported by each player's device, from players active in the last 30 days."
+        : lbScope === "friends" ? "Ratings come from each player's own device and aren't verified by the server."
         : `Ratings come from each player's own device and aren't verified by the server. Players need ${d.minGames}+ rated ${unit} and a visit in the last 30 days to be listed.`));
   }
 }

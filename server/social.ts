@@ -114,6 +114,7 @@ const BATTLE_FRESH_MS = 8_000;
 // on its own and "duplicate column" errors are expected (and ignored) once it's in place.
 const MIGRATIONS = [
   `ALTER TABLE social_users ADD COLUMN room TEXT`,     // the live game a player is in, for friends to watch
+  `ALTER TABLE social_users ADD COLUMN rush INTEGER NOT NULL DEFAULT 0`,   // best 5-minute Puzzle Rush
 ];
 
 // Live arenas run on a fixed schedule so there's always one to join: every 30 minutes a new one
@@ -142,6 +143,7 @@ const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 interface UserRow {
   id: string; code: string; name: string; avatar: string; created: number; last_seen: number; status: string; games: number;
   room?: string | null;
+  rush?: number;
   r_bullet: number; n_bullet: number; r_blitz: number; n_blitz: number; r_rapid: number; n_rapid: number;
   r_puzzle: number; n_puzzle: number; r_bots: number; n_bots: number;
 }
@@ -196,7 +198,7 @@ function publicUser(u: UserRow, now: number) {
   const online = now - u.last_seen < ONLINE_MS;
   return {
     id: u.id, name: u.name, code: u.code, avatar, online,
-    status: online ? u.status : "offline", lastSeen: u.last_seen, games: u.games,
+    status: online ? u.status : "offline", lastSeen: u.last_seen, games: u.games, rush: u.rush ?? 0,
     ratings: Object.fromEntries(CATS.map((c) => [c, { r: u[`r_${c}`], n: u[`n_${c}`] }])),
   };
 }
@@ -383,11 +385,13 @@ export class Social {
       }
       const games = Number.isFinite(Number(b["games"])) ? Math.max(0, Math.min(1_000_000, Math.round(Number(b["games"])))) : me.games;
       const room = typeof b["room"] === "string" && ROOM_RE.test(b["room"]) && status === "playing" ? b["room"] : null;
+      const rushIn = Number(b["rush"]);
+      const rush = Number.isFinite(rushIn) ? Math.max(0, Math.min(300, Math.round(rushIn))) : (me.rush ?? 0);
       const [, unread, reqs, latest, updated] = await this.many(
-        this.q(`UPDATE social_users SET last_seen = ?, status = ?, name = ?, avatar = ?, games = ?, room = ?,
+        this.q(`UPDATE social_users SET last_seen = ?, status = ?, name = ?, avatar = ?, games = ?, room = ?, rush = ?,
             r_bullet = ?, n_bullet = ?, r_blitz = ?, n_blitz = ?, r_rapid = ?, n_rapid = ?,
             r_puzzle = ?, n_puzzle = ?, r_bots = ?, n_bots = ? WHERE id = ?`,
-          now, status, name, avatar, games, room,
+          now, status, name, avatar, games, room, rush,
           vals["r_bullet"], vals["n_bullet"], vals["r_blitz"], vals["n_blitz"], vals["r_rapid"], vals["n_rapid"],
           vals["r_puzzle"], vals["n_puzzle"], vals["r_bots"], vals["n_bots"], me.id),
         this.q("SELECT COUNT(*) AS n FROM social_messages WHERE recipient = ? AND seen = 0", me.id),
@@ -598,6 +602,19 @@ export class Social {
     }
 
     // ---- leaderboard ----
+    if (method === "GET" && path === "/leaderboard" && url.searchParams.get("cat") === "rush") {
+      // best 5-minute Puzzle Rush scores
+      const since = now - 30 * 86_400_000, mine = me.rush ?? 0;
+      const [top, rank, total] = await this.many(
+        this.q("SELECT * FROM social_users WHERE rush > 0 AND last_seen > ? ORDER BY rush DESC, last_seen DESC LIMIT 50", since),
+        this.q("SELECT COUNT(*) AS n FROM social_users WHERE rush > ? AND last_seen > ?", mine, since),
+        this.q("SELECT COUNT(*) AS n FROM social_users WHERE rush > 0 AND last_seen > ?", since));
+      return {
+        cat: "rush", minGames: 1, top: (top ?? []).map((u) => publicUser(u as unknown as UserRow, now)),
+        me: { rank: mine > 0 ? Number(rank?.[0]?.["n"] ?? 0) + 1 : null, rating: mine, games: null },
+        total: Number(total?.[0]?.["n"] ?? 0),
+      };
+    }
     if (method === "GET" && path === "/leaderboard") {
       const cat = (CATS as readonly string[]).includes(url.searchParams.get("cat") || "") ? (url.searchParams.get("cat") as Cat) : "blitz";
       const minGames = cat === "puzzle" ? 10 : 5;

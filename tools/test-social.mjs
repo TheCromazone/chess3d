@@ -126,6 +126,9 @@ const lb = (await call("GET", "/leaderboard", { secret: a.secret, query: "?cat=b
 ok(lb.top.map((u) => u.name).join(",") === "Eve,Carol,Alice,Dan" && lb.me.rank === 3, "leaderboard ranks active players with enough games");
 ok((await call("GET", "/leaderboard", { secret: b.secret, query: "?cat=blitz" })).data.me.rank === null, "players without enough games aren't ranked");
 ok((await call("GET", "/leaderboard", { secret: a.secret, query: "?cat=hacker'--" })).data.cat === "blitz", "unknown categories fall back safely");
+await call("POST", "/heartbeat", { secret: a.secret, body: { rush: 27 } });
+const rushLb = (await call("GET", "/leaderboard", { secret: a.secret, query: "?cat=rush" })).data;
+ok(rushLb.top[0].name === "Alice" && rushLb.top[0].rush === 27 && rushLb.me.rank === 1, "Puzzle Rush has its own leaderboard");
 
 // registration rate limit per IP
 let regLimited = false;
