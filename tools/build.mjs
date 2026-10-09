@@ -46,9 +46,12 @@ await build({
   const zhCode = readFileSync(join(root, "src/core/zh.js"), "utf8")
     .replace(/^import\s.*chess\.js.*$/m, "")
     .replace(/^export (const|class|function) /gm, "$1 ");
+  // the other variants' rules (no imports of their own) go in wrapped, so their names stay private
+  const vxCode = readFileSync(join(root, "src/core/vx.js"), "utf8").replace(/^export (const|class|function) /gm, "$1 ");
   const srcCode = readFileSync(join(root, "src/logic-src.js"), "utf8")
     .replace(/^import\s.*chess\.js.*$/m, "const { Chess } = __ChessLib;")
-    .replace(/^import\s.*zh\.js.*$/m, zhCode);
+    .replace(/^import\s.*zh\.js.*$/m, zhCode)
+    .replace(/^import\s*\{([^}]*)\}\s*from\s*"\.\/core\/vx\.js";$/m, (_, names) => `const {${names}} = (() => {\n${vxCode}\nreturn {${names}};\n})();`);
   writeFileSync(join(dist, "logic.js"), libCode + "\n" + srcCode);
   console.log("logic.js assembled (inline exports)");
 }

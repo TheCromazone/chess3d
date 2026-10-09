@@ -2,11 +2,13 @@
 // (six-export contract; no imports or timers survive in the bundle output).
 import { Chess } from "chess.js";
 import { Crazyhouse, textToMove } from "./core/zh.js";
+import { VxGame, VX_VARIANTS, vxTextToMove, vxMoveToText } from "./core/vx.js";
 
 export const meta = { game: "Chess 3D", minPlayers: 2, maxPlayers: 2 };
 
 const TIME_CONTROLS = { "1+0": [60, 0], "3+2": [180, 2], "5+0": [300, 0], "10+0": [600, 0], "15+10": [900, 10], "inf": null };
-const VERSION = 4;           // v2: chat / takebacks / abort / custom clocks; v3: daily deadlines; v4: crazyhouse, bughouse
+const VERSION = 5;           // v2: chat / takebacks / abort / custom clocks; v3: daily deadlines; v4: crazyhouse, bughouse;
+                             // v5: duck chess, fog of war, giveaway, atomic, horde
 const ROOM_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const otherColor = (c) => (c === "w" ? "b" : "w");
 
@@ -16,6 +18,19 @@ const otherColor = (c) => (c === "w" ? "b" : "w");
 function zhOf(state) {
   if (state.variant !== "bughouse") return new Crazyhouse(state.zh);
   return new Crazyhouse(state.zh, { feed: (color, type) => { state.outbox = [...(state.outbox || []), { t: "give", color: otherColor(color), type }]; } });
+}
+// Duck Chess, Fog of War, Giveaway, Atomic and Horde keep their position in state.vx
+const ZH_VARIANTS = ["crazyhouse", "bughouse"];
+const VARIANTS = [...ZH_VARIANTS, ...Object.keys(VX_VARIANTS)];
+
+// a variant room's rules behind one interface: whose turn, is it over, is this move text legal
+function rulesOf(state) {
+  if (state.vx) {
+    const g = new VxGame(state.variant, state.vx);
+    return { turn: () => g.turn(), outcome: () => g.outcome(), isLegal: (t) => { const m = vxTextToMove(t); return !!m && g.isLegal(m); } };
+  }
+  const z = new Crazyhouse(state.zh);
+  return { turn: () => z.turn(), outcome: () => z.outcome(), isLegal: (t) => { const m = textToMove(t); return !!m && z.isLegal(m); } };
 }
 const DAILY_DAYS = [1, 2, 3, 5, 7, 14];
 
@@ -82,7 +97,7 @@ export function validateAction(state, playerId, action) {
     if (state.phase !== "config") return { ok: false, error: "the game already started" };
     if (color !== "w") return { ok: false, error: "White chooses the time control" };
     if (!parseTc(action.tc).ok) return { ok: false, error: "unknown time control" };
-    if (action.variant !== undefined && !["standard", "crazyhouse", "bughouse"].includes(action.variant)) return { ok: false, error: "unknown variant" };
+    if (action.variant !== undefined && action.variant !== "standard" && !VARIANTS.includes(action.variant)) return { ok: false, error: "unknown variant" };
     if (action.variant === "bughouse" && !(typeof action.link === "string" && ROOM_RE.test(action.link))) return { ok: false, error: "a bughouse board needs its partner board" };
     return { ok: true };
   }
@@ -90,11 +105,10 @@ export function validateAction(state, playerId, action) {
   if (finished) return { ok: false, error: "the game is over" };
 
   if (action.t === "move" && state.variant) {
-    const z = new Crazyhouse(state.zh);
-    if (z.outcome().over) return { ok: false, error: "the game is over" };
-    if (z.turn() !== color) return { ok: false, error: "not your turn" };
-    const m = textToMove(action.move);
-    if (!m || !z.isLegal(m)) return { ok: false, error: "illegal move" };
+    const r = rulesOf(state);
+    if (r.outcome().over) return { ok: false, error: "the game is over" };
+    if (r.turn() !== color) return { ok: false, error: "not your turn" };
+    if (typeof action.move !== "string" || !r.isLegal(action.move)) return { ok: false, error: "illegal move" };
     return { ok: true };
   }
   if (action.t === "move") {
@@ -134,9 +148,9 @@ export function validateAction(state, playerId, action) {
     const opp = color === "w" ? "b" : "w";
     let turn;
     if (state.variant) {
-      const z = new Crazyhouse(state.zh);
-      if (z.outcome().over) return { ok: false, error: "the game is over" };
-      turn = z.turn();
+      const r = rulesOf(state);
+      if (r.outcome().over) return { ok: false, error: "the game is over" };
+      turn = r.turn();
     } else {
       const game = rebuild(state);
       if (game.isGameOver()) return { ok: false, error: "the game is over" };
@@ -176,13 +190,16 @@ export function applyAction(state, playerId, action) {
 
   if (action.t === "config") {
     const { tc, perMove } = parseTc(action.tc);
-    const variant = action.variant === "crazyhouse" || action.variant === "bughouse" ? action.variant : null;
+    const variant = VARIANTS.includes(action.variant) ? action.variant : null;
+    const vx = VX_VARIANTS[variant] ? new VxGame(variant) : null;
     return {
       ...state,
       phase: "playing",
       tcKey: action.tc,
       variant,
-      zh: variant ? new Crazyhouse().state() : undefined,
+      zh: ZH_VARIANTS.includes(variant) ? new Crazyhouse().state() : undefined,
+      vx: vx ? vx.state() : undefined,
+      fen: vx ? vx.fen : state.fen,
       link: variant === "bughouse" ? action.link : undefined,
       outbox: [],
       tc: tc ? { initial: tc[0], inc: tc[1], perMove: !!perMove } : null,
@@ -203,6 +220,11 @@ export function applyAction(state, playerId, action) {
       }
       // daily games: the mover gets their full allowance back for their next turn
       clock = { ...clock, [color]: state.tc.perMove ? state.tc.initial * 1000 : remaining + state.tc.inc * 1000, lastAt: now };
+    }
+    if (state.vx) {
+      const g = new VxGame(state.variant, state.vx);
+      const desc = g.move(vxTextToMove(action.move));
+      return { ...state, clock, drawOffer: null, vx: g.state(), fen: g.fen, moves: [...state.moves, action.move], san: [...state.san, desc.san] };
     }
     if (state.variant) {
       const next = { ...state, clock, drawOffer: null };
@@ -289,7 +311,7 @@ export function isGameOver(state) {
   if (state.aborted) return { over: true, draw: true, reason: "aborted" };
   if (state.agreedDraw) return { over: true, draw: true, reason: "agreement" };
   if (state.variant) {
-    const o = new Crazyhouse(state.zh).outcome();
+    const o = rulesOf(state).outcome();
     if (!o.over) return { over: false };
     return o.winner ? { over: true, winner: o.winner === "w" ? state.white : state.black, reason: o.reason } : { over: true, draw: true, reason: o.reason };
   }
@@ -306,6 +328,23 @@ export function isGameOver(state) {
   return { over: false };
 }
 
-export function viewFor(state, _playerId) {
-  return { ...state, serverNow: Date.now() }; // chess has no hidden information
+// Chess has no hidden information, except in Fog of War: there each player gets only what their
+// pieces can see (the server sends their legal moves too, since a hidden piece can block a pawn),
+// and the other side's moves stay hidden until the game ends. Spectators see nothing until then.
+export function viewFor(state, playerId) {
+  if (state.variant !== "fog" || !state.vx || isGameOver(state).over) return { ...state, serverNow: Date.now() };
+  const g = new VxGame("fog", state.vx);
+  const color = colorOf(state, playerId);
+  const mine = (i) => (i % 2 === 0 ? "w" : "b") === color;
+  const fen = color ? g.foggedFen(color) : "8/8/8/8/8/8/8/8 " + g.fen.split(" ").slice(1).join(" ");
+  return {
+    ...state,
+    vx: { variant: "fog", fen, keys: [] },
+    fen,
+    moves: state.moves.map((m, i) => (mine(i) ? m : null)),
+    san: state.san.map((x, i) => (mine(i) ? x : null)),
+    visible: color ? g.visible(color) : [],
+    legal: color && g.turn() === color ? g.moves().map(vxMoveToText) : [],
+    serverNow: Date.now(),
+  };
 }

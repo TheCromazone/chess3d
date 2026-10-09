@@ -94,6 +94,8 @@ const CSS = `
 .b2d-hover{box-shadow:inset 0 0 0 max(2px,calc(var(--b2d-sq)*.05)) rgba(255,255,255,.65)}
 .b2d-cursor{box-shadow:inset 0 0 0 max(2px,calc(var(--b2d-sq)*.05)) rgba(52,210,123,.95)}
 .b2d-badgesq{pointer-events:none;overflow:visible}
+.b2d-fog{background:rgba(14,11,16,.84)}
+.b2d-duck{background:center/84% no-repeat;filter:drop-shadow(0 calc(var(--b2d-sq)*.03) calc(var(--b2d-sq)*.03) rgba(0,0,0,.45))}
 .b2d-badge{position:absolute;right:-9%;top:-9%;width:40%;height:40%;border-radius:50%;display:grid;place-items:center;color:#fff;font:900 calc(var(--b2d-sq)*.19)/1 system-ui,sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.45),inset 0 0 0 max(1px,calc(var(--b2d-sq)*.02)) rgba(255,255,255,.55);letter-spacing:-.5px}
 .b2d-coord{position:absolute;left:0;top:0;width:12.5%;height:12.5%;box-sizing:border-box;display:flex;
   padding:calc(var(--b2d-sq)*.035) calc(var(--b2d-sq)*.055);
@@ -130,6 +132,9 @@ const div = (cls, parent) => {
 
 const SVGNS = "http://www.w3.org/2000/svg";
 const preloaded = new Set();
+
+// the duck in Duck Chess: a little yellow duck facing right
+const DUCK_IMG = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><g stroke='#4a3500' stroke-width='3' stroke-linejoin='round'><path d='M12 50 L24 60 Q20 86 52 86 Q84 86 84 64 Q84 52 70 52 L42 54 Q26 56 12 50Z' fill='#f4c430'/><circle cx='66' cy='38' r='17' fill='#f4c430'/><path d='M81 35 L97 41 L81 47Z' fill='#f08a24'/></g><circle cx='70' cy='33' r='3.4' fill='#1d1405'/><path d='M36 64 Q52 58 64 68 Q50 77 36 70Z' fill='#e0a91c'/></svg>`)}")`;
 
 export class Board2D {
   /**
@@ -207,6 +212,9 @@ export class Board2D {
       sel: mk("b2d-sel", hl),
       check: mk("b2d-check", hl),
     });
+    // Fog of War: squares you can't see, drawn over the highlights
+    this._fogLayer = div("b2d-layer", hl);
+    this._fogs = [];
 
     const coords = this._coordsLayer = div("b2d-layer b2d-coords", surface);
     coords.setAttribute("aria-hidden", "true");
@@ -230,6 +238,10 @@ export class Board2D {
 
     this._pieceLayer = div("b2d-layer b2d-pieces", b);
     this._pieceLayer.setAttribute("aria-hidden", "true");
+
+    // Duck Chess: the duck sits on its square like a piece, but isn't one
+    this._el.duck = mk("b2d-duck", div("b2d-layer", b));
+    this._el.duck.style.backgroundImage = DUCK_IMG;
 
     // move-classification badge (Game Review), drawn over the pieces at a square's corner
     const badgeLayer = div("b2d-layer", b);
@@ -550,6 +562,10 @@ export class Board2D {
 
   setLastMove(from, to) { this._show(this._el.lastFrom, from); this._show(this._el.lastTo, to); }
   setCheck(sq) { this._show(this._el.check, sq); }
+  /** Extra: Fog of War, the squares to hide */
+  setFog(squares) { this._pool(this._fogs, this._fogLayer, "b2d-fog", squares); }
+  /** Extra: Duck Chess, the duck's square (null hides it) */
+  setDuck(sq) { this._show(this._el.duck, sq); }
   /** Extra: Game Review classification badge on a square (null clears). badge = { text, color } */
   setBadge(sq, badge) {
     if (!sq || !badge) { this._show(this._el.badge, null); return; }

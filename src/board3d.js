@@ -124,7 +124,7 @@ export class Board3D {
     this._pieces = [];
     this._bySq = new Map();
     this._counts = new Int32Array(12);
-    this._hl = { lastFrom: null, lastTo: null, check: null, selected: null, preFrom: null, preTo: null, quiet: [], caps: [], cursor: null };
+    this._hl = { lastFrom: null, lastTo: null, check: null, selected: null, preFrom: null, preTo: null, quiet: [], caps: [], cursor: null, fog: [] };
     this._marks = [];
     this._arrows = [];
     this._userCircles = [];
@@ -441,6 +441,34 @@ export class Board3D {
 
   clearHints() { this._hl.quiet = []; this._hl.caps = []; this._hl.selected = null; this._overlayChanged(); }
 
+  /** Extra: Fog of War, the squares to hide */
+  setFog(squares) { this._hl.fog = (squares || []).filter(isSq); this._overlayChanged(); }
+
+  /** Extra: Duck Chess, the duck's square (null hides it); a small modelled duck */
+  setDuck(sq) {
+    if (!this._duck) {
+      const g = new THREE.Group();
+      const yellow = new THREE.MeshStandardMaterial({ color: 0xf2c230, roughness: 0.55 });
+      const orange = new THREE.MeshStandardMaterial({ color: 0xe8782a, roughness: 0.5 });
+      const dark = new THREE.MeshStandardMaterial({ color: 0x1a1208, roughness: 0.35 });
+      const part = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
+      part(new THREE.SphereGeometry(0.25, 24, 16), yellow, 0, 0.19, 0).scale.set(1.25, 0.78, 0.95);
+      part(new THREE.ConeGeometry(0.09, 0.2, 12), yellow, -0.33, 0.27, 0).rotation.z = Math.PI / 2.4;
+      part(new THREE.SphereGeometry(0.145, 20, 14), yellow, 0.19, 0.47, 0);
+      const beak = part(new THREE.ConeGeometry(0.055, 0.15, 12), orange, 0.37, 0.45, 0);
+      beak.rotation.z = -Math.PI / 2;
+      beak.scale.set(1, 1, 0.65);
+      for (const z of [-0.075, 0.075]) part(new THREE.SphereGeometry(0.022, 10, 8), dark, 0.285, 0.52, z);
+      g.rotation.y = -Math.PI / 4;
+      this.scene.add(g);
+      this._duck = g;
+    }
+    this._duck.visible = isSq(sq);
+    if (isSq(sq)) { const { x, z } = sqToXZ(sq); this._duck.position.set(x, BOARD_TOP, z); }
+    this.renderer.shadowMap.needsUpdate = true;
+    this.invalidate();
+  }
+
   /** Extra: Game Review classification badge floating at a square's corner (null clears). */
   setBadge(sq, badge) {
     if (!this._badge) {
@@ -752,6 +780,7 @@ export class Board3D {
     this._pal = {
       last: pc(hl.last), sel: pc(hl.sel), pre: pc(hl.pre), dot: pc(hl.dot), ring: pc(hl.ring),
       hover: pc(hl.hover), check: pc(hl.check), cursor: pc(hl.cursor),
+      fog: pc("rgba(10,8,12,.86)"),
     };
     this._overlayChanged();
   }
@@ -964,6 +993,7 @@ export class Board3D {
     if (!P) return;
     ov.begin();
     const fill = (sq, rgba) => { if (sq) ov.push(sqX(sq), sqZ(sq), 1, SHAPE.FILL, rgba); };
+    for (const sq of hl.fog) fill(sq, P.fog);
     fill(hl.lastFrom, P.last);
     fill(hl.lastTo, P.last);
     fill(hl.preFrom, P.pre);

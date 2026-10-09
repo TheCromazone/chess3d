@@ -228,7 +228,7 @@ export function sparkline(hist, color = "var(--accent)") {
 
 // ---------- modal ----------
 let modalStack = [];
-export function openModal({ title, sub, body, closable = true, onClose, light = false }) {
+export function openModal({ title, sub, body, closable = true, onClose, light = false, wide = false }) {
   const root = $("#modal-root");
   const back = h(`div.modal-back${light ? ".light" : ""}`);
   const close = () => {
@@ -238,7 +238,7 @@ export function openModal({ title, sub, body, closable = true, onClose, light = 
     if (onClose) onClose();
   };
   const onKey = (e) => { if (e.key === "Escape" && closable && modalStack[modalStack.length - 1] === api) close(); };
-  const card = h("div.modal", { role: "dialog", "aria-modal": "true", "aria-label": title || "Dialog" },
+  const card = h(`div.modal${wide ? ".wide" : ""}`, { role: "dialog", "aria-modal": "true", "aria-label": title || "Dialog" },
     title || sub ? h("div.modal-head",
       title ? h("h2", title) : null,
       sub ? h("p", sub) : null,

@@ -7,6 +7,8 @@ import { MoveInput } from "../core/input.js";
 import { kingSquare } from "../core/tree.js";
 import { Crazyhouse, POCKET_ORDER, textToMove, moveToText, VALUES } from "../core/zh.js";
 import { ZH_LEVELS } from "../core/zh-engine.js";
+import { VX_VARIANTS } from "../core/vx.js";
+import { VX_INFO } from "./vx-game.js";
 import { RoomClient, makePlayerId, parsePlayerId, peekRoom, live } from "../net/room.js";
 import { getProfile, getSettings } from "../store.js";
 import { SFX } from "../audio.js";
@@ -17,16 +19,16 @@ const randomId = (n = 8) => Array.from(crypto.getRandomValues(new Uint8Array(n))
 const REASONS = { checkmate: "by checkmate", stalemate: "by stalemate", threefold: "by repetition", resignation: "by resignation", timeout: "on time", agreement: "by agreement", aborted: "game aborted" };
 const reasonText = (r) => (r && r.startsWith("partner-") ? `on the other board (${REASONS[r.slice(8)] || r.slice(8)})` : REASONS[r] || "");
 
-// one engine worker for the page
+// one engine worker for the page (also used by the other variants: kind "vx")
 let worker = null, jobId = 0;
 const jobs = new Map();
-function think(state, opts) {
+export function think(state, opts, kind = "zh") {
   if (!worker) {
     worker = new Worker("./zh-worker.js");
     worker.onmessage = (e) => { const j = jobs.get(e.data.id); if (j) { jobs.delete(e.data.id); j(e.data.move); } };
   }
   const id = ++jobId;
-  return new Promise((res) => { jobs.set(id, res); worker.postMessage({ id, state, opts }); });
+  return new Promise((res) => { jobs.set(id, res); worker.postMessage({ id, state, opts, kind }); });
 }
 
 // a pocket row: tap a piece to drop it
@@ -539,6 +541,7 @@ export class VariantsScreen {
       body: [h("div.rows",
         row("cube", "Crazyhouse", "Captured pieces come back as drops. Bots, pass and play, or a friend", () => this.app.go("#/crazyhouse")),
         row("users", "Bughouse", "Two boards, two teams: your captures feed your partner", () => this.app.go("#/bughouse")),
+        ...Object.entries(VX_INFO).map(([id, info]) => row(info.icon, VX_VARIANTS[id].name, info.short, () => this.app.go(`#/variant/${id}`))),
         row("grid", "Chess960", "Shuffled back rank, against bots or on one screen", () => this.app.go("#/bots")),
         row("star", "King of the Hill", "Also win by reaching the centre with your king", () => this.app.go("#/bots")),
         row("bolt", "Three-check", "Also win by giving three checks", () => this.app.go("#/bots"))),

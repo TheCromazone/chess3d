@@ -17,6 +17,8 @@ import { BattleScreen } from "./modes/battle.js";
 import { SocialScreen, startSocial } from "./screens/social.js";
 import { ArenasScreen, ArenaLobby } from "./screens/arenas.js";
 import { ZhGame, ZhSetup, BughouseLobby, VariantsScreen } from "./modes/zh-game.js";
+import { VxPlay, VxSetup } from "./modes/vx-game.js";
+import { VX_VARIANTS } from "./core/vx.js";
 import { getResume, setSettings } from "./store.js";
 import { unlockAudio } from "./audio.js";
 import { loadOpenings } from "./openings.js";
@@ -54,6 +56,14 @@ const routes = [
     pattern: /^#\/crazyhouse\/online$/, nav: "play", make: (app) => {
       const q = new URLSearchParams(location.search);
       return q.get("room") ? new ZhGame(app, { mode: "online", room: q.get("room"), tcKey: q.get("tc") || "3+0" }) : new ZhSetup(app);
+    },
+  },
+  { pattern: /^#\/variant\/([a-z]+)(?:\/play)?$/, nav: "play", make: (app, m) => (VX_VARIANTS[m[1]] ? new VxSetup(app, m[1]) : new VariantsScreen(app)) },
+  {
+    pattern: /^#\/variant\/([a-z]+)\/online$/, nav: "play", make: (app, m) => {
+      const q = new URLSearchParams(location.search);
+      if (!VX_VARIANTS[m[1]]) return new VariantsScreen(app);
+      return q.get("room") ? new VxPlay(app, { variant: m[1], mode: "online", room: q.get("room"), tcKey: q.get("tc") || "3+0" }) : new VxSetup(app, m[1]);
     },
   },
   { pattern: /^#\/bughouse$/, nav: "play", make: (app) => new BughouseLobby(app, null) },

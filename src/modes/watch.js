@@ -66,7 +66,7 @@ export class WatchPage {
 // videos play in the page through YouTube's privacy-enhanced player
 function playVideo(v) {
   openModal({
-    title: v.title, sub: v.channel,
+    title: v.title, sub: v.channel, wide: true,
     body: h("div.video-frame", h("iframe", {
       src: `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0`, title: v.title,
       allow: "autoplay; encrypted-media; picture-in-picture; fullscreen", allowfullscreen: true, referrerpolicy: "strict-origin-when-cross-origin",

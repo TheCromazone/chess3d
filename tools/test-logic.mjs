@@ -141,7 +141,7 @@ ok(s9.flagged === "w" && s9.moves.length === 0, "a move after your deadline is a
 // v4: Crazyhouse
 let z = L.setup([P1, P2]);
 ok(z.v >= 4, "state advertises v4");
-ok(!L.validateAction(z, P1, { t: "config", tc: "3+0", variant: "atomic" }).ok, "unknown variants are refused");
+ok(!L.validateAction(z, P1, { t: "config", tc: "3+0", variant: "losers" }).ok, "unknown variants are refused (v4)");
 z = L.applyAction(z, P1, { t: "config", tc: "3+0", variant: "crazyhouse" });
 const zplay = (pid, mv) => { const v = L.validateAction(z, pid, { t: "move", move: mv }); if (!v.ok) { ok(false, mv + ": " + v.error); return; } z = L.applyAction(z, pid, { t: "move", move: mv }); };
 for (const [pid, mv] of [[P1, "e2e4"], [P2, "d7d5"], [P1, "e4d5"], [P2, "d8d5"]]) zplay(pid, mv);
@@ -172,6 +172,41 @@ ok(L.isGameOver(A).over && end && end.winner === "b", "when board A ends, a resu
 Bd = L.applyAction(Bd, "__link", end);
 r = L.isGameOver(Bd);
 ok(r.over && r.winner === P4 && /^partner-/.test(r.reason), "board B ends with the same team winning (P1 and P4)");
+
+// v5: Duck Chess, Fog of War, Giveaway, Atomic, Horde
+ok(L.setup([P1, P2]).v >= 5, "state advertises v5");
+ok(!L.validateAction(L.setup([P1, P2]), P1, { t: "config", tc: "3+0", variant: "kriegspiel" }).ok, "unknown variants are refused");
+const vplay = (st, ...ms) => { for (const [pid, mv] of ms) { const v = L.validateAction(st, pid, { t: "move", move: mv }); if (!v.ok) throw new Error(mv + ": " + v.error); st = L.applyAction(st, pid, { t: "move", move: mv }); } return st; };
+let d = L.applyAction(L.setup([P1, P2]), P1, { t: "config", tc: "3+0", variant: "duck" });
+ok(d.variant === "duck" && d.vx && !d.zh, "a duck room keeps its position in state.vx");
+ok(!L.validateAction(d, P1, { t: "move", move: "e2e4" }).ok, "duck: a move without the duck is refused");
+ok(!L.validateAction(vplay(d, [P1, "e2e4,e6"]), P2, { t: "move", move: "e7e5,a3" }).ok, "duck: a pawn can't pass through the duck");
+d = vplay(d, [P1, "e2e4,e6"], [P2, "d7d5,a3"]);
+ok(d.san.join(" ") === "e4@e6 d5@a3" && !L.validateAction(d, P1, { t: "move", move: "a2a3,h5" }).ok, "duck: moves are recorded with the duck, which blocks its square");
+let atom = L.applyAction(L.setup([P1, P2]), P1, { t: "config", tc: "inf", variant: "atomic" });
+atom = vplay(atom, [P1, "e2e4"], [P2, "d7d5"], [P1, "e4d5"]);
+ok(atom.fen.split(" ")[0] === "rnbqkbnr/ppp1pppp/8/8/8/8/PPPP1PPP/RNBQKBNR", "atomic: a capture explodes (both pawns gone)");
+atom = L.applyAction(L.setup([P1, P2]), P1, { t: "config", tc: "inf", variant: "atomic" });
+atom = vplay(atom, [P1, "g1f3"], [P2, "e7e6"], [P1, "f3g5"], [P2, "a7a6"], [P1, "g5f7"]);
+r = L.isGameOver(atom);
+ok(r.over && r.winner === P1 && r.reason === "explosion", "atomic: Nxf7 blows up the king and wins");
+let give = L.applyAction(L.setup([P1, P2]), P1, { t: "config", tc: "inf", variant: "giveaway" });
+give = vplay(give, [P1, "e2e3"], [P2, "b7b5"]);
+ok(!L.validateAction(give, P1, { t: "move", move: "a2a3" }).ok && L.validateAction(give, P1, { t: "move", move: "f1b5" }).ok, "giveaway: a capture is compulsory");
+let horde = L.applyAction(L.setup([P1, P2]), P1, { t: "config", tc: "inf", variant: "horde" });
+ok(horde.fen.startsWith("rnbqkbnr/pppppppp/8/1PP2PP1/PPPPPPPP"), "horde: the horde is set up");
+// Fog of War: each side sees only its own part of the board, and the other side's moves stay hidden
+let fog = L.applyAction(L.setup([P1, P2]), P1, { t: "config", tc: "inf", variant: "fog" });
+fog = vplay(fog, [P1, "e2e4"], [P2, "e7e5"]);
+const vw = L.viewFor(fog, P1), vb = L.viewFor(fog, P2), vs = L.viewFor(fog, "p-spectator");
+ok(!vw.fen.split(" ")[0].includes("r") && vw.fen.includes("P"), "fog: White's view hides Black's back rank");
+ok(vw.moves[0] === "e2e4" && vw.moves[1] === null && vw.san[1] === null, "fog: White doesn't see Black's move");
+ok(vb.moves[0] === null && vb.moves[1] === "e7e5", "fog: Black doesn't see White's move");
+ok(Array.isArray(vw.legal) && vw.legal.includes("g1f3") && !vw.legal.includes("e4e5") && vb.legal.length === 0, "fog: the mover gets their legal moves (e4 is blocked by an unseen pawn)");
+ok(vw.visible.includes("e5") === false && vw.vx.keys.length === 0, "fog: a blocking pawn stays hidden; history isn't sent");
+ok(vs.fen.startsWith("8/8/8/8/8/8/8/8") && vs.moves.every((m) => m === null), "fog: spectators see nothing until the end");
+fog = L.applyAction(fog, P2, { t: "resign" });
+ok(L.viewFor(fog, P1).moves[1] === "e7e5" && L.viewFor(fog, P1).fen.includes("pppp1ppp"), "fog: everything is revealed when the game ends");
 
 console.log(failures === 0 ? "\nALL TESTS PASSED" : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);
