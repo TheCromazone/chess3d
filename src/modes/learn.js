@@ -33,6 +33,11 @@ export class LearnPage {
         h("div.grid-cards", ...LESSONS.filter(l => l.category === cat).map(l => h("button.tile", { onclick: () => this.app.go(`#/lesson/${l.id}`) },
           h("b", l.title), h("small", `${l.steps.length} steps`), p.lessons[l.id] ? h("span.done", "✓ Completed") : null)))));
     }
+    addChip("Vision", "learn-vision");
+    page.append(h("section", { id: "learn-vision" }, h("h2", "Vision"),
+      h("div.grid-cards", h("button.tile", { onclick: () => this.app.go("#/vision") },
+        h("span.ti", icon("eye", 22)), h("b", "Board vision trainer"), h("small", "Tap the named square, as many as you can in 30 seconds"),
+        p.vision ? h("span.done", `Best: ${Math.max(p.vision.w || 0, p.vision.b || 0)}`) : null))));
     addChip("Endgame drills", "learn-drills");
     page.append(h("section", { id: "learn-drills" }, h("h2", "Endgame drills"),
       h("p.note", { style: { marginBottom: "10px" } }, "Convert or hold these positions against Stockfish."),

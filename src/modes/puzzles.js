@@ -271,7 +271,8 @@ export class PuzzleScreen {
       title: this.mode === "daily" ? "Daily puzzle" : "Puzzles",
       actions: this.mode === "rated" ? h("div", { style: { display: "flex", gap: "6px" } },
         h("button.btn.small", { onclick: () => this.app.go("#/puzzles/rush") }, icon("bolt", 16), "Rush"),
-        h("button.btn.small", { onclick: () => this.app.go("#/puzzles/battle") }, icon("users", 16), "Battle")) : null,
+        h("button.btn.small", { onclick: () => this.app.go("#/puzzles/battle") }, icon("users", 16), "Battle"),
+        h("button.btn.small", { onclick: () => this.app.go("#/puzzles/solo") }, icon("puzzle", 16), "Solo")) : null,
       body: [ratingRow, this.statusEl, themeSel, info],
       foot,
     });

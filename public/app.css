@@ -765,3 +765,6 @@ a.row { color: inherit; text-decoration: none; }
 .eg-result.live { color: var(--danger); }
 .event-page .page-head .btn { margin-bottom: 6px; }
 .event-game .mini-board span { font-size: clamp(11px, 1.6vw, 17px); }
+
+/* Vision trainer: the square to find */
+.vision-target { font-family: var(--display); font-size: 88px; line-height: 1; font-weight: 700; text-align: center; letter-spacing: 2px; }

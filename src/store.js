@@ -216,6 +216,8 @@ export function setResume(v) { if (v) write(KEY.resume, v); else { try { localSt
 // ---------- achievements ----------
 export const ACHIEVEMENTS = [
   { id: "first-game", name: "First moves", desc: "Finish your first game", icon: "♙" },
+  { id: "vision-20", name: "Board sight", desc: "Find 20 squares in a Vision round", icon: "👁" },
+  { id: "solo-chess", name: "Last one standing", desc: "Solve a Solo Chess puzzle", icon: "♛" },
   { id: "first-win", name: "Winner", desc: "Win a game", icon: "♔" },
   { id: "beat-beginner", name: "Off the ground", desc: "Beat a Beginner bot", icon: "🥉" },
   { id: "beat-intermediate", name: "Climbing", desc: "Beat an Intermediate bot", icon: "🥈" },
