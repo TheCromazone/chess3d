@@ -437,6 +437,12 @@ await call("POST", "/delete", { secret: rep3.secret });
   await call("POST", "/clubs/leave", { secret: cid.secret, body: { id: kb.id } });
   ok(count("social_club_matches", "id", run.id) === 0 && count("social_club_match_games", "mid", run.id) === 0 && count("social_club_match_players", "mid", run.id) === 0, "with both clubs gone the match goes");
   ok(count("social_vote_games", "id", vote.id) === 0 && count("social_vote_votes", "game", vote.id) === 0, "and so does the Vote Chess game");
+  // games left behind by clubs dropped earlier are swept up when any club goes
+  sqlite.prepare("INSERT INTO social_club_matches (id, a_club, b_club, tc, boards, status, created) VALUES ('cm_stale', 'c_x', 'c_y', '3d', 1, 'running', 0)").run();
+  sqlite.prepare("INSERT INTO social_vote_games (id, a_club, b_club, tc, status, created) VALUES ('vc_stale', 'c_x', 'c_y', '1d', 'running', 0)").run();
+  const kc = (await call("POST", "/clubs/create", { secret: dee.secret, body: { name: "Brief Club" } })).data;
+  await call("POST", "/clubs/leave", { secret: dee.secret, body: { id: kc.id } });
+  ok(count("social_club_matches", "id", "cm_stale") === 0 && count("social_vote_games", "id", "vc_stale") === 0, "stale games from clubs dropped earlier are swept up too");
 }
 
 // variant ratings and leaderboards
