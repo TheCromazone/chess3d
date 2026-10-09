@@ -177,6 +177,15 @@ export class OnlineGame extends BaseGame {
     this.v2 = (v.v || 1) >= 2;
     if (this.v2 !== wasV2) { this._renderChat(); this._renderControls(); }
 
+    // called off before it began (quick pairing does this when one player has blocked the other)
+    if (s.status === "over" && v.phase === "config") {
+      if (this.kind === "pool" && this.app.controller === this) {
+        toast("That pairing fell through. Finding you another opponent.");
+        this.app.setController(() => new OnlineGame(this.app, { kind: "pool", tcKey: this.tcKey }));
+      } else this._setNote("This game was called off before it started.");
+      return;
+    }
+
     // time control: the first seat (White) configures it from the room's agreed setting
     if (v.phase !== "config") this.sentConfig = false;   // a later reset needs a fresh config
     if (v.phase === "config") {
@@ -197,7 +206,27 @@ export class OnlineGame extends BaseGame {
     if (v.tcKey && v.tcKey !== this.tcKey) { this.tcKey = v.tcKey; }
 
     // moves: reconcile
+    const before = this.chess.history().length;
+    const hadPlan = (this.cond || []).length > 0;
     this._syncMoves(v.moves);
+    const plan = (v.cond && this.myColor && v.cond[this.myColor]) || [];
+    const planChanged = JSON.stringify(plan) !== JSON.stringify(this.cond || []) || this.v8 !== (v.v || 1) >= 8;
+    this.v8 = (v.v || 1) >= 8;
+    this.cond = plan;
+    if (planChanged) this._renderControls();
+    // daily games: tell the opponent it's their move, unless a reply they lined up already answered it
+    if (this._nudge && v.moves.length >= this._nudge.ply) {
+      const n = this._nudge;
+      this._nudge = null;
+      if (v.moves.length === n.ply && s.status === "playing") Social.api("POST", "/nudge", { code: this.oppCode, room: this.room, san: n.san }).catch(() => {});
+      else if (v.moves.length > n.ply && v.san) toast(`They had a reply ready: ${v.san[n.ply]}`);
+    } else if (this.kind === "daily" && hadPlan && v.moves.length >= before + 2 && this.myColor) {
+      toast(`They played ${v.san[before]}, and your planned reply ${v.san[before + 1]} was played`);
+    }
+    if (this.kind === "daily" && this.myColor && v.away) {
+      const until = v.away[this.myColor === "w" ? "b" : "w"];
+      if (until > Date.now()) this._setNote(`Your opponent is on vacation until ${new Date(until).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}.`);
+    }
 
     if (this.kind === "daily" && this.myColor) {
       const oppId = this.myColor === "w" ? v.black : v.white;
@@ -326,10 +355,9 @@ export class OnlineGame extends BaseGame {
     if (!mv) return;
     this.pendingUci = mv.from + mv.to + (mv.promotion || "");
     this.client.action({ t: "move", from: mv.from, to: mv.to, promotion: mv.promotion || undefined });
-    // daily games: let the opponent's devices know it's their move (if they have a profile)
-    if (this.kind === "daily" && this.oppCode && Social.registered()) {
-      Social.api("POST", "/nudge", { code: this.oppCode, room: this.room, san: mv.san }).catch(() => {});
-    }
+    // daily games: let the opponent's devices know it's their move (if they have a profile), once the
+    // server has the move (they may have lined up a reply, and then it's not their move after all)
+    if (this.kind === "daily" && this.oppCode && Social.registered()) this._nudge = { ply: this.chess.history().length, san: mv.san };
   }
 
   onAfterMove() { /* server drives everything */ }
@@ -369,6 +397,7 @@ export class OnlineGame extends BaseGame {
       this.players[this.myColor].rating = getProfile().ratings[cls].r;
     }
     if (r.winner === this.myColor) unlock("online-win");
+    if (this.kind === "pool" && Social.registered()) this._reportLeague();
     return { rated, delta, deltaFor: delta !== null ? { [this.myColor]: delta } : null };
   }
 
@@ -377,6 +406,10 @@ export class OnlineGame extends BaseGame {
     const early = this.plyCount() < 2;
     const list = [];
     if (this.v2) list.push({ label: "Request takeback", short: "Takeback", icon: "undo", onClick: () => { this.client.action({ t: "takeback-offer" }); toast("Takeback requested"); }, disabled: !live || !this.plies().some(n => n.move.color === this.myColor) });
+    // daily games: plan replies while it's their move
+    if (this.kind === "daily" && this.v8 && !this.cfg.variant) {
+      list.push({ label: this.cond && this.cond.length ? `Planned replies (${this.cond.length})` : "Plan replies", short: "Plan", icon: "edit", onClick: () => this._conditionalModal(), disabled: !live || this.chess.turn() === this.myColor });
+    }
     return [
       ...list,
       { label: "Offer draw", short: "Draw", text: "½", onClick: () => { this.client.action({ t: "draw-offer" }); toast("Draw offer sent"); }, disabled: !live || early },
@@ -449,6 +482,57 @@ export class OnlineGame extends BaseGame {
       if (tries < 4 && (e.status === 409 || e.status === 503 || e.status === 0)) setTimeout(() => this._reportArena(tries + 1), 1500 * (tries + 1));
       else toast(e.message);
     }
+  }
+
+  // games against random opponents earn league trophies; the server reads the result from the room
+  async _reportLeague(tries = 0) {
+    try {
+      const r = await Social.api("POST", "/league/result", { room: this.room, pid: this.playerId });
+      if (r.earned > 0 && !this._destroyed) toast(`+${r.earned} league trophies (${r.tiers[r.division ? r.division.tier : r.tier]} league)`);
+    } catch (e) {
+      if (tries < 4 && (e.status === 409 || e.status === 503 || e.status === 0)) setTimeout(() => this._reportLeague(tries + 1), 1500 * (tries + 1));
+    }
+  }
+
+  // daily games: line up replies to the opponent's next move ("if they play Nf6, I play e5")
+  _conditionalModal() {
+    const base = new Chess(this.chess.fen());
+    const sanLine = (uci) => {
+      const g = new Chess(base.fen());
+      const out = [];
+      for (const u of uci) { try { out.push(g.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] || undefined }).san); } catch { break; } }
+      return out;
+    };
+    const send = (lines, done) => {
+      this.client.action({ t: "conditional", lines });
+      toast(lines.length ? "Replies saved" : "Planned replies cleared");
+      done();
+    };
+    const input = h("input.input", { placeholder: "e.g. Nf6 e5  or  Nf6 e5 Nd5 c4", "aria-label": "Their move and your reply, in algebraic notation", autocomplete: "off", spellcheck: "false" });
+    const err = h("p.note", { role: "alert" });
+    const add = () => {
+      const g = new Chess(base.fen());
+      const uci = [];
+      for (const t of input.value.trim().split(/[\s,]+/).filter(Boolean).map((x) => x.replace(/^\d+\.+/, "")).filter(Boolean)) {
+        let mv;
+        try { mv = g.move(t, { strict: false }); } catch { mv = null; }
+        if (!mv) { err.textContent = `${t} isn't a legal move there.`; return; }
+        uci.push(mv.from + mv.to + (mv.promotion || ""));
+      }
+      if (uci.length < 2 || uci.length % 2) { err.textContent = "Give their move and then your reply (add more pairs to plan further)."; return; }
+      send([...this.cond, uci], () => m.close());
+    };
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") add(); });
+    const list = this.cond.length
+      ? h("div.rows", ...this.cond.map((line, i) => h("div.row", h("span.rt", h("b", sanLine(line).map((x, k) => (k % 2 ? "→ " : "if ") + x).join(" ")), h("small", `${line.length / 2} pair${line.length === 2 ? "" : "s"}`)),
+        h("button.btn.small.ghost", { onclick: () => send(this.cond.filter((_, k) => k !== i), () => m.close()) }, "Remove"))))
+      : h("p.note", "No replies planned.");
+    const m = openModal({
+      title: "Plan replies", sub: "If your opponent plays one of these moves, your reply is played at once. Any other move clears the plan, and your opponent never sees it.",
+      body: [list, h("label.lbl", "Their move, then your reply"), input, err,
+        h("div.btn-row", this.cond.length ? h("button.btn.ghost", { onclick: () => send([], () => m.close()) }, "Clear all") : null, h("button.btn.primary", { onclick: add }, icon("plus", 18), "Add"))],
+    });
+    setTimeout(() => input.focus(), 50);
   }
 
   _rematch() {

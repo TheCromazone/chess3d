@@ -3,7 +3,7 @@
 // remembers your seat in each one.
 import { Chess } from "chess.js";
 import { h, icon, timeAgo } from "../ui/dom.js";
-import { toast, segmented, tcLabel } from "../ui/components.js";
+import { toast, segmented, tcLabel, openModal } from "../ui/components.js";
 import { getDailyGames, upsertDaily, removeDaily } from "../store.js";
 import { RoomClient, parsePlayerId } from "../net/room.js";
 import { OnlineGame } from "./online-game.js";
@@ -32,6 +32,23 @@ function peek(entry, timeoutMs = 6000) {
   });
 }
 
+// sit down in a room as your seat, send one action and wait until the room shows it took effect
+// (took(first, now) compares the state before with each one after) or refuses it
+function act(entry, action, took, timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    let done = false, first = null;
+    const finish = (v) => { if (!done) { done = true; c.close(); resolve(v); } };
+    const c = new RoomClient(entry.room, entry.playerId, {
+      onState: (s) => {
+        if (!first) { first = s; c.action(action); return; }
+        if (took(first, s)) finish({ ok: true, state: s });
+      },
+      onError: (error) => finish({ ok: false, error }),
+    });
+    setTimeout(() => finish({ ok: false, error: "the game didn't answer" }), timeoutMs);
+  });
+}
+
 // read one game's room and update its entry; returns the fresh entry (or null if unreachable)
 async function check(e) {
   const s = await peek(e);
@@ -48,7 +65,9 @@ async function check(e) {
   return upsertDaily({
     room: e.room, playerId: e.playerId, myColor, tc: v && v.tcKey ? v.tcKey : e.tc || null, deadline,
     opponent: oppId ? parsePlayerId(oppId).name : e.opponent || null,
-    moves: v ? v.moves.length : 0, status: s.status, turn, result,
+    moves: v ? v.moves.length : 0, status: s.status, turn, result, server: v ? v.v || 1 : null,
+    away: v && v.away && myColor ? v.away[myColor] || null : null, oppAway: v && v.away && myColor ? v.away[myColor === "w" ? "b" : "w"] || null : null,
+    vacationLeft: v && myColor ? 14 - ((v.vacation && v.vacation[myColor]) || 0) : null,
     lastMove: v && v.san && v.san.length ? v.san[v.san.length - 1] : null,
   });
 }
@@ -79,6 +98,7 @@ export function watchDaily(app) {
   setInterval(run, 150000);
   setTimeout(run, 20000);
 }
+const shortDate = (t) => new Date(t).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 const timeLeftText = (ms) => { const t = timeLeft(ms); return t[0].toUpperCase() + t.slice(1) + "."; };
 
 export class DailyScreen {
@@ -99,6 +119,32 @@ export class DailyScreen {
     if (!this.dead) this.render();
   }
 
+  // like chess.com: a vacation stops the clock on your daily games (here, it adds the days to your
+  // clock in each game, up to 14 days a game)
+  vacation() {
+    const games = getDailyGames().filter((e) => e.status === "playing" && e.tc && /d$/.test(e.tc));
+    let days = 3;
+    const go = h("button.btn.primary.block", {
+      onclick: async () => {
+        go.disabled = true;
+        go.textContent = "Starting your vacation…";
+        const used = (s, c) => (s.view && s.view.vacation && s.view.vacation[c]) || 0;
+        const out = await Promise.all(games.map((e) => act(e, { t: "vacation", days }, (a, b) => used(b, e.myColor) > used(a, e.myColor))));
+        const done = out.filter((r) => r.ok).length;
+        const why = out.find((r) => !r.ok);
+        m.close();
+        toast(done ? `Vacation started in ${done} game${done === 1 ? "" : "s"}${why ? ` (not all: ${why.error})` : ""}` : `No vacation started: ${why ? why.error : "no games"}`);
+        this.refresh();
+      },
+    }, icon("pause", 18), "Start vacation");
+    const left = Math.min(...games.map((e) => (e.vacationLeft == null ? 14 : e.vacationLeft)));
+    const m = openModal({
+      title: "Take a vacation",
+      sub: `Your clock gets this many extra days in each of your ${games.length} timed daily game${games.length === 1 ? "" : "s"}, so you won't lose on time while you're away. Each game allows 14 vacation days; you have ${left} left in the game that's used the most.`,
+      body: [segmented([1, 3, 7, 14].map((d) => ({ value: d, label: `${d} day${d === 1 ? "" : "s"}` })), days, (v) => { days = v; }), go],
+    });
+  }
+
   open(e) {
     this.app.launch(() => new OnlineGame(this.app, { kind: "daily", room: e.room, playerId: e.playerId, tcKey: e.tc || "inf" }), "#/online");
   }
@@ -114,6 +160,8 @@ export class DailyScreen {
       else if (e.turn === e.myColor) { state = "Your move"; badge = h("span.badge", "Your move"); }
       else state = "Their move";
       if (e.status === "playing" && e.deadline) state += ` (${timeLeft(e.deadline - Date.now())})`;
+      if (e.status === "playing" && e.away > Date.now()) state += `, you're on vacation until ${shortDate(e.away)}`;
+      else if (e.status === "playing" && e.oppAway > Date.now()) state += `, they're on vacation until ${shortDate(e.oppAway)}`;
       rows.appendChild(h("div", { style: { display: "flex", gap: "6px", alignItems: "stretch" } },
         h("button.row", { onclick: () => this.open(e), style: { flex: "1" } },
           h("span.ri", icon("calendar", 20)),
@@ -129,7 +177,9 @@ export class DailyScreen {
         h("p", { style: { color: "var(--ink-2)" } }, "Correspondence games with friends. Make a move, close the browser, and come back later. Miss the deadline for a move and you lose on time."),
         yourMove.length ? h("div.status-line.good", icon("bolt", 16), h("span", `It's your move in ${yourMove.length} game${yourMove.length === 1 ? "" : "s"}.`)) : null,
         games.length ? rows : h("p.note", "No daily games yet. Start one and send the link to a friend."),
-        games.length ? h("button.btn.ghost.small", { onclick: () => { toast("Checking your games…"); this.refresh(); }, style: { alignSelf: "flex-start" } }, icon("undo", 16), "Refresh") : null,
+        games.length ? h("div.btn-row", { style: { justifyContent: "flex-start" } },
+          h("button.btn.ghost.small", { onclick: () => { toast("Checking your games…"); this.refresh(); } }, icon("undo", 16), "Refresh"),
+          games.some((e) => e.status === "playing" && e.tc && /d$/.test(e.tc)) ? h("button.btn.ghost.small", { onclick: () => this.vacation() }, icon("pause", 16), "Take a vacation") : null) : null,
         h("div.field", h("div.lbl", "Time per move for a new game"), segmented(DAILY_PACES, pace, (v) => { pace = v; })),
       ],
       foot: h("button.btn.primary.big.block", { onclick: () => this.app.launch(() => new OnlineGame(this.app, { kind: "daily", tcKey: pace }), "#/online") }, icon("plus", 18), "New daily game"),

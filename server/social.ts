@@ -111,6 +111,18 @@ const SCHEMA = [
      id TEXT PRIMARY KEY, a_club TEXT NOT NULL, b_club TEXT NOT NULL, room TEXT NOT NULL DEFAULT '', a_pid TEXT NOT NULL DEFAULT '',
      b_pid TEXT NOT NULL DEFAULT '', tc TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'challenge', created INTEGER NOT NULL,
      deadline INTEGER NOT NULL DEFAULT 0, ply INTEGER NOT NULL DEFAULT 0, result TEXT, token TEXT)`,
+  // Leagues: a permanent tier per player, weekly divisions of up to 50, entries with trophies, and each scored game once
+  `CREATE TABLE IF NOT EXISTS social_league (uid TEXT PRIMARY KEY, tier INTEGER NOT NULL DEFAULT 0, best INTEGER NOT NULL DEFAULT 0)`,
+  `CREATE TABLE IF NOT EXISTS social_league_divs (
+     id TEXT PRIMARY KEY, week INTEGER NOT NULL, tier INTEGER NOT NULL, created INTEGER NOT NULL, settled INTEGER NOT NULL DEFAULT 0, token TEXT)`,
+  `CREATE INDEX IF NOT EXISTS social_league_divs_week ON social_league_divs (week, tier)`,
+  `CREATE TABLE IF NOT EXISTS social_league_entries (
+     week INTEGER NOT NULL, uid TEXT NOT NULL, div TEXT NOT NULL, tier INTEGER NOT NULL, points INTEGER NOT NULL DEFAULT 0,
+     games INTEGER NOT NULL DEFAULT 0, reached INTEGER NOT NULL, place INTEGER, promoted INTEGER, PRIMARY KEY (week, uid))`,
+  `CREATE INDEX IF NOT EXISTS social_league_entries_div ON social_league_entries (div)`,
+  `CREATE TABLE IF NOT EXISTS social_league_games (
+     room TEXT NOT NULL, uid TEXT NOT NULL, opp TEXT NOT NULL, created INTEGER NOT NULL, points INTEGER NOT NULL, token TEXT, PRIMARY KEY (room, uid))`,
+  `CREATE INDEX IF NOT EXISTS social_league_games_opp ON social_league_games (uid, opp, created)`,
   `CREATE TABLE IF NOT EXISTS social_vote_votes (
      game TEXT NOT NULL, ply INTEGER NOT NULL, uid TEXT NOT NULL, move TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY (game, ply, uid))`,
   `CREATE TABLE IF NOT EXISTS social_battles (
@@ -305,6 +317,41 @@ export function swissPairings(players: SwissEntrant[]): { pairs: [string, string
 // club matches: sign-ups close a day after the challenge is accepted (or when an owner starts it)
 const MATCH_SIGNUP_MS = 24 * 60 * 60_000;
 const MATCH_TCS = ["1d", "2d", "3d", "5d", "7d"];
+
+// Leagues (like chess.com's): eight tiers; each week players are grouped in divisions of up to 50 of the same
+// tier, earn trophies from rated games against random opponents and from arenas, and the top of each division
+// moves up a tier when the week ends (nobody moves down)
+export const LEAGUE_TIERS = ["Wood", "Stone", "Bronze", "Silver", "Crystal", "Elite", "Champion", "Legend"];
+const LEAGUE_PROMOTE = [20, 15, 10, 5, 3, 3, 1, 0];    // places that move up, per 50 players
+const LEAGUE_SIZE = 50;
+const WEEK_MS = 7 * 86_400_000;
+const LEAGUE_EPOCH = Date.UTC(2026, 0, 4, 19);        // a Sunday, 19:00 UTC: every league week ends at that time
+export const LEAGUE_POINTS: Record<string, [number, number]> = { bullet: [3, 1], blitz: [9, 3], rapid: [15, 5] };   // win, draw
+const LEAGUE_PER_OPPONENT = 4;                        // scoring games against one opponent in a day
+const LEAGUE_ARENA_FACTOR = 2;
+export function leagueWeek(now: number): number { return Math.floor((now - LEAGUE_EPOCH) / WEEK_MS); }
+export function leagueWeekEnds(week: number): number { return LEAGUE_EPOCH + (week + 1) * WEEK_MS; }
+// how many of a division move up: the tier's share of 50 places, at least one (none from Legend)
+export function leaguePromotions(tier: number, size: number): number {
+  const q = LEAGUE_PROMOTE[tier] ?? 0;
+  return q ? Math.max(1, Math.round(size * q / LEAGUE_SIZE)) : 0;
+}
+// "3+2" -> blitz (chess.com's estimate over 40 moves); null for daily, unlimited and anything under a minute a side
+export function tcClass(tc: string): string | null {
+  const m = /^(\d+(?:\.\d+)?)\+(\d+)$/.exec(tc);
+  if (!m) return null;
+  const base = Number(m[1]), inc = Number(m[2]);
+  if (base < 1) return null;
+  const est = base * 60 + inc * 40;
+  return est < 180 ? "bullet" : est < 600 ? "blitz" : "rapid";
+}
+// a quick-pairing room's time class from its name ("pool-3p2-<bucket>-<n>", or Chess960's "vpchess960-…")
+export function leagueRoomClass(room: string): string | null {
+  const m = /^(?:pool|vpchess960)-(\d+(?:_\d+)?)p(\d+)-\d+-\d+$/.exec(room);
+  return m ? tcClass(`${m[1]!.replace("_", ".")}+${m[2]}`) : null;
+}
+// the friend code a player id carries when its player has social on ("p-x1y2z3.Name.1500.K7M2QX9P")
+function codeOfPid(pid: string): string | null { return /\.([0-9A-Z]{8})$/.exec(pid)?.[1] ?? null; }
 
 const CATS = ["bullet", "blitz", "rapid", "puzzle", "bots"] as const;
 type Cat = (typeof CATS)[number];
@@ -904,6 +951,7 @@ export class Social {
     const seg0 = seg[0] ?? "", seg1 = seg[1] ?? "", seg2 = seg[2] ?? "";
     // club team matches (before the club routes, which would take /clubs/:id/matches)
     if (seg0 === "matches" || (seg0 === "clubs" && seg2 === "matches")) return this.clubMatches(request, me, seg, now);
+    if (seg0 === "league") return this.league(request, me, seg, now);
     if (seg0 === "votechess" || (seg0 === "clubs" && seg2 === "votechess")) return this.voteChess(request, me, seg, now);
     if (seg0 === "clubs" && seg1 && !["create", "join", "leave"].includes(seg1)) {
       const id = seg1;
@@ -1061,11 +1109,12 @@ export class Social {
 
     // GET /users/:id — a friend's or club-mate's public profile
     if (method === "GET" && seg0 === "users" && seg1) {
-      const [ur, blocked] = await this.many(this.q("SELECT * FROM social_users WHERE id = ?", seg1),
-        this.q("SELECT 1 AS x FROM social_blocks WHERE uid = ? AND blocked = ?", me.id, seg1));
+      const [ur, blocked, lg] = await this.many(this.q("SELECT * FROM social_users WHERE id = ?", seg1),
+        this.q("SELECT 1 AS x FROM social_blocks WHERE uid = ? AND blocked = ?", me.id, seg1),
+        this.q("SELECT tier FROM social_league WHERE uid = ?", seg1));
       const u = ur?.[0] as UserRow | undefined;
       if (!u) throw new HttpError(404, "no such player");
-      return { user: publicUser(u, now), blocked: !!blocked?.length };
+      return { user: publicUser(u, now), blocked: !!blocked?.length, league: lg?.length ? Number(lg[0]!["tier"]) : null };
     }
 
     // POST /delete: remove this player, their friendships, messages and club memberships
@@ -1074,6 +1123,9 @@ export class Social {
         this.q("SELECT club FROM social_club_members WHERE member = ?", me.id),
         this.q("DELETE FROM social_friends WHERE a = ? OR b = ?", me.id, me.id),
         this.q("DELETE FROM social_blocks WHERE uid = ? OR blocked = ?", me.id, me.id),
+        this.q("DELETE FROM social_league WHERE uid = ?", me.id),
+        this.q("DELETE FROM social_league_entries WHERE uid = ?", me.id),
+        this.q("DELETE FROM social_league_games WHERE uid = ?", me.id),
         this.q("DELETE FROM social_messages WHERE sender = ? OR recipient = ?", me.id, me.id),
         this.q("DELETE FROM social_club_members WHERE member = ?", me.id),
         this.q("DELETE FROM social_club_bans WHERE member = ?", me.id),
@@ -1248,10 +1300,140 @@ export class Social {
           s.pts, s.wins, s.streak, s.mark, room, id, uid, room, token));
       }
       await this.many(...stmts);
-      const final = await this.q("SELECT outcome FROM social_arena_games WHERE room = ?", room).first<{ outcome: string }>();
+      const final = await this.q("SELECT outcome, token FROM social_arena_games WHERE room = ?", room).first<{ outcome: string; token: string }>();
+      // the request that scored the game also gives both players their league trophies (arena games count double)
+      const cls = final?.token === token && outcome !== "void" ? tcClass(String((await this.q("SELECT tc FROM social_arenas WHERE id = ?", id).first<{ tc: string }>())?.tc ?? "")) : null;
+      if (cls) {
+        const [win, draw] = LEAGUE_POINTS[cls]!;
+        const pts = (side: string) => LEAGUE_ARENA_FACTOR * (outcome === side ? win : outcome === "draw" ? draw : 0);
+        await this.leagueCredit(game.a_uid, room, game.b_uid, pts("a"), now);
+        await this.leagueCredit(game.b_uid, room, game.a_uid, pts("b"), now);
+      }
       return { outcome: final?.outcome ?? outcome, you: game.a_uid === me.id ? "a" : "b" };
     }
     throw new HttpError(404, "not found");
+  }
+
+  // ---- Leagues ----
+  // GET /league: your tier, this week's division (once you've played a scoring game) and how last week went
+  // POST /league/result {room, pid}: score a finished game against a random opponent; the server reads the room
+  private async league(request: Request, me: UserRow, seg: string[], now: number): Promise<unknown> {
+    if (request.method === "GET" && seg.length === 1) return this.leagueView(me, now);
+    if (request.method !== "POST" || seg[1] !== "result") throw new HttpError(404, "not found");
+    const b = await body(request);
+    const room = str(b["room"], 64), pid = str(b["pid"], 64);
+    const cls = leagueRoomClass(room);
+    if (!cls) throw new HttpError(400, "only rated games against random opponents earn trophies");
+    if (!this.hooks.roomState) throw new HttpError(503, "results can't be checked right now");
+    const st = await this.hooks.roomState(room);
+    if (!st || st.status !== "over" || !st.result) throw new HttpError(409, "the game isn't over yet");
+    if (!st.seats.includes(pid) || codeOfPid(pid) !== me.code) throw new HttpError(403, "that isn't your game");
+    const oppPid = st.seats.find((p) => p !== pid) ?? "";
+    const oppCode = codeOfPid(oppPid);
+    const opp = oppCode ? await this.q("SELECT id FROM social_users WHERE code = ?", oppCode).first<{ id: string }>() : null;
+    const r = st.result;
+    let why: string | null = null;
+    if (r.reason === "aborted") why = "aborted games don't count";
+    else if (!opp || opp.id === me.id) why = "trophies come from games against players with Social on";
+    let earned = 0;
+    if (!why) {
+      const [win, draw] = LEAGUE_POINTS[cls]!;
+      const got = await this.leagueCredit(me.id, room, opp!.id, r.draw ? draw : r.winner === pid ? win : 0, now);
+      if (got === null) why = "this game was already counted";
+      else earned = got;
+    }
+    return { ...(await this.leagueView(me, now)), earned, why };
+  }
+
+  // add a game's trophies to this week's entry (joining a division first); each game counts once per player.
+  // Returns the trophies added (none past the daily limit against one opponent), or null if it was counted already
+  private async leagueCredit(uid: string, room: string, opp: string, points: number, now: number): Promise<number | null> {
+    const week = leagueWeek(now);
+    await this.leagueSettleFor(uid, week);
+    await this.leagueJoin(uid, week, now);
+    const against = await this.q("SELECT COUNT(*) AS n FROM social_league_games WHERE uid = ? AND opp = ? AND created > ? AND points > 0",
+      uid, opp, now - 86_400_000).first<{ n: number }>();
+    const pts = against && against.n >= LEAGUE_PER_OPPONENT ? 0 : points;
+    const token = randomString(12);
+    await this.many(
+      this.q("INSERT OR IGNORE INTO social_league_games (room, uid, opp, created, points, token) VALUES (?, ?, ?, ?, ?, ?)", room, uid, opp, now, pts, token),
+      this.q(`UPDATE social_league_entries SET points = points + ?, games = games + 1, reached = CASE WHEN ? > 0 THEN ? ELSE reached END
+          WHERE week = ? AND uid = ? AND EXISTS (SELECT 1 FROM social_league_games WHERE room = ? AND uid = ? AND token = ?)`,
+        pts, pts, now, week, uid, room, uid, token));
+    const g = await this.q("SELECT token FROM social_league_games WHERE room = ? AND uid = ?", room, uid).first<{ token: string }>();
+    return g && g.token === token ? pts : null;
+  }
+
+  // a player's first scoring game of the week puts them in a division of their tier with room left (or a new one)
+  private async leagueJoin(uid: string, week: number, now: number): Promise<void> {
+    if (await this.q("SELECT 1 AS x FROM social_league_entries WHERE week = ? AND uid = ?", week, uid).first()) return;
+    await this.q("INSERT OR IGNORE INTO social_league (uid, tier, best) VALUES (?, 0, 0)", uid).run();
+    const tier = (await this.q("SELECT tier FROM social_league WHERE uid = ?", uid).first<{ tier: number }>())?.tier ?? 0;
+    const open = await this.q(`SELECT d.id FROM social_league_divs d WHERE d.week = ? AND d.tier = ?
+        AND (SELECT COUNT(*) FROM social_league_entries e WHERE e.div = d.id) < ? ORDER BY d.created LIMIT 1`, week, tier, LEAGUE_SIZE).first<{ id: string }>();
+    let div = open?.id;
+    if (!div) {
+      div = "lg_" + randomString(10).toLowerCase();
+      await this.q("INSERT INTO social_league_divs (id, week, tier, created) VALUES (?, ?, ?, ?)", div, week, tier, now).run();
+    }
+    await this.q("INSERT OR IGNORE INTO social_league_entries (week, uid, div, tier, reached) VALUES (?, ?, ?, ?, ?)", week, uid, div, tier, now).run();
+  }
+
+  // divisions from weeks that have ended are settled (once) when one of their players next looks
+  private async leagueSettleFor(uid: string, week: number): Promise<void> {
+    const open = await this.q(`SELECT d.id, d.tier FROM social_league_entries e JOIN social_league_divs d ON d.id = e.div
+        WHERE e.uid = ? AND e.week < ? AND d.settled = 0`, uid, week).all<{ id: string; tier: number }>();
+    for (const d of open.results) await this.leagueSettle(d.id, d.tier);
+  }
+
+  // final places; the top of the division (with at least one trophy) moves up a tier
+  private async leagueSettle(div: string, tier: number): Promise<void> {
+    const token = randomString(12);
+    await this.q("UPDATE social_league_divs SET settled = 1, token = ? WHERE id = ? AND settled = 0", token, div).run();
+    const mine = await this.q("SELECT token FROM social_league_divs WHERE id = ?", div).first<{ token: string }>();
+    if (!mine || mine.token !== token) return;
+    const rows = (await this.q("SELECT uid, points FROM social_league_entries WHERE div = ? ORDER BY points DESC, reached ASC", div)
+      .all<{ uid: string; points: number }>()).results;
+    const up = leaguePromotions(tier, rows.length);
+    const stmts = [];
+    for (const [i, r] of rows.entries()) {
+      const promoted = i < up && r.points > 0;
+      stmts.push(this.q("UPDATE social_league_entries SET place = ?, promoted = ? WHERE div = ? AND uid = ?", i + 1, promoted ? 1 : 0, div, r.uid));
+      if (promoted) stmts.push(this.q("UPDATE social_league SET tier = MAX(tier, ?), best = MAX(best, ?) WHERE uid = ?", tier + 1, tier + 1, r.uid));
+    }
+    if (stmts.length) await this.many(...stmts);
+  }
+
+  private async leagueView(me: UserRow, now: number) {
+    const week = leagueWeek(now);
+    await this.leagueSettleFor(me.id, week);
+    const [t, cur, last] = await this.many(
+      this.q("SELECT tier, best FROM social_league WHERE uid = ?", me.id),
+      this.q("SELECT div, tier FROM social_league_entries WHERE week = ? AND uid = ?", week, me.id),
+      this.q(`SELECT e.week, e.tier, e.place, e.promoted, e.points, (SELECT COUNT(*) FROM social_league_entries x WHERE x.div = e.div) AS size
+          FROM social_league_entries e WHERE e.uid = ? AND e.week < ? ORDER BY e.week DESC LIMIT 1`, me.id, week));
+    const entry = cur?.[0];
+    let division = null;
+    if (entry) {
+      const dtier = Number(entry["tier"]);
+      const rows = (await this.q(`SELECT e.uid, e.points, e.games, u.name, u.avatar FROM social_league_entries e LEFT JOIN social_users u ON u.id = e.uid
+          WHERE e.div = ? ORDER BY e.points DESC, e.reached ASC LIMIT ?`, String(entry["div"]), LEAGUE_SIZE + 10).all()).results;
+      division = {
+        tier: dtier, promote: leaguePromotions(dtier, rows.length),
+        standings: rows.map((r, i) => {
+          let avatar: unknown = null;
+          try { avatar = r["avatar"] ? JSON.parse(String(r["avatar"])) : null; } catch { avatar = null; }
+          return { place: i + 1, uid: r["uid"], name: r["name"] ?? "Deleted player", avatar, points: r["points"], games: r["games"], me: r["uid"] === me.id };
+        }),
+      };
+    }
+    const l = last?.[0];
+    return {
+      tiers: LEAGUE_TIERS, tier: Number(t?.[0]?.["tier"] ?? 0), best: Number(t?.[0]?.["best"] ?? 0),
+      ends: leagueWeekEnds(week), division,
+      last: l ? { tier: Number(l["tier"]), place: l["place"] ?? null, promoted: !!l["promoted"], points: l["points"], size: l["size"], settled: l["place"] != null } : null,
+      points: LEAGUE_POINTS, perOpponent: LEAGUE_PER_OPPONENT, arenaFactor: LEAGUE_ARENA_FACTOR,
+    };
   }
 
   // ---- club team matches ----

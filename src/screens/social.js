@@ -7,6 +7,7 @@ import { getProfile } from "../store.js";
 import { OnlineGame } from "../modes/online-game.js";
 import { makePlayerId } from "../net/room.js";
 import { DAILY_PACES } from "../modes/daily.js";
+import { tierBadge, LEAGUE_TIERS } from "./league.js";
 import { gamePgn } from "./pages.js";
 import { signInModal } from "./account.js";
 import { SFX } from "../audio.js";
@@ -381,10 +382,14 @@ export class SocialScreen {
     }, "Remove from club") : null;
     // recent games, newest first; each opens on the analysis board
     const games = h("div.profile-games", h("p.note", "Loading recent games…"));
+    const leagueSlot = h("div.profile-league");
+    S.api("GET", `/users/${u.id}`).then((d) => {
+      if (d.league != null) leagueSlot.replaceChildren(tierBadge(d.league, ".sm"), h("span", `${LEAGUE_TIERS[d.league]} league`));
+    }).catch(() => {});
     const m = openModal({
       title: u.name,
       sub: `${presenceText(u)}${u.games ? `, ${u.games} game${u.games === 1 ? "" : "s"} played` : ""}`,
-      body: [h("div.profile-pop", userAvatar(u, ".lg"), grid),
+      body: [h("div.profile-pop", userAvatar(u, ".lg"), grid), leagueSlot,
         Object.keys(u.variants || {}).length ? h("p.note", "Variants: " + Object.entries(u.variants).sort((a, b) => b[1].n - a[1].n).map(([k, v]) => `${VARIANT_NAMES[k] || k} ${v.r}`).join(", ")) : null,
         blocked ? h("p.note", "You've blocked this player.") : actions, remove, kick, blockBtn, h("div.lbl.note", "Recent games"), games],
     });

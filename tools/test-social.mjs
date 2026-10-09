@@ -207,6 +207,8 @@ await call("POST", `/arenas/${live.id}/result`, { secret: ann.secret, body: { ro
 let st = (await call("GET", `/arenas/${live.id}`, { secret: ann.secret })).data;
 const row = (n) => st.standings.find((x) => x.name === n);
 ok(res.outcome && row("Ann").score === 2 && row("Cid").score === 0 && row("Ann").games === 1, "the server reads the winner from the room and scores once");
+const arenaTrophies = sqlite.prepare("SELECT uid, points FROM social_league_games WHERE room = ?").all(pc.room);
+ok(arenaTrophies.length === 2 && arenaTrophies.find((x) => x.uid === ann.id).points === 18 && arenaTrophies.find((x) => x.uid === cid.id).points === 0, "an arena win earns double league trophies (3+0 is blitz: 2 x 9)");
 // two more wins for Ann: the third win in a row counts double
 for (let i = 0; i < 2; i++) {
   await call("POST", `/arenas/${live.id}/pair`, { secret: ann.secret, body: { pid: pidA } });
@@ -612,6 +614,58 @@ ok(again && again.id !== o1.id && !again.opponent, "after a battle ends, searchi
   await call("POST", "/delete", { secret: fay.secret });
   ok((await call("GET", "/blocks", { secret: eve.secret })).data.blocked.length === 0 && sqlite.prepare("SELECT COUNT(*) AS n FROM social_blocks").get().n === 0, "deleting a profile removes its blocks");
   await call("POST", "/delete", { secret: eve.secret });
+}
+
+// Leagues
+{
+  const saved = clock;
+  const week = Math.floor((clock - Date.UTC(2026, 0, 4, 19)) / (7 * 86_400_000));
+  clock = Date.UTC(2026, 0, 4, 19) + (week + 2) * 7 * 86_400_000 + 3_600_000;  // an hour into a later league week (the arena test's players are in this one)
+  const gil = (await call("POST", "/register", { body: { name: "Gil" }, ip: "10.2.2.1" })).data;
+  const hal = (await call("POST", "/register", { body: { name: "Hal" }, ip: "10.2.2.2" })).data;
+  const gp = `p-gggg.Gil.1500.${gil.code}`, hp = `p-hhhh.Hal.1500.${hal.code}`;
+  let n = 0;
+  const game = (seats, result, tc = "3p2") => { const room = `pool-${tc}-${14000000 + n}-${n++ % 10}`; rooms.set(room, { status: "over", seats, result }); return room; };
+  const report = (u, room, pid) => call("POST", "/league/result", { secret: u.secret, body: { room, pid } });
+  let lg = (await call("GET", "/league", { secret: gil.secret })).data;
+  ok(lg.tier === 0 && lg.tiers[0] === "Wood" && !lg.division && lg.ends > clock && lg.ends - clock < 7 * 86_400_000, "everyone starts in Wood, joining a division with their first scoring game");
+  ok((await report(gil, "c-friendly1", gp)).status === 400, "games against friends don't earn trophies");
+  rooms.set("pool-3p2-14000000-9", { status: "playing", seats: [gp, hp], result: null });
+  ok((await report(gil, "pool-3p2-14000000-9", gp)).status === 409, "a game in progress can't be scored");
+  const r1 = game([gp, hp], { winner: gp, reason: "checkmate" });
+  ok((await report(gil, r1, hp)).status === 403, "you can only score your own seat");
+  lg = (await report(gil, r1, gp)).data;
+  ok(lg.earned === 9 && lg.division.standings.length === 1 && lg.division.standings[0].points === 9 && lg.division.standings[0].me, "a blitz win against a random opponent earns 9 trophies");
+  ok((await report(gil, r1, gp)).data.why.includes("already"), "a game counts once");
+  lg = (await report(hal, r1, hp)).data;
+  ok(lg.earned === 0 && lg.division.standings.length === 2 && lg.division.standings[1].name === "Hal" && lg.division.standings[1].games === 1, "a loss earns nothing but joins the same Wood division");
+  ok((await report(gil, game([gp, "p-anon.Guest.1200"], { winner: gp, reason: "resignation" }), gp)).data.why.includes("Social"), "games against players without Social don't count");
+  ok((await report(gil, game([gp, hp], { draw: true, reason: "aborted" }), gp)).data.why.includes("aborted"), "nor do aborted games");
+  ok((await report(gil, game([gp, hp], { draw: true, reason: "agreement" }, "10p0"), gp)).data.earned === 5, "a rapid draw earns 5");
+  ok((await report(gil, game([gp, hp], { winner: gp, reason: "timeout" }, "1p0"), gp)).data.earned === 3, "a bullet win earns 3");
+  // four scoring games a day against one opponent: the fifth earns nothing
+  ok((await report(gil, game([gp, hp], { winner: gp, reason: "checkmate" }), gp)).data.earned === 9, "a fourth scoring game against the same opponent counts");
+  ok((await report(gil, game([gp, hp], { winner: gp, reason: "checkmate" }), gp)).data.earned === 0, "after four scoring games against one opponent in a day, more don't earn trophies");
+  clock += 86_400_000;
+  ok((await report(gil, game([gp, hp], { winner: gp, reason: "checkmate" }), gp)).data.earned === 9, "the next day they do again");
+  ok((await report(gil, game([gp, hp], { winner: gp, reason: "checkmate" }, "0_5p0"), gp)).status === 400, "games under a minute a side don't count");
+  ok((await call("GET", `/users/${gil.id}`, { secret: hal.secret })).data.league === 0, "a profile shows the player's league");
+  lg = (await call("GET", "/league", { secret: hal.secret })).data;
+  ok(lg.division.promote === 1 && lg.division.standings[0].name === "Gil" && lg.division.standings[0].points === 35, "standings, and how many places move up");
+  // the week ends: Gil (top, with trophies) moves up to Stone; Hal stays in Wood
+  clock = lg.ends + 60_000;
+  lg = (await call("GET", "/league", { secret: hal.secret })).data;
+  ok(lg.tier === 0 && !lg.division && lg.last.place === 2 && !lg.last.promoted && lg.last.settled, "after the week, your final place");
+  lg = (await call("GET", "/league", { secret: gil.secret })).data;
+  ok(lg.tier === 1 && lg.best === 1 && lg.last.place === 1 && lg.last.promoted, "the winner moves up to Stone");
+  lg = (await report(gil, game([gp, hp], { winner: hp, reason: "resignation" }), gp)).data;
+  ok(lg.division && lg.division.tier === 1 && lg.division.standings.length === 1, "and plays this week in a Stone division");
+  lg = (await report(hal, game([gp, hp], { winner: hp, reason: "resignation" }), hp)).data;
+  ok(lg.division.tier === 0 && !lg.division.standings.some((x) => x.name === "Gil"), "while Hal's division is Wood");
+  await call("POST", "/delete", { secret: gil.secret });
+  await call("POST", "/delete", { secret: hal.secret });
+  ok(sqlite.prepare("SELECT COUNT(*) AS n FROM social_league_entries WHERE uid IN (?, ?)").get(gil.id, hal.id).n === 0, "deleting a profile removes its league entries");
+  clock = saved;
 }
 
 console.log(failures === 0 ? "\nALL SOCIAL TESTS PASSED" : `\n${failures} FAILURES`);

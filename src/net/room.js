@@ -136,8 +136,13 @@ export function findMatch(tcKey, playerId, onProgress = () => {}, { prefix = "po
           return;
         }
         if (s.status === "playing") {
-          // a player you've blocked sat down: leave (they'll see the seat empty and search on too)
-          if (avoid(s.seats)) { c.close(); finish({ next: true }); return; }
+          // a player you've blocked sat down: call the game off before a move and look elsewhere
+          if (avoid(s.seats)) {
+            try { c.action({ t: "abort" }); } catch { /* the room drops us anyway */ }
+            setTimeout(() => c.close(), 400);
+            finish({ next: true });
+            return;
+          }
           if (s.connected < seats) {
             // opponent seat belongs to someone who already left
             setTimeout(() => {

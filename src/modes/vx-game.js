@@ -273,6 +273,13 @@ export class VxPlay {
       const opp = this.oppInfo && this.oppInfo.rating ? this.oppInfo.rating : 1500;
       delta = applyVariantRating(this.variant, opp, myResult === "win" ? 1 : myResult === "loss" ? 0 : 0.5);
       rating = variantRating(this.variant);
+      // like chess.com, Chess960 is the variant that earns league trophies (the server reads the room)
+      if (this.variant === "chess960" && Social.registered()) {
+        const report = (tries) => Social.api("POST", "/league/result", { room: this.room, pid: this.playerId })
+          .then((r) => { if (r.earned > 0) toast(`+${r.earned} league trophies`); })
+          .catch((e) => { if (tries < 4 && [0, 409, 503].includes(e.status)) setTimeout(() => report(tries + 1), 1500 * (tries + 1)); });
+        report(0);
+      }
     }
     const name = (c) => this.player(c).name;
     saveVariantGame({

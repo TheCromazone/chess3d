@@ -8,9 +8,16 @@ import { FourPlayer, FP_COLORS, fpTextToMove } from "./core/fp.js";
 export const meta = { game: "Chess 3D", minPlayers: 2, maxPlayers: 2 };
 
 const TIME_CONTROLS = { "1+0": [60, 0], "3+2": [180, 2], "5+0": [300, 0], "10+0": [600, 0], "15+10": [900, 10], "inf": null };
-const VERSION = 7;           // v2: chat / takebacks / abort / custom clocks; v3: daily deadlines; v4: crazyhouse, bughouse;
+const VERSION = 8;           // v2: chat / takebacks / abort / custom clocks; v3: daily deadlines; v4: crazyhouse, bughouse;
                              // v5: duck chess, fog of war, giveaway, atomic, horde; v6: 4-player chess;
-                             // v7: config may swap colours (club matches)
+                             // v7: config may swap colours (club matches); v8: abort before set-up, daily vacation,
+                             // conditional moves
+const VACATION_DAYS = 14;    // per player per daily game
+const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
+const uciOf = (m) => m.from + m.to + (m.promotion || "");
+function tryUci(game, u) {
+  try { game.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] || undefined }); return true; } catch { return false; }
+}
 const ROOM_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const otherColor = (c) => (c === "w" ? "b" : "w");
 
@@ -98,6 +105,7 @@ export function validateAction(state, playerId, action) {
   }
 
   if (action.t === "config") {
+    if (state.aborted) return { ok: false, error: "the game was called off" };
     if (state.phase !== "config") return { ok: false, error: "the game already started" };
     if (color !== "w") return { ok: false, error: "White chooses the time control" };
     if (!parseTc(action.tc).ok) return { ok: false, error: "unknown time control" };
@@ -107,8 +115,33 @@ export function validateAction(state, playerId, action) {
     if (action.swap !== undefined && typeof action.swap !== "boolean") return { ok: false, error: "malformed config" };
     return { ok: true };
   }
+  // either player can call the game off before it's set up (quick pairing does when a blocked player sits down)
+  if (action.t === "abort" && state.phase === "config") return { ok: true };
   if (state.phase === "config") return { ok: false, error: "waiting for White to choose the time control" };
   if (finished) return { ok: false, error: "the game is over" };
+
+  // daily games: a vacation adds days to your clock for your current (or next) move, up to 14 a game
+  if (action.t === "vacation") {
+    if (!state.tc || !state.tc.perMove) return { ok: false, error: "vacations are for daily games" };
+    if (!Number.isInteger(action.days) || action.days < 1) return { ok: false, error: "how many days?" };
+    const left = VACATION_DAYS - ((state.vacation && state.vacation[color]) || 0);
+    if (action.days > left) return { ok: false, error: left ? `you have ${left} vacation day${left === 1 ? "" : "s"} left in this game` : "you've used this game's vacation days" };
+    return { ok: true };
+  }
+  // daily games: while it's your opponent's move, line up replies ("if they play X, I play Y", and on)
+  if (action.t === "conditional") {
+    if (state.variant || !state.tc || !state.tc.perMove) return { ok: false, error: "conditional moves are for daily games" };
+    const game = rebuild(state);
+    if (game.isGameOver()) return { ok: false, error: "the game is over" };
+    if (game.turn() === color) return { ok: false, error: "it's your move" };
+    if (!Array.isArray(action.lines) || action.lines.length > 20) return { ok: false, error: "malformed lines" };
+    for (const line of action.lines) {
+      if (!Array.isArray(line) || line.length < 2 || line.length > 20 || line.length % 2) return { ok: false, error: "each line pairs their move with your reply" };
+      const g = new Chess(game.fen());
+      for (const u of line) if (typeof u !== "string" || !UCI_RE.test(u) || !tryUci(g, u)) return { ok: false, error: "a line has an illegal move" };
+    }
+    return { ok: true };
+  }
 
   if (action.t === "move" && state.variant) {
     const r = rulesOf(state);
@@ -248,7 +281,7 @@ export function applyAction(state, playerId, action) {
     }
     const game = rebuild(state);
     const mv = game.move({ from: action.from, to: action.to, promotion: action.promotion || undefined });
-    return {
+    return playConditional({
       ...state,
       moves: [...state.moves, { from: action.from, to: action.to, promotion: action.promotion || undefined }],
       san: [...state.san, mv.san],
@@ -256,10 +289,21 @@ export function applyAction(state, playerId, action) {
       clock,
       drawOffer: null,
       takebackOffer: null,
-    };
+    }, color, uciOf(action));
   }
 
-  if (action.t === "abort") return withPartnerEnd({ ...state, aborted: true, clock: { ...state.clock, lastAt: null } });
+  if (action.t === "abort") return withPartnerEnd({ ...state, aborted: true, cond: undefined, clock: { ...state.clock, lastAt: null } });
+  if (action.t === "vacation") {
+    const ms = action.days * 86_400_000;
+    const away = Math.max(now, (state.away && state.away[color]) || 0) + ms;
+    return {
+      ...state,
+      clock: { ...state.clock, [color]: state.clock[color] + ms },
+      vacation: { ...(state.vacation || {}), [color]: ((state.vacation && state.vacation[color]) || 0) + action.days },
+      away: { ...(state.away || {}), [color]: away },
+    };
+  }
+  if (action.t === "conditional") return { ...state, cond: { ...(state.cond || {}), [color]: action.lines.map((l) => l.slice()) } };
   if (action.t === "takeback-offer") return { ...state, takebackOffer: color };
   if (action.t === "takeback-decline") return { ...state, takebackOffer: null };
   if (action.t === "takeback-accept") {
@@ -272,7 +316,7 @@ export function applyAction(state, playerId, action) {
     const g2 = new Chess();
     for (const m of moves) g2.move(m);
     const clock = state.tc ? { ...state.clock, lastAt: now } : state.clock;
-    return { ...state, moves, san: state.san.slice(0, keep), fen: g2.fen(), takebackOffer: null, drawOffer: null, clock };
+    return { ...state, moves, san: state.san.slice(0, keep), fen: g2.fen(), takebackOffer: null, drawOffer: null, clock, cond: undefined };
   }
 
   if (action.t === "resign") return withPartnerEnd({ ...state, resigned: color });
@@ -293,6 +337,23 @@ export function applyAction(state, playerId, action) {
   return state;
 }
 
+// the other player may have lined up a reply to this move: play it (and keep the lines that go on from it);
+// any other move clears their lines
+function playConditional(state, mover, played) {
+  const other = otherColor(mover);
+  const lines = state.cond && state.cond[other];
+  if (!lines || !lines.length) return state;
+  const follow = lines.filter((l) => l[0] === played);
+  const cleared = { ...state, cond: { ...state.cond, [other]: [] } };
+  if (!follow.length || isGameOver(cleared).over) return cleared;
+  const reply = follow[0][1];
+  const pid = other === "w" ? state.white : state.black;
+  const action = { t: "move", from: reply.slice(0, 2), to: reply.slice(2, 4), promotion: reply[4] || undefined };
+  if (!validateAction(cleared, pid, action).ok) return cleared;
+  const rest = follow.filter((l) => l[1] === reply && l.length > 2).map((l) => l.slice(2));
+  return applyAction({ ...cleared, cond: { ...cleared.cond, [other]: rest } }, pid, action);
+}
+
 // Bughouse: when this board ends, the linked board ends too, with the result for the same teams
 // (this board's White partners the other board's Black)
 function withPartnerEnd(state) {
@@ -304,7 +365,7 @@ function withPartnerEnd(state) {
 }
 
 export function isGameOver(state) {
-  if (state.phase === "config") return { over: false };
+  if (state.phase === "config") return state.aborted ? { over: true, draw: true, reason: "aborted" } : { over: false };
   if (state.fourSeats) return fourOver(state);
   if (state.partnerEnd) {
     const w = state.partnerEnd.winner;
@@ -343,6 +404,8 @@ export function isGameOver(state) {
 // pieces can see (the server sends their legal moves too, since a hidden piece can block a pawn),
 // and the other side's moves stay hidden until the game ends. Spectators see nothing until then.
 export function viewFor(state, playerId) {
+  // conditional moves are private: each player sees only their own
+  if (state.cond) { const c = colorOf(state, playerId); state = { ...state, cond: c ? { [c]: state.cond[c] || [] } : undefined }; }
   if (state.variant !== "fog" || !state.vx || isGameOver(state).over) return { ...state, serverNow: Date.now() };
   const g = new VxGame("fog", state.vx);
   const color = colorOf(state, playerId);

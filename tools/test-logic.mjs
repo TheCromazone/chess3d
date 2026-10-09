@@ -257,5 +257,45 @@ ok(r.over && r.winner === P1 && r.reason === "hill", "King of the Hill: the king
   ok(te.over && te.winners.includes(R) && te.winners.includes(Y) && !te.winners.includes(G), "Teams: Green resigns, so Red and Yellow win");
 }
 
+// v8: abort before set-up, vacation and conditional moves in daily games
+{
+  const act = (st, p, a) => { const v = L.validateAction(st, p, a); if (!v.ok) throw new Error(v.error); return L.applyAction(st, p, a); };
+  let a = L.setup([P1, P2]);
+  ok(L.validateAction(a, P2, { t: "abort" }).ok && a.v >= 8, "either player can call a game off before it's set up");
+  a = L.applyAction(a, P2, { t: "abort" });
+  const over = L.isGameOver(a);
+  ok(over.over && over.reason === "aborted", "and it's over, aborted");
+  ok(!L.validateAction(a, P1, { t: "config", tc: "3+2" }).ok, "a called-off game can't be set up");
+
+  const D = 86_400_000;
+  let d = act(L.setup([P1, P2]), P1, { t: "config", tc: "3d" });
+  ok(!L.validateAction(act(L.setup([P1, P2]), P1, { t: "config", tc: "5+0" }), P1, { t: "vacation", days: 2 }).ok, "vacations are only for daily games");
+  d = act(d, P1, { t: "vacation", days: 5 });
+  ok(d.clock.w === 8 * D && d.vacation.w === 5 && d.away.w > Date.now() + 5 * D - 5000, "a vacation adds days to your clock for this move");
+  ok(!L.validateAction(d, P1, { t: "vacation", days: 10 }).ok && L.validateAction(d, P1, { t: "vacation", days: 9 }).ok, "up to 14 vacation days a game");
+  d = act(d, P1, { t: "move", from: "e2", to: "e4" });
+  ok(d.clock.w === 3 * D, "after your move the usual allowance is back");
+  d = act(d, P1, { t: "vacation", days: 2 });
+  ok(d.clock.w === 5 * D, "a vacation taken on their move adds to your next one");
+
+  // conditional moves: White lines up 1...e5 2.Nf3 (then 2...Nc6 3.Bb5) and 1...c5 2.Nf3
+  let c = act(L.setup([P1, P2]), P1, { t: "config", tc: "3d" });
+  ok(!L.validateAction(c, P1, { t: "conditional", lines: [["e7e5", "g1f3"]] }).ok, "on your own move, just play it");
+  c = act(c, P1, { t: "move", from: "e2", to: "e4" });
+  ok(!L.validateAction(c, P1, { t: "conditional", lines: [["e7e5", "e1e3"]] }).ok, "illegal replies are refused");
+  ok(!L.validateAction(c, P1, { t: "conditional", lines: [["e7e5"]] }).ok, "a line pairs their move with your reply");
+  ok(!L.validateAction(c, P2, { t: "conditional", lines: [["g1f3", "e7e5"]] }).ok, "only the player waiting can line up replies");
+  c = act(c, P1, { t: "conditional", lines: [["e7e5", "g1f3", "b8c6", "f1b5"], ["c7c5", "g1f3"]] });
+  ok(L.viewFor(c, P1).cond.w.length === 2 && !L.viewFor(c, P2).cond.w && !L.viewFor(c, "p-watcher").cond, "your lines are hidden from your opponent and spectators");
+  c = act(c, P2, { t: "move", from: "e7", to: "e5" });
+  ok(c.san.join(" ") === "e4 e5 Nf3" && c.cond.w.length === 1 && c.cond.w[0].join() === "b8c6,f1b5", "their move matched a line: the reply is played at once, and the rest of the line waits");
+  c = act(c, P2, { t: "move", from: "b8", to: "c6" });
+  ok(c.san.join(" ") === "e4 e5 Nf3 Nc6 Bb5" && c.cond.w.length === 0, "and so on down the line");
+  c = act(c, P1, { t: "conditional", lines: [["a7a6", "b5a4"]] });
+  c = act(c, P2, { t: "move", from: "g8", to: "f6" });
+  ok(c.san.length === 6 && c.cond.w.length === 0, "a move the lines don't cover clears them, and it's your move as usual");
+  ok(L.validateAction(c, P1, { t: "move", from: "e1", to: "g1" }).ok, "(White castles by hand)");
+}
+
 console.log(failures === 0 ? "\nALL TESTS PASSED" : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);
