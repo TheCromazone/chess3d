@@ -30,7 +30,7 @@ events (top tournaments relayed move by move), video lessons, blogs and a coach 
 added Leagues, daily tournaments, blocking players, top live games, and for daily games vacations and
 conditional moves (rules v8). Loop 12 moved ratings to the server (every online game is rated from its
 room, puzzle attempts are checked against the puzzle data, Puzzle Rush runs are timed and checked),
-let students message coaches without being friends, translated the interface into 25
+let students message coaches without being friends, translated the interface into 29
 languages (right-to-left ones included), added a weekly report of the site's own results to the Watch page, and published
 original articles on the Learn page.
 Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don't have (alternative noted)
@@ -168,7 +168,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Light / dark site theme | ✅ | dark, light, or match device |
 | Keyboard shortcuts sheet | ✅ | press ? |
 | Mobile app | ✅ | installable PWA, works offline for bots / puzzles / analysis |
-| Languages | ✅ | 26: English, Bahasa Indonesia, Czech, German, Spanish, French, Italian, Hungarian, Dutch, Polish, Portuguese, Romanian, Swedish, Vietnamese, Turkish, Greek, Russian, Ukrainian, Hebrew, Arabic, Persian, Hindi, Japanese, Korean, and Simplified and Traditional Chinese, chosen in Settings; Arabic, Hebrew and Persian mirror the page right to left while boards and notation stay left to right (the browser's language by default); players' own words are never translated |
+| Languages | ✅ | 30: English, Bahasa Indonesia, Czech, Danish, German, Spanish, French, Italian, Hungarian, Dutch, Norwegian, Polish, Portuguese, Romanian, Finnish, Swedish, Vietnamese, Turkish, Greek, Russian, Ukrainian, Hebrew, Arabic, Persian, Hindi, Thai, Japanese, Korean, and Simplified and Traditional Chinese, chosen in Settings; Arabic, Hebrew and Persian mirror the page right to left while boards and notation stay left to right (the browser's language by default); players' own words are never translated |
 | Accessibility | ✅ | labelled controls, focus rings, reduced motion, keyboard play on the 2D board, spoken moves for screen readers |
 
 ## Still different from chess.com
@@ -186,4 +186,4 @@ content that needs a staff of writers and coaches, not missing software.
 - **A masters game database.** The opening explorer has statistics from about a million games
   between players rated 1800 and up; chess.com also has a masters database. The free masters
   explorer we could use needs a Lichess login token on the server, and the owner chose not to add one.
-- **Every language.** chess.com is offered in more languages than the 26 here.
+- **Every language.** chess.com is offered in more languages than the 30 here.

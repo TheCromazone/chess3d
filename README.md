@@ -40,7 +40,7 @@ lessons, Stockfish game review, and analysis. There's no sign-up: your device ho
 
 **You**
 - Local profile with ratings per category and per variant, rating history, stats, Insights (accuracy by phase, colour and time control), a game archive (review or download any game as PGN), variant games to replay, and achievements. Export and import your data.
-- Settings: 26 languages, including right-to-left Arabic, Hebrew and Persian (English, Bahasa Indonesia, Czech, German, Spanish, French, Italian, Hungarian, Dutch, Polish, Portuguese, Romanian, Swedish, Vietnamese, Turkish, Greek, Russian, Ukrainian, Hebrew, Arabic, Persian, Hindi, Japanese, Korean, Simplified and Traditional Chinese); dark or light appearance, 3D or 2D board, board and piece themes, top-down 3D camera, coordinates, animation speed, legal-move hints, sound.
+- Settings: 30 languages, including right-to-left Arabic, Hebrew and Persian (English, Bahasa Indonesia, Czech, Danish, German, Spanish, French, Italian, Hungarian, Dutch, Norwegian, Polish, Portuguese, Romanian, Finnish, Swedish, Vietnamese, Turkish, Greek, Russian, Ukrainian, Hebrew, Arabic, Persian, Hindi, Thai, Japanese, Korean, Simplified and Traditional Chinese); dark or light appearance, 3D or 2D board, board and piece themes, top-down 3D camera, coordinates, animation speed, legal-move hints, sound.
 - Installable as an app (PWA); bots, puzzles, analysis and review work offline.
 - Right-click to draw arrows and circles (Shift, Alt, Ctrl change the color).
 
