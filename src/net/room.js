@@ -5,7 +5,7 @@
 const PLATFORM_HOST = "timely-ibis-513.higgsfield.app";
 
 // the live game you're seated in right now (shared with friends so they can watch)
-export const live = { room: null };
+export const live = { room: null, busy: false };
 
 export function roomUrl(room) {
   // served from the Higgsfield project itself: rooms live on the same origin

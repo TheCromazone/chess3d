@@ -50,6 +50,7 @@ export class OnlineGame extends BaseGame {
 
   mount() {
     super.mount();
+    live.busy = false;     // searching or waiting isn't playing yet
     if (this.kind === "pool" && !this.client) this._search();
     else this._join();
     this.app.leaveGuard = async () => {
@@ -267,7 +268,7 @@ export class OnlineGame extends BaseGame {
     }
     if (s.status === "playing") {
       if (this.phase !== "playing") { this.phase = "playing"; this._renderControls(); }
-      if (this.myColor && this.kind !== "daily") live.room = this.room;
+      if (this.myColor && this.kind !== "daily") { live.room = this.room; live.busy = true; }
     }
     this.renderStrips();
     this._renderStatus();
@@ -429,6 +430,7 @@ export class OnlineGame extends BaseGame {
 
   _resetLocal() {
     this.result = null;
+    live.busy = !!this.myColor;
     this._modalShown = false;
     this.sentConfig = false;
     this.pendingUci = null;

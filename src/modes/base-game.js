@@ -9,6 +9,7 @@ import { getSettings, saveGame, newGameId, updateProfile, unlock } from "../stor
 import { moveSound, SFX } from "../audio.js";
 import { openingForGame, loadOpenings } from "../openings.js";
 import { shareGame } from "../net/social.js";
+import { live } from "../net/room.js";
 
 export const VARIANTS = [
   { value: "standard", label: "Standard", desc: "" },
@@ -70,6 +71,7 @@ export class BaseGame {
   postGameButtons() { return []; }
 
   mount() {
+    live.busy = true;      // friends see you as playing until the game ends
     this._lastMoveAt = performance.now();
     this.app.setInGame(true);
     this.input.bind();
@@ -81,6 +83,7 @@ export class BaseGame {
   }
 
   destroy() {
+    live.busy = false;
     this._destroyed = true;
     clearInterval(this._tick);
     this.input.clear();
@@ -330,6 +333,7 @@ export class BaseGame {
   finish(result) {
     if (this.result) return;
     this.result = result;
+    live.busy = false;
     announce(`Game over. ${result.winner ? (result.winner === "w" ? "White" : "Black") + " won" : result.reason === "aborted" ? "Aborted" : "Draw"} ${REASON_TEXT[result.reason] || ""}.`);
     if (this.clock && this.clock.active) {
       const c = this.clock.active;

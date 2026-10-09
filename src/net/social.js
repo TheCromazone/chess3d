@@ -93,7 +93,7 @@ export async function beat() {
   const p = getProfile();
   const ratings = {};
   for (const c of CATS) ratings[c] = { r: p.ratings[c].r, n: p.ratings[c].n };
-  const playing = !!live.room || !!document.getElementById("app")?.classList.contains("in-game");
+  const playing = !!live.room || live.busy;
   let r;
   try {
     r = await api("POST", "/heartbeat", { status: playing ? "playing" : "online", room: live.room, name: socialName(p.name), avatar: p.avatar, ratings, games: p.stats.games });

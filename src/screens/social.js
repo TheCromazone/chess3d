@@ -332,7 +332,7 @@ export class SocialScreen {
     const games = h("div.profile-games", h("p.note", "Loading recent games…"));
     const m = openModal({
       title: u.name,
-      sub: `${presenceText(u)}${u.games ? `, ${u.games} games played` : ""}`,
+      sub: `${presenceText(u)}${u.games ? `, ${u.games} game${u.games === 1 ? "" : "s"} played` : ""}`,
       body: [h("div.profile-pop", userAvatar(u, ".lg"), grid), actions, remove, kick, h("div.lbl.note", "Recent games"), games],
     });
     S.api("GET", `/users/${u.id}/games`).then((d) => {
