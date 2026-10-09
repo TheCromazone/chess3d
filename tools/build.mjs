@@ -21,6 +21,15 @@ await build({
   logLevel: "info",
 });
 
+// the Crazyhouse engine runs in its own worker
+await build({
+  entryPoints: [join(root, "src/zh-worker.js")],
+  bundle: true, format: "iife", minify: true,
+  target: ["es2020", "safari15"],
+  outfile: join(dist, "zh-worker.js"),
+  logLevel: "warning",
+});
+
 // server rules module: the platform validator statically scans for `export const meta`
 // etc., so bundle chess.js as an inline IIFE library and keep the six exports inline.
 {

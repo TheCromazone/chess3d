@@ -15,6 +15,14 @@ export function roomUrl(room) {
   return "wss://" + PLATFORM_HOST + "/ws/" + room;
 }
 
+// Read a room's seats and status without joining it (joining would take an empty seat)
+export async function peekRoom(room) {
+  const base = /(^|\.)higgsfield\.app$/.test(location.hostname) ? "" : "https://" + PLATFORM_HOST;
+  const res = await fetch(`${base}/api/room/${encodeURIComponent(room)}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("room unavailable");
+  return res.json();
+}
+
 // "p-k3j2x9.MagnusFan.1450", plus ".K7M2QX9P" (a friend code) when social is on, so the
 // opponent can add you as a friend after the game
 export function makePlayerId(name, rating, code) {

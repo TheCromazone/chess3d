@@ -429,6 +429,26 @@ textarea.input { min-height: 110px; resize: vertical; font-family: ui-monospace,
 .code-card .btn { white-space: nowrap; }
 .lb-box { display: flex; flex-direction: column; gap: 12px; }
 .lb-controls { display: flex; flex-direction: column; gap: 8px; }
+/* crazyhouse / bughouse */
+.pockets { display: flex; flex-direction: column; gap: 6px; }
+.pocket { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 44px; padding: 4px 8px; border-radius: var(--radius); background: var(--panel-2); border: 1px solid var(--line); }
+.pocket-label { font-size: 12.5px; font-weight: 600; color: var(--ink-3); min-width: 86px; }
+.pocket-label:empty { display: none; }
+.pocket-piece { position: relative; width: 40px; height: 40px; border-radius: 8px; display: grid; place-items: center; background: var(--panel-3); border: 1px solid var(--line); }
+.pocket-piece .pg { font-size: 26px; line-height: 1; }
+.pocket-piece small { position: absolute; right: 2px; bottom: 0; font-size: 11px; font-weight: 800; color: var(--ink-2); }
+.pocket-piece.on { border-color: var(--accent); background: rgba(52, 210, 123, .16); }
+.pocket-piece:disabled { cursor: default; opacity: 1; }
+.zh-moves { font-size: 13.5px; line-height: 1.7; color: var(--ink-2); max-height: 140px; overflow-y: auto; }
+.partner { display: flex; flex-direction: column; gap: 6px; }
+.partner-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.partner-row .pocket { min-height: 0; padding: 2px 6px; background: none; border: 0; }
+.partner-row .pocket-piece { width: 28px; height: 28px; }
+.partner-row .pocket-piece .pg { font-size: 19px; }
+.mini-board { display: grid; grid-template-columns: repeat(8, 1fr); width: min(100%, 240px); aspect-ratio: 1; border-radius: 6px; overflow: hidden; align-self: center; }
+.mini-board span { display: grid; place-items: center; font-size: clamp(14px, 3.4vw, 22px); line-height: 1; color: #1b140e; }
+.mini-board .lt { background: #e8d9bd; } .mini-board .dk { background: #b58863; }
+.team-h { font-size: 14px; margin: 6px 0 -2px; }
 .row .ri.live { color: var(--accent); background: rgba(52, 210, 123, .12); }
 .arena-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .arena-table tr.me td { background: rgba(52, 210, 123, .08); }

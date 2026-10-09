@@ -16,6 +16,7 @@ import { maybeWelcome } from "./screens/welcome.js";
 import { BattleScreen } from "./modes/battle.js";
 import { SocialScreen, startSocial } from "./screens/social.js";
 import { ArenasScreen, ArenaLobby } from "./screens/arenas.js";
+import { ZhGame, ZhSetup, BughouseLobby, VariantsScreen } from "./modes/zh-game.js";
 import { getResume, setSettings } from "./store.js";
 import { unlockAudio } from "./audio.js";
 import { loadOpenings } from "./openings.js";
@@ -47,6 +48,16 @@ const routes = [
   { pattern: /^#\/puzzles\/battle$/, nav: "puzzles", make: (app) => new BattleScreen(app) },
   { pattern: /^#\/arena$/, nav: "play", make: (app) => new ArenaScreen(app) },
   { pattern: /^#\/arenas$/, nav: "play", make: (app) => new ArenasScreen(app) },
+  { pattern: /^#\/variants$/, nav: "play", make: (app) => new VariantsScreen(app) },
+  { pattern: /^#\/crazyhouse(?:\/play)?$/, nav: "play", make: (app) => new ZhSetup(app) },
+  {
+    pattern: /^#\/crazyhouse\/online$/, nav: "play", make: (app) => {
+      const q = new URLSearchParams(location.search);
+      return q.get("room") ? new ZhGame(app, { mode: "online", room: q.get("room"), tcKey: q.get("tc") || "3+0" }) : new ZhSetup(app);
+    },
+  },
+  { pattern: /^#\/bughouse$/, nav: "play", make: (app) => new BughouseLobby(app, null) },
+  { pattern: /^#\/bughouse\/([a-z0-9]{4,16})(?:\/play)?(?:\?.*)?$/, nav: "play", make: (app, m) => new BughouseLobby(app, m[1]) },
   { pattern: /^#\/arenas\/(ar-\d+)$/, nav: "play", make: (app, m) => new ArenaLobby(app, m[1]) },
   { pattern: /^#\/daily$/, nav: "play", make: (app) => new DailyScreen(app) },
   { pattern: /^#\/puzzles\/theme\/([\w-]+)$/, nav: "puzzles", make: (app, m) => new PuzzleScreen(app, { mode: "rated", theme: m[1] }) },
@@ -74,7 +85,7 @@ const routes = [
 ];
 
 // invite links from older builds carry only ?room=
-if (new URLSearchParams(location.search).get("room") && !location.hash) {
+if (new URLSearchParams(location.search).get("room") && !location.hash && !/^zh-/.test(new URLSearchParams(location.search).get("room"))) {
   history.replaceState(null, "", location.pathname + location.search + "#/online");
 }
 

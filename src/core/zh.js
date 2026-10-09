@@ -113,7 +113,7 @@ export class Crazyhouse {
       if (this.promoted.includes(mv.from)) this.promoted = this.promoted.filter((s) => s !== mv.from).concat(mv.to);
       if (mv.promotion) this.promoted.push(mv.to);
       this.fen = c.fen();
-      desc = { color, from: mv.from, to: mv.to, promotion: mv.promotion, captured: mv.captured, san: mv.san.replace(/[+#]$/, ""), flags: mv.flags };
+      desc = { color, from: mv.from, to: mv.to, piece: mv.piece, promotion: mv.promotion, captured: mv.captured, san: mv.san.replace(/[+#]$/, ""), flags: mv.flags };
     }
     const after = this.chess();
     if (after.inCheck()) desc.san += this.legalMoves().length ? "+" : "#";
