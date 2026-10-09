@@ -114,6 +114,21 @@ also takes `kind: "blog" | "coach"`.
 videos (YouTube channel feeds, three per channel) and live streamers (Lichess and Chess.com
 streamer lists), fetched by the Worker at most every 15 minutes and cached in `social_config`.
 
+Swiss tournaments (`/swiss`, `/swiss/:id`, `POST /swiss/:id/join {pid}`, `/withdraw`, `/ping {pid}`):
+one every two hours at a quarter past. The tournament moves along whenever a player's screen checks
+in: at the start round 1 pairs the players seen in the last minute (a round waits up to five
+minutes for two), each game is scored from its room (no-show forfeits after 90 seconds, a draw at
+the round's time cap), and the next round pairs by score without rematches. Each step is claimed
+with a token, so concurrent requests can't double-pair or double-score.
+
+Club team matches (`POST /clubs/:id/matches`, `GET /clubs/:id/matches`, `/matches/:mid` with
+`accept`, `decline`, `join {pid}`, `leave`, `start`) pair two clubs' sign-ups by rapid rating; each
+board plays two daily games, and rules v7's `swap` lets the player who sets up a room take Black,
+so each game gets the colour the pairing chose. Vote Chess (`POST /clubs/:id/votechess`,
+`/votechess/:vid` with `accept`, `decline`, `vote {move}`, `play`) seats both clubs in a room and
+plays the leading vote through the room's internal `/__act` path (the Worker's `roomAct` hook),
+which seats a player or applies an action exactly as a player's would be checked.
+
 Web push: the Worker makes a VAPID key pair once and keeps it in D1 (`social_config`); `GET
 /push/key` publishes the public half. `POST /push/subscribe {endpoint}` accepts only the browsers'
 push services (FCM, Mozilla, Apple, Windows). New messages, challenges, friend requests and

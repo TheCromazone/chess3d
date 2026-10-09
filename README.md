@@ -14,21 +14,21 @@ lessons, Stockfish game review, and analysis. There's no sign-up: your device ho
 - **Bots:** 16 personalities from 250 to 3200, backed by Stockfish 18, with hints, takebacks, resumable games, and a rating vs bots.
 - **Pass and play:** two players on one screen, with optional auto-flip.
 - **Variants:** Crazyhouse, Bughouse, 4-Player Chess (free-for-all and teams), Duck Chess, Fog of War, Giveaway, Atomic, Horde, Chess960, King of the Hill and Three-check. Each has bots, pass and play, friend invites and rated games against random opponents (Bughouse: a four-player lobby), with a rating and leaderboard per variant.
-- **Arenas:** live tournaments against real players every 30 minutes (blitz and bullet), with instant re-pairing, live standings and win-streak bonuses; or a Bot Arena against the bots nearest your rating.
+- **Tournaments:** live arenas every 30 minutes (blitz and bullet) with instant re-pairing, live standings and win-streak bonuses; Swiss tournaments every two hours; or a Bot Arena against the bots nearest your rating.
 - Clocks with increment and custom time controls, premoves, drag-and-drop or click-to-move, auto-queen, keyboard move entry, move-list navigation (← → keys), material count, and opening names.
 
 **Improve**
 - **Game Review:** every move classified (brilliant, great, best, excellent, good, book, inaccuracy, mistake, miss, blunder), accuracy, an estimated game rating, an evaluation graph, key moments, coach explanations, and "retry" for your mistakes.
 - **Analysis board:** move tree with variations, live multi-line Stockfish evaluation, eval bar, best-move arrows, opening explorer, PGN/FEN import and export, a board editor, and "play a bot from here".
 - **Share:** a link that opens the game in analysis, an animated GIF, or a PNG of any position.
-- **Puzzles:** 17,000+ rated puzzles (with your own puzzle rating, theme and difficulty filters), a daily puzzle with streaks, Puzzle Rush (3 min, 5 min, survival), and Puzzle Battle against another player or a bot.
-- **Learn:** interactive lessons, endgame drills against Stockfish, an opening trainer, and video lessons (whole series from chess teachers, played in the page).
+- **Puzzles:** 17,000+ rated puzzles (with your own puzzle rating, theme and difficulty filters), a daily puzzle with streaks, Puzzle Rush (3 min, 5 min, survival), Puzzle Battle against another player or a bot, and Solo Chess.
+- **Learn:** interactive lessons, endgame drills against Stockfish, an opening trainer, the Vision coordinates trainer, and video lessons (whole series from chess teachers, played in the page).
 - **Watch:** top tournaments live (games relayed by Lichess broadcasts), chess streamers live now, the latest videos and news, 40 famous games replayed move by move, and Bot TV.
 
 **Social**
 - **Friends:** share your friend code or an invite link, accept requests, and see who's online or playing.
 - **Challenges and messages:** challenge a friend to a live or daily game and they get a pop-up with Accept / Decline; message friends one to one.
-- **Clubs:** public or invite-only clubs with their own chat and member list.
+- **Clubs:** public or invite-only clubs with their own chat and member list, team matches against other clubs (daily games, two per board), and Vote Chess, where a club's moves are chosen by its members' votes.
 - **Forums and blogs:** topics and replies in five forums; players' blog posts with likes; both with reporting.
 - **Coaches:** players who teach list themselves with a description, languages, topics and rate; students add them as a friend to arrange lessons.
 - **Notifications:** pop-ups in the app, and optional browser notifications when it's closed (challenges, messages, friend requests, your move in daily games).

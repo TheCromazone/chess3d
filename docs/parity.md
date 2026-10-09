@@ -25,7 +25,8 @@ War, Giveaway, Atomic and Horde on one perft-checked move generator (rules v5), 
 free-for-all and teams, in four-seat rooms (rules v6), each with bots, pass and play and online play.
 Loop 9 took Chess960, King of the Hill and Three-check online, gave every variant rated games
 against random opponents with its own rating, leaderboard and replayable history, and added live
-events (top tournaments relayed move by move), video lessons, blogs and a coach directory.
+events (top tournaments relayed move by move), video lessons, blogs and a coach directory. Loop
+10 added Swiss tournaments, club team matches, Vote Chess, the Vision trainer and Solo Chess.
 Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don't have (alternative noted)
 
 ## Play
@@ -62,6 +63,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Variant ratings, leaderboards and history | ✅ | a rating per variant from rated games (from 1500), a leaderboard per variant, ratings on player profiles, and every variant game replayable from the profile |
 | Daily / correspondence chess | ✅ | 1, 3 or 7 days per move (or no limit), lose on time when a deadline passes (rules v3); persistent rooms, "your move" list with time left, daily challenges to friends |
 | Tournaments / arenas | ✅ | live arenas against real players every 30 minutes (blitz on the hour, bullet on the half hour): instant re-pairing, streak bonuses, live standings, results read by the server from the game room; Bot Arena for practice |
+| Swiss tournaments | ✅ | every two hours (Blitz 3+2 over 5 rounds, Rapid 10+0 over 4): pairing by score without rematches, balanced colours, byes, forfeits for no-shows, Buchholz tie-break; checked live with three players |
 
 ## Analysis
 
@@ -91,6 +93,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Hints / show solution | ✅ | |
 | Puzzle Battle | ✅ | against real players (matched by the server, same puzzles, live scores) or a bot |
 | Puzzle difficulty | ✅ | easiest → hardest |
+| Solo Chess | ✅ | every move captures until one piece is left; puzzles built backwards from a survivor, all checked solvable |
 
 ## Learn
 
@@ -99,6 +102,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Lessons (rules, tactics, strategy) | ✅ | 23 interactive lessons |
 | Endgame practice vs engine | ✅ | 15 drills |
 | Opening trainer | ✅ | 32 openings |
+| Vision (coordinates trainer) | ✅ | tap the named square, 30 seconds, from either side; best scores kept |
 | Video lessons | ✅ | 23 whole series from chess teachers (Hanging Pawns, IM John Bartholomew, GM Daniel Naroditsky, Chess Talk, Chessbrah) by topic, played in the page |
 
 ## Watch
@@ -131,6 +135,8 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | Direct messages | ✅ | threads with friends, unread counts on the nav, notices for new messages |
 | Notifications | ✅ | in-app notices while open; opt-in browser notifications when closed (web push) for challenges, messages, friend requests and daily moves; verified end to end in Chrome with the site closed |
 | Clubs | ✅ | create (public or invite-only), join by code or from the public list, club chat, member list with presence |
+| Club team matches | ✅ | owners challenge other clubs; members sign up; boards pair by rating and each pair plays two daily games, one with each colour; scores from the rooms |
+| Vote Chess | ✅ | two clubs play one daily game, each move the one most members voted for, played at the deadline or early by the owner |
 | Leaderboards | ✅ | global top 50 per category (blitz, bullet, rapid, puzzles, bots, Puzzle Rush) with your rank, or just your friends; ratings are self-reported by devices and labelled so; bot ladder on the profile |
 | Accounts | ✅ | passwordless by the user's choice: your profile key is the account, with a unique name; sign in on other devices with a one-time code or your recovery key; profile, ratings, settings and games back up to the cloud and follow you; sign out of this or all other devices; delete the profile |
 | Data portability | ✅ | automatic cloud backup with a profile, plus export / import of a backup file |

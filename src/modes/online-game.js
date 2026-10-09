@@ -108,7 +108,8 @@ export class OnlineGame extends BaseGame {
       this.room = (this.kind === "daily" ? "daily-" : "") + Math.random().toString(36).slice(2, 8);
     }
     sessionStorage.setItem("mp-pid-" + this.room, this.playerId);
-    if (this.kind === "daily") upsertDaily({ room: this.room, playerId: this.playerId });
+    // a club match's colour is remembered with the game, for coming back from the daily list
+    if (this.kind === "daily") upsertDaily({ room: this.room, playerId: this.playerId, ...(this.cfg.forceColor ? { forceColor: this.cfg.forceColor } : {}) });
     const params = new URLSearchParams(location.search);
     params.set("room", this.room);
     if (this.tcKey && !params.get("tc")) params.set("tc", this.tcKey);
@@ -185,7 +186,8 @@ export class OnlineGame extends BaseGame {
         let tc = this.tcKey || new URLSearchParams(location.search).get("tc") || "10+0";
         if (/d$/.test(tc) && (v.v || 1) < 3) tc = "inf";   // a server without daily deadlines
         // a club match may have given you Black: the room seated you first, so swap
-        const swap = this.cfg.forceColor === "b" && (v.v || 1) >= 7 ? { swap: true } : {};
+        const forceColor = this.cfg.forceColor || (getDaily(this.room) || {}).forceColor;
+        const swap = forceColor === "b" && (v.v || 1) >= 7 ? { swap: true } : {};
         this.client.action({ t: "config", tc: this.v2 || SERVER_TCS.includes(tc) ? tc : nearestTc(tc), ...swap });
       }
       this._setNote(this.myColor === "w" ? "Starting…" : "Waiting for White to start the clock…");
