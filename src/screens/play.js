@@ -2,7 +2,7 @@
 import { Chess } from "chess.js";
 import { h, icon, todayStr } from "../ui/dom.js";
 import { tcPicker, tcLabel, segmented, switchRow, openModal, ONLINE_TIME_CONTROLS } from "../ui/components.js";
-import { getProfile, getResume, setResume, getGames, getDailyGames, getSettings } from "../store.js";
+import { getProfile, getResume, setResume, getGames, getDailyGames, getSettings, setSettings } from "../store.js";
 import { BOTS } from "../bots.js";
 import { BotGame, LocalGame, findBot } from "../modes/bot-game.js";
 import { OnlineGame } from "../modes/online-game.js";
@@ -43,6 +43,20 @@ export class HomeScreen {
     tcBtn.addEventListener("click", () => {
       const m = openModal({ title: "Time control", body: tcPicker(lastOnlineTc, (k) => { lastOnlineTc = k; tcBtn.querySelector("span").textContent = tcLabel(k); m.close(); }, { allowUnlimited: false, allowCustom: false, groups: ONLINE_TIME_CONTROLS }) });
     });
+    const optLabel = () => { const st = getSettings(); return `${st.pairRated === false ? "Unrated" : "Rated"}${st.pairRange ? ` ±${st.pairRange}` : ""}`; };
+    const optBtn = h("button.tc-current.tc-opts", { "aria-label": "Pairing options" }, icon("users", 18), h("span", optLabel()), icon("chevron", 16));
+    optBtn.addEventListener("click", () => {
+      const st = getSettings();
+      const m = openModal({
+        title: "Pairing options",
+        sub: "Unrated games don't change your rating or earn league trophies. A rating range only pairs you with players near your rating, so it can take longer.",
+        body: [
+          h("div.field", h("div.lbl", "Games"), segmented([{ value: true, label: "Rated" }, { value: false, label: "Unrated" }], st.pairRated !== false, (v) => { setSettings({ pairRated: v }); optBtn.querySelector("span").textContent = optLabel(); })),
+          h("div.field", h("div.lbl", "Opponent rating"), segmented([0, 100, 200, 400].map((v) => ({ value: v, label: v ? `±${v}` : "Any" })), st.pairRange || 0, (v) => { setSettings({ pairRange: v }); optBtn.querySelector("span").textContent = optLabel(); })),
+          h("button.btn.primary.block", { onclick: () => m.close() }, "Done"),
+        ],
+      });
+    });
     const resume = getResume();
     const resumeBot = resume && resume.kind === "bot" ? findBot(resume.botId) : null;
     const daily = p.daily.solved[todayStr()];
@@ -63,8 +77,8 @@ export class HomeScreen {
       title: "",
       body: [
         h("div", h("div.hero-title", "Play chess"), h("p.hero-sub", getSettings().view === "2d" ? "Against friends, bots and the world, with Stockfish at your side." : "On a real 3D board, with Stockfish at your side.")),
-        tcBtn,
-        h("button.btn.primary.big.block", { onclick: () => app.launch(() => new OnlineGame(app, { kind: "pool", tcKey: lastOnlineTc }), "#/online") }, "Play online"),
+        h("div.tc-row", tcBtn, optBtn),
+        h("button.btn.primary.big.block", { onclick: () => { const st = getSettings(); app.launch(() => new OnlineGame(app, { kind: "pool", tcKey: lastOnlineTc, rated: st.pairRated !== false, range: st.pairRange || 0 }), "#/online"); } }, "Play online"),
         rows,
         h("div.quick-stats",
           h("div", h("small", "Bots"), h("b", String(p.ratings.bots.r))),

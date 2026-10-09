@@ -14,6 +14,8 @@ function write(key, value) {
 }
 
 export const DEFAULT_SETTINGS = {
+  pairRated: true,        // games against random opponents are rated (unrated ones have a pool of their own)
+  pairRange: 0,           // only pair with players within this many rating points (0: anyone)
   appearance: "dark",     // "dark" | "light" | "system"
   view: "3d",             // "3d" | "2d"
   boardTheme3d: "walnut",

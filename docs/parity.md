@@ -36,6 +36,7 @@ Status: ✅ shipped · 🟡 partial · ❌ missing · ⛔ needs a backend we don
 | chess.com feature | Status | Notes |
 |---|---|---|
 | Play online vs random opponent (matchmaking) | ✅ | quick pairing through rotating public pool rooms; ghost seats skipped; verified with two live clients |
+| Rated or unrated, rating range | ✅ | pairing options: unrated games have a pool of their own (no rating change, no league trophies); a rating range (±100, ±200, ±400) only pairs you with players near your rating |
 | Play a friend (invite link) | ✅ | time control chosen up front, share sheet on mobile |
 | Time controls: bullet/blitz/rapid presets + custom | ✅ | 9 presets + custom for bots, friends and pass and play; quick pairing uses the 5 pool presets |
 | Bots with names, ratings, personalities | ✅ | 16 original personalities, 250 → 3200, chat lines, Stockfish 18 |

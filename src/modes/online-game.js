@@ -85,7 +85,12 @@ export class OnlineGame extends BaseGame {
   _search() {
     this.phase = "searching";
     this._renderLobby();
-    this.search = findMatch(this.tcKey, this.playerId, (p) => { if (p.phase === "waiting") this._renderLobby(); });
+    // unrated games have a pool of their own; a rating range turns down players outside it
+    const range = this.cfg.range || 0, mine = this.myRating;
+    this.search = findMatch(this.tcKey, this.playerId, (p) => { if (p.phase === "waiting") this._renderLobby(); }, {
+      prefix: this.cfg.rated === false ? "upool" : "pool",
+      accept: range ? (pid) => { const r = parsePlayerId(pid).rating; return !r || Math.abs(r - mine) <= range; } : null,
+    });
     this.search.promise.then(({ room, client }) => {
       if (this.dead) { client.close(); return; }   // matched just as the user left
       this.search = null;
@@ -181,7 +186,7 @@ export class OnlineGame extends BaseGame {
     if (s.status === "over" && v.phase === "config") {
       if (this.kind === "pool" && this.app.controller === this) {
         toast("That pairing fell through. Finding you another opponent.");
-        this.app.setController(() => new OnlineGame(this.app, { kind: "pool", tcKey: this.tcKey }));
+        this.app.setController(() => new OnlineGame(this.app, { kind: "pool", tcKey: this.tcKey, rated: this.cfg.rated, range: this.cfg.range }));
       } else this._setNote("This game was called off before it started.");
       return;
     }
@@ -395,7 +400,7 @@ export class OnlineGame extends BaseGame {
     }
     // daily games with a time limit are rated too (chess.com's Daily rating); unlimited ones aren't
     const daily = this.kind === "daily" && /^\d+d$/.test(this.tcKey || "");
-    const rated = this.kind === "pool" || !!this.cfg.arena || !!this.cfg.swiss || daily;
+    const rated = (this.kind === "pool" && this.cfg.rated !== false) || !!this.cfg.arena || !!this.cfg.swiss || daily;
     const cls = daily ? "daily" : timeClass(this.tcKey);
     let delta = null;
     if (rated && cls) {
@@ -404,7 +409,7 @@ export class OnlineGame extends BaseGame {
       this.players[this.myColor].rating = getProfile().ratings[cls].r;
     }
     if (r.winner === this.myColor) unlock("online-win");
-    if (this.kind === "pool" && Social.registered()) this._reportLeague();
+    if (this.kind === "pool" && this.cfg.rated !== false && Social.registered()) this._reportLeague();
     return { rated, delta, deltaFor: delta !== null ? { [this.myColor]: delta } : null };
   }
 
@@ -441,7 +446,7 @@ export class OnlineGame extends BaseGame {
       return btns.concat(this._addFriendButton());
     }
     if (this.myColor) btns.push(h("button.btn", { onclick: () => { close(); this._rematch(); } }, icon("flip", 18), "Rematch"));
-    btns.push(h("button.btn", { onclick: () => { close(); this.app.setController(() => new OnlineGame(this.app, { kind: "pool", tcKey: this.tcKey })); } }, icon("users", 18), "New opponent"));
+    btns.push(h("button.btn", { onclick: () => { close(); this.app.setController(() => new OnlineGame(this.app, { kind: "pool", tcKey: this.tcKey, rated: this.cfg.rated, range: this.cfg.range })); } }, icon("users", 18), "New opponent"));
     return btns.concat(this._addFriendButton());
   }
 
@@ -656,6 +661,7 @@ export class OnlineGame extends BaseGame {
     if (this.phase === "searching" || this.phase === "connecting") {
       body.push(h("div.card",
         h("h3", `Looking for an opponent at ${tcLabel(this.tcKey)}`),
+        this.cfg.rated === false || this.cfg.range ? h("p.note", [this.cfg.rated === false ? "Unrated" : "Rated", this.cfg.range ? `opponents within ${this.cfg.range} of your ${this.myRating}` : null].filter(Boolean).join(", ") + ".") : null,
         this._timeEl = h("p.note", "Searching…"),
         h("p.note", "Chess 3D pairs players who search at the same time. If nobody turns up, play a bot while you wait.")));
       body.push(h("button.btn.block", { onclick: () => this.app.go("#/bots") }, icon("robot", 18), "Play a bot instead"));

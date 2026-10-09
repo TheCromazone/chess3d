@@ -100,8 +100,9 @@ export class RoomClient {
 const BUCKET_MS = 120000;
 const POOL_SIZE = 10;
 
-// opts.prefix names the pool (variants have their own); opts.seats is how many players a game needs
-export function findMatch(tcKey, playerId, onProgress = () => {}, { prefix = "pool", seats = 2 } = {}) {
+// opts.prefix names the pool (variants have their own); opts.seats is how many players a game needs;
+// opts.accept(playerId) can turn down opponents (a rating range)
+export function findMatch(tcKey, playerId, onProgress = () => {}, { prefix = "pool", seats = 2, accept = null } = {}) {
   let cancelled = false;
   let client = null;
   let rolloverTimer = null;
@@ -110,11 +111,11 @@ export function findMatch(tcKey, playerId, onProgress = () => {}, { prefix = "po
   const done = new Promise((res, rej) => { resolveFn = res; rejectFn = rej; });
 
   const tcSlug = tcKey.replace("+", "p").replace(".", "_");
-  const avoid = (seats) => seats.some((p) => p !== playerId && isBlocked(p));
+  const avoid = (seats) => seats.some((p) => p !== playerId && (isBlocked(p) || (accept && !accept(p))));
   const tryRoom = async (bucket, i, id) => {
     const room = `${prefix}-${tcSlug}-${bucket}-${i}`;
-    // someone you've blocked is waiting here: look elsewhere (joining would seat you with them)
-    if (blockedCodes().size) {
+    // someone you've blocked (or outside your rating range) is waiting here: look elsewhere
+    if (blockedCodes().size || accept) {
       try { if (avoid((await peekRoom(room)).seats || [])) return { next: true }; } catch { /* the join below finds out */ }
     }
     return joinRoom(room, id);
@@ -137,7 +138,7 @@ export function findMatch(tcKey, playerId, onProgress = () => {}, { prefix = "po
           return;
         }
         if (s.status === "playing") {
-          // a player you've blocked sat down: call the game off before a move and look elsewhere. Wait a
+          // a player you've blocked (or outside your range) sat down: call the game off before a move and look elsewhere. Wait a
           // moment first: they search again straight away and settle in a room of their own, which the
           // rest of this sweep then steps around (otherwise you keep meeting and use up the pool's rooms)
           if (avoid(s.seats)) {
