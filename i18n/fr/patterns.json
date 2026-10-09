@@ -198,5 +198,9 @@
  [
   "^Searching… (\\d+:\\d+)$",
   "Recherche… $1"
+ ],
+ [
+  "^(\\d+) min read$",
+  "$1 min de lecture"
  ]
 ]

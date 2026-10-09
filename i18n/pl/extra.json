@@ -95,5 +95,12 @@
  "Blitz Arena": "Arena blitz",
  "Bullet Arena": "Arena bullet",
  "Blitz Swiss": "Turniej szwajcarski blitz",
- "Rapid Swiss": "Turniej szwajcarski rapid"
+ "Rapid Swiss": "Turniej szwajcarski rapid",
+ "Articles": "Artykuły",
+ "Next article": "Następny artykuł",
+ "Improvement": "Doskonalenie",
+ "History": "Historia",
+ "Couldn't load this article. Check your connection and try again.": "Nie udało się wczytać tego artykułu. Sprawdź połączenie i spróbuj ponownie.",
+ "That article doesn't exist.": "Taki artykuł nie istnieje.",
+ "Couldn't load the articles right now.": "Nie można teraz wczytać artykułów."
 }

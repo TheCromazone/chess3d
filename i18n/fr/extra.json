@@ -95,5 +95,12 @@
  "Blitz Arena": "Arène blitz",
  "Bullet Arena": "Arène bullet",
  "Blitz Swiss": "Suisse blitz",
- "Rapid Swiss": "Suisse rapide"
+ "Rapid Swiss": "Suisse rapide",
+ "Articles": "Articles",
+ "Next article": "Article suivant",
+ "Improvement": "Progresser",
+ "History": "Histoire",
+ "Couldn't load this article. Check your connection and try again.": "Impossible de charger cet article. Vérifiez votre connexion et réessayez.",
+ "That article doesn't exist.": "Cet article n'existe pas.",
+ "Couldn't load the articles right now.": "Impossible de charger les articles pour l'instant."
 }

@@ -95,5 +95,12 @@
  "Blitz Arena": "Blitz Arenası",
  "Bullet Arena": "Bullet Arenası",
  "Blitz Swiss": "Blitz İsviçre",
- "Rapid Swiss": "Hızlı İsviçre"
+ "Rapid Swiss": "Hızlı İsviçre",
+ "Articles": "Makaleler",
+ "Next article": "Sonraki makale",
+ "Improvement": "Gelişim",
+ "History": "Tarih",
+ "Couldn't load this article. Check your connection and try again.": "Bu makale yüklenemedi. Bağlantını kontrol edip tekrar dene.",
+ "That article doesn't exist.": "Böyle bir makale yok.",
+ "Couldn't load the articles right now.": "Makaleler şu anda yüklenemiyor."
 }

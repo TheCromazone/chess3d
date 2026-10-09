@@ -1,0 +1,206 @@
+[
+ [
+  "^you're on vacation until (.+)$",
+  "$1까지 휴가 중이에요"
+ ],
+ [
+  "^they're on vacation until (.+)$",
+  "$1까지 휴가 중"
+ ],
+ [
+  "^(\\d+) days left$",
+  "$1일 남음"
+ ],
+ [
+  "^(\\d+) h left$",
+  "$1시간 남음"
+ ],
+ [
+  "^(\\d+) min left$",
+  "$1분 남음"
+ ],
+ [
+  "^out of time$",
+  "시간 초과"
+ ],
+ [
+  "^(\\d+) moves?$",
+  "$1수"
+ ],
+ [
+  "^last (.+)$",
+  "마지막 수 $1"
+ ],
+ [
+  "^(\\d+) days? per move$",
+  "수당 $1일"
+ ],
+ [
+  "^(.+), (\\d+ (?:min|h|d) ago|just now)$",
+  "$1, $2"
+ ],
+ [
+  "^Play (.+)$",
+  "$1 재생"
+ ],
+ [
+  "^(\\d+) min ago$",
+  "$1분 전"
+ ],
+ [
+  "^(\\d+) h ago$",
+  "$1시간 전"
+ ],
+ [
+  "^(\\d+) d ago$",
+  "$1일 전"
+ ],
+ [
+  "^Updated (.+)$",
+  "$1 업데이트"
+ ],
+ [
+  "^(\\d+) games? in progress$",
+  "진행 중인 대국 $1판"
+ ],
+ [
+  "^Your move in (\\d+) games?$",
+  "대국 $1판에서 내 차례"
+ ],
+ [
+  "^(.+), rated (\\d+)$",
+  "$1, 레이팅 $2"
+ ],
+ [
+  "^vs (.+)$",
+  "vs $1"
+ ],
+ [
+  "^(1-0|0-1|½-½|1/2-1/2) (.+)$",
+  "$1 $2"
+ ],
+ [
+  "^([A-E]\\d\\d) · as White$",
+  "$1 · 백"
+ ],
+ [
+  "^([A-E]\\d\\d) · as Black$",
+  "$1 · 흑"
+ ],
+ [
+  "^(Basics|Tactics|Strategy|Endgames) (\\d+)/(\\d+)$",
+  "$1 $2/$3"
+ ],
+ [
+  "^(\\d+) steps$",
+  "$1단계"
+ ],
+ [
+  "^(.+), (\\d+) videos$",
+  "$1, 영상 $2개"
+ ],
+ [
+  "^(\\d+) puzzles?$",
+  "퍼즐 $1개"
+ ],
+ [
+  "^(\\d+) games?$",
+  "대국 $1판"
+ ],
+ [
+  "^(\\d+) rated games?$",
+  "레이팅 대국 $1판"
+ ],
+ [
+  "^(\\d+) reviewed games?$",
+  "리뷰한 대국 $1판"
+ ],
+ [
+  "^(.+) \\((\\d+)\\)$",
+  "$1 ($2)"
+ ],
+ [
+  "^White to move\\. Find the best move\\.$",
+  "백 차례. 최선의 수를 찾으세요."
+ ],
+ [
+  "^Black to move\\. Find the best move\\.$",
+  "흑 차례. 최선의 수를 찾으세요."
+ ],
+ [
+  "^(.+) is thinking…$",
+  "$1: 생각하는 중…"
+ ],
+ [
+  "^(\\d+) pieces left$",
+  "기물 $1개 남음"
+ ],
+ [
+  "^Solved at this level: (\\d+)\\.$",
+  "이 레벨에서 맞힌 개수: $1."
+ ],
+ [
+  "^(\\d+) of (\\d+)$",
+  "$2 중 $1"
+ ],
+ [
+  "^Best from White's side: (\\d+)\\. From Black's side: (\\d+)\\.$",
+  "백 진영 최고 기록: $1. 흑 진영 최고 기록: $2."
+ ],
+ [
+  "^(.+) vs (.+)\\. Live now\\.$",
+  "$1 vs $2. 지금 생중계 중."
+ ],
+ [
+  "^Joined (.+)\\. (\\d+) games? played\\.$",
+  "가입일 $1. 대국 $2판을 뒀어요."
+ ],
+ [
+  "^Score from (\\d+) games?$",
+  "대국 $1판의 점수"
+ ],
+ [
+  "^Bot ladder: you're #(\\d+) of (\\d+)$",
+  "봇 순위: $2명 중 $1위"
+ ],
+ [
+  "^Achievements \\((\\d+)/(\\d+)\\)$",
+  "업적 ($1/$2)"
+ ],
+ [
+  "^(\\d+)% win rate$",
+  "승률 $1%"
+ ],
+ [
+  "^Best streak (\\d+)$",
+  "최고 연속 기록 $1"
+ ],
+ [
+  "^(\\d+) won, (\\d+) drawn, (\\d+) lost\\. Last played (.+)$",
+  "$1승 $2무 $3패. 마지막 대국: $4"
+ ],
+ [
+  "^Depth (\\d+)$",
+  "깊이 $1"
+ ],
+ [
+  "^3 min (\\d+) · 5 min (\\d+) · Survival (\\d+)$",
+  "3분 $1 · 5분 $2 · 서바이벌 $3"
+ ],
+ [
+  "^Other players will see your name \\((.+)\\), avatar, ratings, your recent online and bot games, and whether you're online\\. There's no email or password: a key saved in this browser is your account, your games and ratings are backed up to it, and you can sign in on other devices from Settings\\.$",
+  "다른 플레이어에게 내 이름($1), 아바타, 레이팅, 최근 온라인 대국과 봇 대국, 접속 여부가 보여요. 이메일이나 비밀번호는 없어요. 이 브라우저에 저장된 키가 곧 계정이고, 대국과 레이팅이 여기에 백업되며, 설정에서 다른 기기에 로그인할 수 있어요."
+ ],
+ [
+  "^Looking for an opponent at (.+)$",
+  "$1 대국 상대를 찾는 중"
+ ],
+ [
+  "^Searching… (\\d+:\\d+)$",
+  "찾는 중… $1"
+ ],
+ [
+  "^(\\d+) min read$",
+  "$1분 분량"
+ ]
+]

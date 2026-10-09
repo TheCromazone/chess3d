@@ -95,5 +95,12 @@
  "Blitz Arena": "Blitz-Arena",
  "Bullet Arena": "Bullet-Arena",
  "Blitz Swiss": "Blitz-Schweizer",
- "Rapid Swiss": "Schnellschach-Schweizer"
+ "Rapid Swiss": "Schnellschach-Schweizer",
+ "Articles": "Artikel",
+ "Next article": "Nächster Artikel",
+ "Improvement": "Besser werden",
+ "History": "Geschichte",
+ "Couldn't load this article. Check your connection and try again.": "Dieser Artikel konnte nicht geladen werden. Prüfe deine Verbindung und versuch es noch einmal.",
+ "That article doesn't exist.": "Diesen Artikel gibt es nicht.",
+ "Couldn't load the articles right now.": "Die Artikel können gerade nicht geladen werden."
 }

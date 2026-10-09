@@ -95,5 +95,12 @@
  "Blitz Arena": "Арена: блиц",
  "Bullet Arena": "Арена: пуля",
  "Blitz Swiss": "Швейцарка: блиц",
- "Rapid Swiss": "Швейцарка: рапид"
+ "Rapid Swiss": "Швейцарка: рапид",
+ "Articles": "Статьи",
+ "Next article": "Следующая статья",
+ "Improvement": "Совершенствование",
+ "History": "История",
+ "Couldn't load this article. Check your connection and try again.": "Не удалось загрузить статью. Проверь подключение и попробуй ещё раз.",
+ "That article doesn't exist.": "Такой статьи нет.",
+ "Couldn't load the articles right now.": "Сейчас не удаётся загрузить статьи."
 }

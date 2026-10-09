@@ -1,0 +1,206 @@
+[
+ [
+  "^you're on vacation until (.+)$",
+  "kamu sedang liburan sampai $1"
+ ],
+ [
+  "^they're on vacation until (.+)$",
+  "sedang liburan sampai $1"
+ ],
+ [
+  "^(\\d+) days left$",
+  "sisa $1 hari"
+ ],
+ [
+  "^(\\d+) h left$",
+  "sisa $1 jam"
+ ],
+ [
+  "^(\\d+) min left$",
+  "sisa $1 mnt"
+ ],
+ [
+  "^out of time$",
+  "waktu habis"
+ ],
+ [
+  "^(\\d+) moves?$",
+  "$1 langkah"
+ ],
+ [
+  "^last (.+)$",
+  "terakhir $1"
+ ],
+ [
+  "^(\\d+) days? per move$",
+  "$1 hari per langkah"
+ ],
+ [
+  "^(.+), (\\d+ (?:min|h|d) ago|just now)$",
+  "$1, $2"
+ ],
+ [
+  "^Play (.+)$",
+  "Putar $1"
+ ],
+ [
+  "^(\\d+) min ago$",
+  "$1 mnt lalu"
+ ],
+ [
+  "^(\\d+) h ago$",
+  "$1 jam lalu"
+ ],
+ [
+  "^(\\d+) d ago$",
+  "$1 hr lalu"
+ ],
+ [
+  "^Updated (.+)$",
+  "Diperbarui $1"
+ ],
+ [
+  "^(\\d+) games? in progress$",
+  "$1 permainan sedang berlangsung"
+ ],
+ [
+  "^Your move in (\\d+) games?$",
+  "Giliranmu di $1 permainan"
+ ],
+ [
+  "^(.+), rated (\\d+)$",
+  "$1, rating $2"
+ ],
+ [
+  "^vs (.+)$",
+  "vs $1"
+ ],
+ [
+  "^(1-0|0-1|½-½|1/2-1/2) (.+)$",
+  "$1 $2"
+ ],
+ [
+  "^([A-E]\\d\\d) · as White$",
+  "$1 · sebagai Putih"
+ ],
+ [
+  "^([A-E]\\d\\d) · as Black$",
+  "$1 · sebagai Hitam"
+ ],
+ [
+  "^(Basics|Tactics|Strategy|Endgames) (\\d+)/(\\d+)$",
+  "$1 $2/$3"
+ ],
+ [
+  "^(\\d+) steps$",
+  "$1 tahap"
+ ],
+ [
+  "^(.+), (\\d+) videos$",
+  "$1, $2 video"
+ ],
+ [
+  "^(\\d+) puzzles?$",
+  "$1 puzzle"
+ ],
+ [
+  "^(\\d+) games?$",
+  "$1 permainan"
+ ],
+ [
+  "^(\\d+) rated games?$",
+  "$1 permainan dinilai"
+ ],
+ [
+  "^(\\d+) reviewed games?$",
+  "$1 permainan ditinjau"
+ ],
+ [
+  "^(.+) \\((\\d+)\\)$",
+  "$1 ($2)"
+ ],
+ [
+  "^White to move\\. Find the best move\\.$",
+  "Giliran Putih. Temukan langkah terbaik."
+ ],
+ [
+  "^Black to move\\. Find the best move\\.$",
+  "Giliran Hitam. Temukan langkah terbaik."
+ ],
+ [
+  "^(.+) is thinking…$",
+  "$1 sedang berpikir…"
+ ],
+ [
+  "^(\\d+) pieces left$",
+  "Tersisa $1 buah"
+ ],
+ [
+  "^Solved at this level: (\\d+)\\.$",
+  "Terpecahkan di level ini: $1."
+ ],
+ [
+  "^(\\d+) of (\\d+)$",
+  "$1 dari $2"
+ ],
+ [
+  "^Best from White's side: (\\d+)\\. From Black's side: (\\d+)\\.$",
+  "Terbaik dari sisi Putih: $1. Dari sisi Hitam: $2."
+ ],
+ [
+  "^(.+) vs (.+)\\. Live now\\.$",
+  "$1 vs $2. Siaran langsung sekarang."
+ ],
+ [
+  "^Joined (.+)\\. (\\d+) games? played\\.$",
+  "Bergabung $1. $2 permainan dimainkan."
+ ],
+ [
+  "^Score from (\\d+) games?$",
+  "Skor dari $1 permainan"
+ ],
+ [
+  "^Bot ladder: you're #(\\d+) of (\\d+)$",
+  "Tangga bot: kamu #$1 dari $2"
+ ],
+ [
+  "^Achievements \\((\\d+)/(\\d+)\\)$",
+  "Pencapaian ($1/$2)"
+ ],
+ [
+  "^(\\d+)% win rate$",
+  "Tingkat menang $1%"
+ ],
+ [
+  "^Best streak (\\d+)$",
+  "Rentetan terbaik $1"
+ ],
+ [
+  "^(\\d+) won, (\\d+) drawn, (\\d+) lost\\. Last played (.+)$",
+  "$1 menang, $2 remis, $3 kalah. Terakhir bermain $4"
+ ],
+ [
+  "^Depth (\\d+)$",
+  "Kedalaman $1"
+ ],
+ [
+  "^3 min (\\d+) · 5 min (\\d+) · Survival (\\d+)$",
+  "3 mnt $1 · 5 mnt $2 · Bertahan Hidup $3"
+ ],
+ [
+  "^Other players will see your name \\((.+)\\), avatar, ratings, your recent online and bot games, and whether you're online\\. There's no email or password: a key saved in this browser is your account, your games and ratings are backed up to it, and you can sign in on other devices from Settings\\.$",
+  "Pemain lain akan melihat namamu ($1), avatar, rating, permainan online dan bot terbarumu, serta apakah kamu sedang online. Tidak ada email atau kata sandi: kunci yang tersimpan di browser ini adalah akunmu, permainan dan ratingmu dicadangkan ke kunci itu, dan kamu bisa masuk di perangkat lain dari Pengaturan."
+ ],
+ [
+  "^Looking for an opponent at (.+)$",
+  "Mencari lawan untuk $1"
+ ],
+ [
+  "^Searching… (\\d+:\\d+)$",
+  "Mencari… $1"
+ ],
+ [
+  "^(\\d+) min read$",
+  "$1 menit baca"
+ ]
+]

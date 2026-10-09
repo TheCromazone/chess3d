@@ -5,16 +5,24 @@
 // parts are translated too where the table has them. Text nobody translated stays English.
 export const LANGUAGES = [
   { code: "en", name: "English" },
+  { code: "id", name: "Bahasa Indonesia" },
+  { code: "cs", name: "Čeština" },
+  { code: "de", name: "Deutsch" },
   { code: "es", name: "Español" },
   { code: "fr", name: "Français" },
-  { code: "de", name: "Deutsch" },
   { code: "it", name: "Italiano" },
+  { code: "nl", name: "Nederlands" },
   { code: "pl", name: "Polski" },
   { code: "pt", name: "Português" },
+  { code: "sv", name: "Svenska" },
+  { code: "vi", name: "Tiếng Việt" },
   { code: "tr", name: "Türkçe" },
   { code: "ru", name: "Русский" },
+  { code: "uk", name: "Українська" },
   { code: "ja", name: "日本語" },
+  { code: "ko", name: "한국어" },
   { code: "zh", name: "中文（简体）" },
+  { code: "zh-TW", name: "中文（繁體）" },
 ];
 const KEY = "chess3d.lang";
 const ATTRS = ["aria-label", "placeholder", "title", "alt"];
@@ -29,7 +37,9 @@ export function currentLanguage() {
   let saved = null;
   try { saved = localStorage.getItem(KEY); } catch { /* private mode */ }
   if (saved && LANGUAGES.some((l) => l.code === saved)) return saved;
-  const nav = (navigator.languages || [navigator.language || "en"]).map((x) => String(x).slice(0, 2).toLowerCase());
+  // Taiwan, Hong Kong and Macau, or any "Hant" tag, read Traditional Chinese; otherwise the first two letters decide
+  const nav = (navigator.languages || [navigator.language || "en"]).map((x) => String(x).toLowerCase())
+    .map((x) => (/^zh-(tw|hk|mo|hant)/.test(x) ? "zh-TW" : x.slice(0, 2)));
   return nav.find((c) => LANGUAGES.some((l) => l.code === c)) || "en";
 }
 export function setLanguage(code) {

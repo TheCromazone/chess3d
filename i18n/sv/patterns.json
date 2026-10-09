@@ -1,0 +1,206 @@
+[
+ [
+  "^you're on vacation until (.+)$",
+  "du är på semester till $1"
+ ],
+ [
+  "^they're on vacation until (.+)$",
+  "på semester till $1"
+ ],
+ [
+  "^(\\d+) days left$",
+  "$1 dagar kvar"
+ ],
+ [
+  "^(\\d+) h left$",
+  "$1 tim kvar"
+ ],
+ [
+  "^(\\d+) min left$",
+  "$1 min kvar"
+ ],
+ [
+  "^out of time$",
+  "tiden är slut"
+ ],
+ [
+  "^(\\d+) moves?$",
+  "$1 drag"
+ ],
+ [
+  "^last (.+)$",
+  "senast $1"
+ ],
+ [
+  "^(\\d+) days? per move$",
+  "$1 dagar per drag"
+ ],
+ [
+  "^(.+), (\\d+ (?:min|h|d) ago|just now)$",
+  "$1, $2"
+ ],
+ [
+  "^Play (.+)$",
+  "Spela upp $1"
+ ],
+ [
+  "^(\\d+) min ago$",
+  "för $1 min sedan"
+ ],
+ [
+  "^(\\d+) h ago$",
+  "för $1 tim sedan"
+ ],
+ [
+  "^(\\d+) d ago$",
+  "för $1 d sedan"
+ ],
+ [
+  "^Updated (.+)$",
+  "Uppdaterad $1"
+ ],
+ [
+  "^(\\d+) games? in progress$",
+  "$1 pågående partier"
+ ],
+ [
+  "^Your move in (\\d+) games?$",
+  "Ditt drag i $1 partier"
+ ],
+ [
+  "^(.+), rated (\\d+)$",
+  "$1, rating $2"
+ ],
+ [
+  "^vs (.+)$",
+  "mot $1"
+ ],
+ [
+  "^(1-0|0-1|½-½|1/2-1/2) (.+)$",
+  "$1 $2"
+ ],
+ [
+  "^([A-E]\\d\\d) · as White$",
+  "$1 · med Vit"
+ ],
+ [
+  "^([A-E]\\d\\d) · as Black$",
+  "$1 · med Svart"
+ ],
+ [
+  "^(Basics|Tactics|Strategy|Endgames) (\\d+)/(\\d+)$",
+  "$1 $2/$3"
+ ],
+ [
+  "^(\\d+) steps$",
+  "$1 steg"
+ ],
+ [
+  "^(.+), (\\d+) videos$",
+  "$1, $2 videor"
+ ],
+ [
+  "^(\\d+) puzzles?$",
+  "$1 pussel"
+ ],
+ [
+  "^(\\d+) games?$",
+  "$1 partier"
+ ],
+ [
+  "^(\\d+) rated games?$",
+  "$1 rankade partier"
+ ],
+ [
+  "^(\\d+) reviewed games?$",
+  "$1 granskade partier"
+ ],
+ [
+  "^(.+) \\((\\d+)\\)$",
+  "$1 ($2)"
+ ],
+ [
+  "^White to move\\. Find the best move\\.$",
+  "Vit vid draget. Hitta det bästa draget."
+ ],
+ [
+  "^Black to move\\. Find the best move\\.$",
+  "Svart vid draget. Hitta det bästa draget."
+ ],
+ [
+  "^(.+) is thinking…$",
+  "$1 tänker…"
+ ],
+ [
+  "^(\\d+) pieces left$",
+  "$1 pjäser kvar"
+ ],
+ [
+  "^Solved at this level: (\\d+)\\.$",
+  "Lösta på den här nivån: $1."
+ ],
+ [
+  "^(\\d+) of (\\d+)$",
+  "$1 av $2"
+ ],
+ [
+  "^Best from White's side: (\\d+)\\. From Black's side: (\\d+)\\.$",
+  "Bäst från Vits sida: $1. Från Svarts sida: $2."
+ ],
+ [
+  "^(.+) vs (.+)\\. Live now\\.$",
+  "$1 mot $2. Live nu."
+ ],
+ [
+  "^Joined (.+)\\. (\\d+) games? played\\.$",
+  "Medlem sedan $1. $2 partier spelade."
+ ],
+ [
+  "^Score from (\\d+) games?$",
+  "Poäng från $1 partier"
+ ],
+ [
+  "^Bot ladder: you're #(\\d+) of (\\d+)$",
+  "Botstegen: du är nr $1 av $2"
+ ],
+ [
+  "^Achievements \\((\\d+)/(\\d+)\\)$",
+  "Prestationer ($1/$2)"
+ ],
+ [
+  "^(\\d+)% win rate$",
+  "$1 % vinstandel"
+ ],
+ [
+  "^Best streak (\\d+)$",
+  "Bästa svit: $1"
+ ],
+ [
+  "^(\\d+) won, (\\d+) drawn, (\\d+) lost\\. Last played (.+)$",
+  "$1 vunna, $2 remi, $3 förlorade. Senast spelat: $4"
+ ],
+ [
+  "^Depth (\\d+)$",
+  "Djup $1"
+ ],
+ [
+  "^3 min (\\d+) · 5 min (\\d+) · Survival (\\d+)$",
+  "3 min $1 · 5 min $2 · Överlevnad $3"
+ ],
+ [
+  "^Other players will see your name \\((.+)\\), avatar, ratings, your recent online and bot games, and whether you're online\\. There's no email or password: a key saved in this browser is your account, your games and ratings are backed up to it, and you can sign in on other devices from Settings\\.$",
+  "Andra spelare ser ditt namn ($1), din avatar, dina ratingar, dina senaste online- och botpartier och om du är online. Det finns ingen e-post och inget lösenord: en nyckel sparad i den här webbläsaren är ditt konto, dina partier och ratingar säkerhetskopieras till den, och du kan logga in på andra enheter via Inställningar."
+ ],
+ [
+  "^Looking for an opponent at (.+)$",
+  "Söker en motståndare för $1"
+ ],
+ [
+  "^Searching… (\\d+:\\d+)$",
+  "Söker… $1"
+ ],
+ [
+  "^(\\d+) min read$",
+  "$1 min läsning"
+ ]
+]

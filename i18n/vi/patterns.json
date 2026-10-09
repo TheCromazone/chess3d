@@ -1,0 +1,206 @@
+[
+ [
+  "^you're on vacation until (.+)$",
+  "bạn đang nghỉ đến $1"
+ ],
+ [
+  "^they're on vacation until (.+)$",
+  "họ đang nghỉ đến $1"
+ ],
+ [
+  "^(\\d+) days left$",
+  "còn $1 ngày"
+ ],
+ [
+  "^(\\d+) h left$",
+  "còn $1 giờ"
+ ],
+ [
+  "^(\\d+) min left$",
+  "còn $1 phút"
+ ],
+ [
+  "^out of time$",
+  "hết giờ"
+ ],
+ [
+  "^(\\d+) moves?$",
+  "$1 nước"
+ ],
+ [
+  "^last (.+)$",
+  "nước cuối $1"
+ ],
+ [
+  "^(\\d+) days? per move$",
+  "$1 ngày mỗi nước"
+ ],
+ [
+  "^(.+), (\\d+ (?:min|h|d) ago|just now)$",
+  "$1, $2"
+ ],
+ [
+  "^Play (.+)$",
+  "Phát $1"
+ ],
+ [
+  "^(\\d+) min ago$",
+  "$1 phút trước"
+ ],
+ [
+  "^(\\d+) h ago$",
+  "$1 giờ trước"
+ ],
+ [
+  "^(\\d+) d ago$",
+  "$1 ngày trước"
+ ],
+ [
+  "^Updated (.+)$",
+  "Cập nhật $1"
+ ],
+ [
+  "^(\\d+) games? in progress$",
+  "$1 ván đang diễn ra"
+ ],
+ [
+  "^Your move in (\\d+) games?$",
+  "Đến lượt bạn ở $1 ván"
+ ],
+ [
+  "^(.+), rated (\\d+)$",
+  "$1, Elo $2"
+ ],
+ [
+  "^vs (.+)$",
+  "đấu với $1"
+ ],
+ [
+  "^(1-0|0-1|½-½|1/2-1/2) (.+)$",
+  "$1 $2"
+ ],
+ [
+  "^([A-E]\\d\\d) · as White$",
+  "$1 · với quân Trắng"
+ ],
+ [
+  "^([A-E]\\d\\d) · as Black$",
+  "$1 · với quân Đen"
+ ],
+ [
+  "^(Basics|Tactics|Strategy|Endgames) (\\d+)/(\\d+)$",
+  "$1 $2/$3"
+ ],
+ [
+  "^(\\d+) steps$",
+  "$1 bước"
+ ],
+ [
+  "^(.+), (\\d+) videos$",
+  "$1, $2 video"
+ ],
+ [
+  "^(\\d+) puzzles?$",
+  "$1 câu đố"
+ ],
+ [
+  "^(\\d+) games?$",
+  "$1 ván"
+ ],
+ [
+  "^(\\d+) rated games?$",
+  "$1 ván tính Elo"
+ ],
+ [
+  "^(\\d+) reviewed games?$",
+  "$1 ván đã phân tích"
+ ],
+ [
+  "^(.+) \\((\\d+)\\)$",
+  "$1 ($2)"
+ ],
+ [
+  "^White to move\\. Find the best move\\.$",
+  "Trắng đi. Hãy tìm nước đi tốt nhất."
+ ],
+ [
+  "^Black to move\\. Find the best move\\.$",
+  "Đen đi. Hãy tìm nước đi tốt nhất."
+ ],
+ [
+  "^(.+) is thinking…$",
+  "$1 đang suy nghĩ…"
+ ],
+ [
+  "^(\\d+) pieces left$",
+  "Còn $1 quân"
+ ],
+ [
+  "^Solved at this level: (\\d+)\\.$",
+  "Đã giải ở cấp độ này: $1."
+ ],
+ [
+  "^(\\d+) of (\\d+)$",
+  "$1 trên $2"
+ ],
+ [
+  "^Best from White's side: (\\d+)\\. From Black's side: (\\d+)\\.$",
+  "Kỷ lục bên Trắng: $1. Bên Đen: $2."
+ ],
+ [
+  "^(.+) vs (.+)\\. Live now\\.$",
+  "$1 đấu với $2. Đang trực tiếp."
+ ],
+ [
+  "^Joined (.+)\\. (\\d+) games? played\\.$",
+  "Tham gia từ $1. Đã chơi $2 ván."
+ ],
+ [
+  "^Score from (\\d+) games?$",
+  "Điểm từ $1 ván"
+ ],
+ [
+  "^Bot ladder: you're #(\\d+) of (\\d+)$",
+  "Thang xếp hạng bot: bạn hạng #$1 trên $2"
+ ],
+ [
+  "^Achievements \\((\\d+)/(\\d+)\\)$",
+  "Thành tích ($1/$2)"
+ ],
+ [
+  "^(\\d+)% win rate$",
+  "Tỷ lệ thắng $1%"
+ ],
+ [
+  "^Best streak (\\d+)$",
+  "Chuỗi dài nhất: $1"
+ ],
+ [
+  "^(\\d+) won, (\\d+) drawn, (\\d+) lost\\. Last played (.+)$",
+  "Thắng $1, hòa $2, thua $3. Lần chơi gần nhất: $4"
+ ],
+ [
+  "^Depth (\\d+)$",
+  "Độ sâu $1"
+ ],
+ [
+  "^3 min (\\d+) · 5 min (\\d+) · Survival (\\d+)$",
+  "3 phút $1 · 5 phút $2 · Sinh tồn $3"
+ ],
+ [
+  "^Other players will see your name \\((.+)\\), avatar, ratings, your recent online and bot games, and whether you're online\\. There's no email or password: a key saved in this browser is your account, your games and ratings are backed up to it, and you can sign in on other devices from Settings\\.$",
+  "Người chơi khác sẽ thấy tên của bạn ($1), ảnh đại diện, Elo, các ván trực tuyến và ván với bot gần đây của bạn, và việc bạn có đang trực tuyến hay không. Không cần email hay mật khẩu: một khóa được lưu trong trình duyệt này chính là tài khoản của bạn, ván cờ và Elo của bạn được sao lưu vào đó, và bạn có thể đăng nhập trên thiết bị khác từ Cài đặt."
+ ],
+ [
+  "^Looking for an opponent at (.+)$",
+  "Đang tìm đối thủ cho $1"
+ ],
+ [
+  "^Searching… (\\d+:\\d+)$",
+  "Đang tìm… $1"
+ ],
+ [
+  "^(\\d+) min read$",
+  "$1 phút đọc"
+ ]
+]

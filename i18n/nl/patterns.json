@@ -1,0 +1,206 @@
+[
+ [
+  "^you're on vacation until (.+)$",
+  "je bent op vakantie tot $1"
+ ],
+ [
+  "^they're on vacation until (.+)$",
+  "op vakantie tot $1"
+ ],
+ [
+  "^(\\d+) days left$",
+  "nog $1 dagen"
+ ],
+ [
+  "^(\\d+) h left$",
+  "nog $1 u"
+ ],
+ [
+  "^(\\d+) min left$",
+  "nog $1 min"
+ ],
+ [
+  "^out of time$",
+  "tijd om"
+ ],
+ [
+  "^(\\d+) moves?$",
+  "$1 zetten"
+ ],
+ [
+  "^last (.+)$",
+  "laatste zet $1"
+ ],
+ [
+  "^(\\d+) days? per move$",
+  "$1 dagen per zet"
+ ],
+ [
+  "^(.+), (\\d+ (?:min|h|d) ago|just now)$",
+  "$1, $2"
+ ],
+ [
+  "^Play (.+)$",
+  "$1 afspelen"
+ ],
+ [
+  "^(\\d+) min ago$",
+  "$1 min geleden"
+ ],
+ [
+  "^(\\d+) h ago$",
+  "$1 u geleden"
+ ],
+ [
+  "^(\\d+) d ago$",
+  "$1 d geleden"
+ ],
+ [
+  "^Updated (.+)$",
+  "Bijgewerkt $1"
+ ],
+ [
+  "^(\\d+) games? in progress$",
+  "$1 lopende partijen"
+ ],
+ [
+  "^Your move in (\\d+) games?$",
+  "Je bent aan zet in $1 partijen"
+ ],
+ [
+  "^(.+), rated (\\d+)$",
+  "$1, rating $2"
+ ],
+ [
+  "^vs (.+)$",
+  "tegen $1"
+ ],
+ [
+  "^(1-0|0-1|½-½|1/2-1/2) (.+)$",
+  "$1 $2"
+ ],
+ [
+  "^([A-E]\\d\\d) · as White$",
+  "$1 · met Wit"
+ ],
+ [
+  "^([A-E]\\d\\d) · as Black$",
+  "$1 · met Zwart"
+ ],
+ [
+  "^(Basics|Tactics|Strategy|Endgames) (\\d+)/(\\d+)$",
+  "$1 $2/$3"
+ ],
+ [
+  "^(\\d+) steps$",
+  "$1 stappen"
+ ],
+ [
+  "^(.+), (\\d+) videos$",
+  "$1, $2 video's"
+ ],
+ [
+  "^(\\d+) puzzles?$",
+  "$1 puzzels"
+ ],
+ [
+  "^(\\d+) games?$",
+  "$1 partijen"
+ ],
+ [
+  "^(\\d+) rated games?$",
+  "$1 partijen met rating"
+ ],
+ [
+  "^(\\d+) reviewed games?$",
+  "$1 geanalyseerde partijen"
+ ],
+ [
+  "^(.+) \\((\\d+)\\)$",
+  "$1 ($2)"
+ ],
+ [
+  "^White to move\\. Find the best move\\.$",
+  "Wit aan zet. Zoek de beste zet."
+ ],
+ [
+  "^Black to move\\. Find the best move\\.$",
+  "Zwart aan zet. Zoek de beste zet."
+ ],
+ [
+  "^(.+) is thinking…$",
+  "$1 denkt na…"
+ ],
+ [
+  "^(\\d+) pieces left$",
+  "$1 stukken over"
+ ],
+ [
+  "^Solved at this level: (\\d+)\\.$",
+  "Opgelost op dit niveau: $1."
+ ],
+ [
+  "^(\\d+) of (\\d+)$",
+  "$1 van $2"
+ ],
+ [
+  "^Best from White's side: (\\d+)\\. From Black's side: (\\d+)\\.$",
+  "Beste met Wit: $1. Met Zwart: $2."
+ ],
+ [
+  "^(.+) vs (.+)\\. Live now\\.$",
+  "$1 tegen $2. Nu live."
+ ],
+ [
+  "^Joined (.+)\\. (\\d+) games? played\\.$",
+  "Lid sinds $1. $2 partijen gespeeld."
+ ],
+ [
+  "^Score from (\\d+) games?$",
+  "Score uit $1 partijen"
+ ],
+ [
+  "^Bot ladder: you're #(\\d+) of (\\d+)$",
+  "Botranglijst: je staat op #$1 van $2"
+ ],
+ [
+  "^Achievements \\((\\d+)/(\\d+)\\)$",
+  "Prestaties ($1/$2)"
+ ],
+ [
+  "^(\\d+)% win rate$",
+  "$1% winstpercentage"
+ ],
+ [
+  "^Best streak (\\d+)$",
+  "Beste reeks: $1"
+ ],
+ [
+  "^(\\d+) won, (\\d+) drawn, (\\d+) lost\\. Last played (.+)$",
+  "$1 gewonnen, $2 remise, $3 verloren. Laatst gespeeld: $4"
+ ],
+ [
+  "^Depth (\\d+)$",
+  "Diepte $1"
+ ],
+ [
+  "^3 min (\\d+) · 5 min (\\d+) · Survival (\\d+)$",
+  "3 min $1 · 5 min $2 · Overleven $3"
+ ],
+ [
+  "^Other players will see your name \\((.+)\\), avatar, ratings, your recent online and bot games, and whether you're online\\. There's no email or password: a key saved in this browser is your account, your games and ratings are backed up to it, and you can sign in on other devices from Settings\\.$",
+  "Andere spelers zien je naam ($1), avatar, ratings, je recente online partijen en botpartijen, en of je online bent. Er is geen e-mail of wachtwoord: een sleutel in deze browser is je account, je partijen en ratings worden daarin geback-upt, en je kunt via Instellingen op andere apparaten inloggen."
+ ],
+ [
+  "^Looking for an opponent at (.+)$",
+  "Tegenstander zoeken voor $1"
+ ],
+ [
+  "^Searching… (\\d+:\\d+)$",
+  "Zoeken… $1"
+ ],
+ [
+  "^(\\d+) min read$",
+  "$1 min lezen"
+ ]
+]

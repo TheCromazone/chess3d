@@ -95,5 +95,12 @@
  "Blitz Arena": "闪电棋竞技场",
  "Bullet Arena": "子弹棋竞技场",
  "Blitz Swiss": "闪电棋瑞士制",
- "Rapid Swiss": "快棋瑞士制"
+ "Rapid Swiss": "快棋瑞士制",
+ "Articles": "文章",
+ "Next article": "下一篇",
+ "Improvement": "提高",
+ "History": "历史",
+ "Couldn't load this article. Check your connection and try again.": "无法加载这篇文章。请检查网络连接后重试。",
+ "That article doesn't exist.": "没有这篇文章。",
+ "Couldn't load the articles right now.": "暂时无法加载文章。"
 }

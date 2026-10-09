@@ -1,52 +1,206 @@
 [
- ["^you're on vacation until (.+)$", "du bist im Urlaub bis $1"],
- ["^they're on vacation until (.+)$", "im Urlaub bis $1"],
- ["^(\\d+) days left$", "noch $1 Tage"],
- ["^(\\d+) h left$", "noch $1 Std."],
- ["^(\\d+) min left$", "noch $1 Min."],
- ["^out of time$", "Zeit abgelaufen"],
- ["^(\\d+) moves?$", "$1 Züge"],
- ["^last (.+)$", "zuletzt $1"],
- ["^(\\d+) days? per move$", "$1 Tage pro Zug"],
- ["^(.+), (\\d+ (?:min|h|d) ago|just now)$", "$1, $2"],
- ["^Play (.+)$", "$1 abspielen"],
- ["^(\\d+) min ago$", "vor $1 Min."],
- ["^(\\d+) h ago$", "vor $1 Std."],
- ["^(\\d+) d ago$", "vor $1 Tg."],
- ["^Updated (.+)$", "Aktualisiert $1"],
- ["^(\\d+) games? in progress$", "$1 laufende Partien"],
- ["^Your move in (\\d+) games?$", "Du bist in $1 Partien am Zug"],
- ["^(.+), rated (\\d+)$", "$1, Wertung $2"],
- ["^vs (.+)$", "gegen $1"],
- ["^(1-0|0-1|½-½|1/2-1/2) (.+)$", "$1 $2"],
- ["^([A-E]\\d\\d) · as White$", "$1 · mit Weiß"],
- ["^([A-E]\\d\\d) · as Black$", "$1 · mit Schwarz"],
- ["^(Basics|Tactics|Strategy|Endgames) (\\d+)/(\\d+)$", "$1 $2/$3"],
- ["^(\\d+) steps$", "$1 Schritte"],
- ["^(.+), (\\d+) videos$", "$1, $2 Videos"],
- ["^(\\d+) puzzles?$", "$1 Aufgaben"],
- ["^(\\d+) games?$", "$1 Partien"],
- ["^(\\d+) rated games?$", "$1 gewertete Partien"],
- ["^(\\d+) reviewed games?$", "$1 ausgewertete Partien"],
- ["^(.+) \\((\\d+)\\)$", "$1 ($2)"],
- ["^White to move\\. Find the best move\\.$", "Weiß am Zug. Finde den besten Zug."],
- ["^Black to move\\. Find the best move\\.$", "Schwarz am Zug. Finde den besten Zug."],
- ["^(.+) is thinking…$", "$1 denkt nach…"],
- ["^(\\d+) pieces left$", "$1 Figuren übrig"],
- ["^Solved at this level: (\\d+)\\.$", "Auf dieser Stufe gelöst: $1."],
- ["^(\\d+) of (\\d+)$", "$1 von $2"],
- ["^Best from White's side: (\\d+)\\. From Black's side: (\\d+)\\.$", "Bestwert mit Weiß: $1. Mit Schwarz: $2."],
- ["^(.+) vs (.+)\\. Live now\\.$", "$1 gegen $2. Jetzt live."],
- ["^Joined (.+)\\. (\\d+) games? played\\.$", "Dabei seit $1. $2 Partien gespielt."],
- ["^Score from (\\d+) games?$", "Ergebnis aus $1 Partien"],
- ["^Bot ladder: you're #(\\d+) of (\\d+)$", "Bot-Rangliste: Du bist Nr. $1 von $2"],
- ["^Achievements \\((\\d+)/(\\d+)\\)$", "Erfolge ($1/$2)"],
- ["^(\\d+)% win rate$", "$1 % Siegquote"],
- ["^Best streak (\\d+)$", "Beste Serie: $1"],
- ["^(\\d+) won, (\\d+) drawn, (\\d+) lost\\. Last played (.+)$", "$1 gewonnen, $2 remis, $3 verloren. Zuletzt gespielt: $4"],
- ["^Depth (\\d+)$", "Tiefe $1"],
- ["^3 min (\\d+) · 5 min (\\d+) · Survival (\\d+)$", "3 Min. $1 · 5 Min. $2 · Überleben $3"],
- ["^Other players will see your name \\((.+)\\), avatar, ratings, your recent online and bot games, and whether you're online\\. There's no email or password: a key saved in this browser is your account, your games and ratings are backed up to it, and you can sign in on other devices from Settings\\.$", "Andere Spieler sehen deinen Namen ($1), deinen Avatar, deine Wertungen, deine letzten Online- und Bot-Partien und ob du online bist. Es gibt keine E-Mail und kein Passwort: Ein Schlüssel in diesem Browser ist dein Konto, deine Partien und Wertungen werden darin gesichert, und du kannst dich in den Einstellungen auf anderen Geräten anmelden."],
- ["^Looking for an opponent at (.+)$", "Suche einen Gegner für $1"],
- ["^Searching… (\\d+:\\d+)$", "Suche… $1"]
+ [
+  "^you're on vacation until (.+)$",
+  "du bist im Urlaub bis $1"
+ ],
+ [
+  "^they're on vacation until (.+)$",
+  "im Urlaub bis $1"
+ ],
+ [
+  "^(\\d+) days left$",
+  "noch $1 Tage"
+ ],
+ [
+  "^(\\d+) h left$",
+  "noch $1 Std."
+ ],
+ [
+  "^(\\d+) min left$",
+  "noch $1 Min."
+ ],
+ [
+  "^out of time$",
+  "Zeit abgelaufen"
+ ],
+ [
+  "^(\\d+) moves?$",
+  "$1 Züge"
+ ],
+ [
+  "^last (.+)$",
+  "zuletzt $1"
+ ],
+ [
+  "^(\\d+) days? per move$",
+  "$1 Tage pro Zug"
+ ],
+ [
+  "^(.+), (\\d+ (?:min|h|d) ago|just now)$",
+  "$1, $2"
+ ],
+ [
+  "^Play (.+)$",
+  "$1 abspielen"
+ ],
+ [
+  "^(\\d+) min ago$",
+  "vor $1 Min."
+ ],
+ [
+  "^(\\d+) h ago$",
+  "vor $1 Std."
+ ],
+ [
+  "^(\\d+) d ago$",
+  "vor $1 Tg."
+ ],
+ [
+  "^Updated (.+)$",
+  "Aktualisiert $1"
+ ],
+ [
+  "^(\\d+) games? in progress$",
+  "$1 laufende Partien"
+ ],
+ [
+  "^Your move in (\\d+) games?$",
+  "Du bist in $1 Partien am Zug"
+ ],
+ [
+  "^(.+), rated (\\d+)$",
+  "$1, Wertung $2"
+ ],
+ [
+  "^vs (.+)$",
+  "gegen $1"
+ ],
+ [
+  "^(1-0|0-1|½-½|1/2-1/2) (.+)$",
+  "$1 $2"
+ ],
+ [
+  "^([A-E]\\d\\d) · as White$",
+  "$1 · mit Weiß"
+ ],
+ [
+  "^([A-E]\\d\\d) · as Black$",
+  "$1 · mit Schwarz"
+ ],
+ [
+  "^(Basics|Tactics|Strategy|Endgames) (\\d+)/(\\d+)$",
+  "$1 $2/$3"
+ ],
+ [
+  "^(\\d+) steps$",
+  "$1 Schritte"
+ ],
+ [
+  "^(.+), (\\d+) videos$",
+  "$1, $2 Videos"
+ ],
+ [
+  "^(\\d+) puzzles?$",
+  "$1 Aufgaben"
+ ],
+ [
+  "^(\\d+) games?$",
+  "$1 Partien"
+ ],
+ [
+  "^(\\d+) rated games?$",
+  "$1 gewertete Partien"
+ ],
+ [
+  "^(\\d+) reviewed games?$",
+  "$1 ausgewertete Partien"
+ ],
+ [
+  "^(.+) \\((\\d+)\\)$",
+  "$1 ($2)"
+ ],
+ [
+  "^White to move\\. Find the best move\\.$",
+  "Weiß am Zug. Finde den besten Zug."
+ ],
+ [
+  "^Black to move\\. Find the best move\\.$",
+  "Schwarz am Zug. Finde den besten Zug."
+ ],
+ [
+  "^(.+) is thinking…$",
+  "$1 denkt nach…"
+ ],
+ [
+  "^(\\d+) pieces left$",
+  "$1 Figuren übrig"
+ ],
+ [
+  "^Solved at this level: (\\d+)\\.$",
+  "Auf dieser Stufe gelöst: $1."
+ ],
+ [
+  "^(\\d+) of (\\d+)$",
+  "$1 von $2"
+ ],
+ [
+  "^Best from White's side: (\\d+)\\. From Black's side: (\\d+)\\.$",
+  "Bestwert mit Weiß: $1. Mit Schwarz: $2."
+ ],
+ [
+  "^(.+) vs (.+)\\. Live now\\.$",
+  "$1 gegen $2. Jetzt live."
+ ],
+ [
+  "^Joined (.+)\\. (\\d+) games? played\\.$",
+  "Dabei seit $1. $2 Partien gespielt."
+ ],
+ [
+  "^Score from (\\d+) games?$",
+  "Ergebnis aus $1 Partien"
+ ],
+ [
+  "^Bot ladder: you're #(\\d+) of (\\d+)$",
+  "Bot-Rangliste: Du bist Nr. $1 von $2"
+ ],
+ [
+  "^Achievements \\((\\d+)/(\\d+)\\)$",
+  "Erfolge ($1/$2)"
+ ],
+ [
+  "^(\\d+)% win rate$",
+  "$1 % Siegquote"
+ ],
+ [
+  "^Best streak (\\d+)$",
+  "Beste Serie: $1"
+ ],
+ [
+  "^(\\d+) won, (\\d+) drawn, (\\d+) lost\\. Last played (.+)$",
+  "$1 gewonnen, $2 remis, $3 verloren. Zuletzt gespielt: $4"
+ ],
+ [
+  "^Depth (\\d+)$",
+  "Tiefe $1"
+ ],
+ [
+  "^3 min (\\d+) · 5 min (\\d+) · Survival (\\d+)$",
+  "3 Min. $1 · 5 Min. $2 · Überleben $3"
+ ],
+ [
+  "^Other players will see your name \\((.+)\\), avatar, ratings, your recent online and bot games, and whether you're online\\. There's no email or password: a key saved in this browser is your account, your games and ratings are backed up to it, and you can sign in on other devices from Settings\\.$",
+  "Andere Spieler sehen deinen Namen ($1), deinen Avatar, deine Wertungen, deine letzten Online- und Bot-Partien und ob du online bist. Es gibt keine E-Mail und kein Passwort: Ein Schlüssel in diesem Browser ist dein Konto, deine Partien und Wertungen werden darin gesichert, und du kannst dich in den Einstellungen auf anderen Geräten anmelden."
+ ],
+ [
+  "^Looking for an opponent at (.+)$",
+  "Suche einen Gegner für $1"
+ ],
+ [
+  "^Searching… (\\d+:\\d+)$",
+  "Suche… $1"
+ ],
+ [
+  "^(\\d+) min read$",
+  "$1 Min. Lesezeit"
+ ]
 ]

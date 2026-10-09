@@ -95,5 +95,12 @@
  "Blitz Arena": "ブリッツ・アリーナ",
  "Bullet Arena": "バレット・アリーナ",
  "Blitz Swiss": "ブリッツ・スイス式",
- "Rapid Swiss": "ラピッド・スイス式"
+ "Rapid Swiss": "ラピッド・スイス式",
+ "Articles": "記事",
+ "Next article": "次の記事",
+ "Improvement": "上達",
+ "History": "歴史",
+ "Couldn't load this article. Check your connection and try again.": "この記事を読み込めませんでした。接続を確認して、もう一度お試しください。",
+ "That article doesn't exist.": "その記事は見つかりません。",
+ "Couldn't load the articles right now.": "今は記事を読み込めません。"
 }

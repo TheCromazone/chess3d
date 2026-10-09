@@ -1,52 +1,206 @@
 [
- ["^you're on vacation until (.+)$","$1 tarihine kadar tatildesin"],
- ["^they're on vacation until (.+)$","$1 tarihine kadar tatilde"],
- ["^(\\d+) days left$","$1 gün kaldı"],
- ["^(\\d+) h left$","$1 sa kaldı"],
- ["^(\\d+) min left$","$1 dk kaldı"],
- ["^out of time$","süre doldu"],
- ["^(\\d+) moves?$","$1 hamle"],
- ["^last (.+)$","son hamle $1"],
- ["^(\\d+) days? per move$","Hamle başına $1 gün"],
- ["^(.+), (\\d+ (?:min|h|d) ago|just now)$","$1, $2"],
- ["^Play (.+)$","Oynat: $1"],
- ["^(\\d+) min ago$","$1 dk önce"],
- ["^(\\d+) h ago$","$1 sa önce"],
- ["^(\\d+) d ago$","$1 gün önce"],
- ["^Updated (.+)$","Güncellendi: $1"],
- ["^(\\d+) games? in progress$","Devam eden $1 oyun"],
- ["^Your move in (\\d+) games?$","$1 oyunda sıra sende"],
- ["^(.+), rated (\\d+)$","$1, puan $2"],
- ["^vs (.+)$","Rakip: $1"],
- ["^(1-0|0-1|½-½|1/2-1/2) (.+)$","$1 $2"],
- ["^([A-E]\\d\\d) · as White$","$1 · Beyazla"],
- ["^([A-E]\\d\\d) · as Black$","$1 · Siyahla"],
- ["^(Basics|Tactics|Strategy|Endgames) (\\d+)/(\\d+)$","$1 $2/$3"],
- ["^(\\d+) steps$","$1 adım"],
- ["^(.+), (\\d+) videos$","$1, $2 video"],
- ["^(\\d+) puzzles?$","$1 bulmaca"],
- ["^(\\d+) games?$","$1 oyun"],
- ["^(\\d+) rated games?$","$1 puanlı oyun"],
- ["^(\\d+) reviewed games?$","$1 incelenmiş oyun"],
- ["^(.+) \\((\\d+)\\)$","$1 ($2)"],
- ["^White to move\\. Find the best move\\.$","Hamle Beyazda. En iyi hamleyi bul."],
- ["^Black to move\\. Find the best move\\.$","Hamle Siyahta. En iyi hamleyi bul."],
- ["^(.+) is thinking…$","$1 düşünüyor…"],
- ["^(\\d+) pieces left$","$1 taş kaldı"],
- ["^Solved at this level: (\\d+)\\.$","Bu seviyede çözülen: $1."],
- ["^(\\d+) of (\\d+)$","$1 / $2"],
- ["^Best from White's side: (\\d+)\\. From Black's side: (\\d+)\\.$","Beyaz tarafında en iyi: $1. Siyah tarafında: $2."],
- ["^(.+) vs (.+)\\. Live now\\.$","$1 - $2. Şu an canlı."],
- ["^Joined (.+)\\. (\\d+) games? played\\.$","Katılma tarihi: $1. Oynanan oyun: $2."],
- ["^Score from (\\d+) games?$","$1 oyundan elde edilen skor"],
- ["^Bot ladder: you're #(\\d+) of (\\d+)$","Bot sıralaması: $2 kişi arasında $1. sıradasın"],
- ["^Achievements \\((\\d+)/(\\d+)\\)$","Başarımlar ($1/$2)"],
- ["^(\\d+)% win rate$","%$1 kazanma oranı"],
- ["^Best streak (\\d+)$","En iyi seri: $1"],
- ["^(\\d+) won, (\\d+) drawn, (\\d+) lost\\. Last played (.+)$","$1 galibiyet, $2 beraberlik, $3 mağlubiyet. Son oyun: $4"],
- ["^Depth (\\d+)$","Derinlik $1"],
- ["^3 min (\\d+) · 5 min (\\d+) · Survival (\\d+)$","3 dk $1 · 5 dk $2 · Hayatta kalma $3"],
- ["^Other players will see your name \\((.+)\\), avatar, ratings, your recent online and bot games, and whether you're online\\. There's no email or password: a key saved in this browser is your account, your games and ratings are backed up to it, and you can sign in on other devices from Settings\\.$","Diğer oyuncular adını ($1), avatarını, puanlarını, son çevrim içi ve bot oyunlarını ve çevrim içi olup olmadığını görür. E-posta ya da şifre yok: Bu tarayıcıda kayıtlı bir anahtar senin hesabındır; oyunların ve puanların ona yedeklenir ve Ayarlar'dan diğer cihazlarında giriş yapabilirsin."],
- ["^Looking for an opponent at (.+)$","$1 için rakip aranıyor"],
- ["^Searching… (\\d+:\\d+)$","Aranıyor… $1"]
+ [
+  "^you're on vacation until (.+)$",
+  "$1 tarihine kadar tatildesin"
+ ],
+ [
+  "^they're on vacation until (.+)$",
+  "$1 tarihine kadar tatilde"
+ ],
+ [
+  "^(\\d+) days left$",
+  "$1 gün kaldı"
+ ],
+ [
+  "^(\\d+) h left$",
+  "$1 sa kaldı"
+ ],
+ [
+  "^(\\d+) min left$",
+  "$1 dk kaldı"
+ ],
+ [
+  "^out of time$",
+  "süre doldu"
+ ],
+ [
+  "^(\\d+) moves?$",
+  "$1 hamle"
+ ],
+ [
+  "^last (.+)$",
+  "son hamle $1"
+ ],
+ [
+  "^(\\d+) days? per move$",
+  "Hamle başına $1 gün"
+ ],
+ [
+  "^(.+), (\\d+ (?:min|h|d) ago|just now)$",
+  "$1, $2"
+ ],
+ [
+  "^Play (.+)$",
+  "Oynat: $1"
+ ],
+ [
+  "^(\\d+) min ago$",
+  "$1 dk önce"
+ ],
+ [
+  "^(\\d+) h ago$",
+  "$1 sa önce"
+ ],
+ [
+  "^(\\d+) d ago$",
+  "$1 gün önce"
+ ],
+ [
+  "^Updated (.+)$",
+  "Güncellendi: $1"
+ ],
+ [
+  "^(\\d+) games? in progress$",
+  "Devam eden $1 oyun"
+ ],
+ [
+  "^Your move in (\\d+) games?$",
+  "$1 oyunda sıra sende"
+ ],
+ [
+  "^(.+), rated (\\d+)$",
+  "$1, puan $2"
+ ],
+ [
+  "^vs (.+)$",
+  "Rakip: $1"
+ ],
+ [
+  "^(1-0|0-1|½-½|1/2-1/2) (.+)$",
+  "$1 $2"
+ ],
+ [
+  "^([A-E]\\d\\d) · as White$",
+  "$1 · Beyazla"
+ ],
+ [
+  "^([A-E]\\d\\d) · as Black$",
+  "$1 · Siyahla"
+ ],
+ [
+  "^(Basics|Tactics|Strategy|Endgames) (\\d+)/(\\d+)$",
+  "$1 $2/$3"
+ ],
+ [
+  "^(\\d+) steps$",
+  "$1 adım"
+ ],
+ [
+  "^(.+), (\\d+) videos$",
+  "$1, $2 video"
+ ],
+ [
+  "^(\\d+) puzzles?$",
+  "$1 bulmaca"
+ ],
+ [
+  "^(\\d+) games?$",
+  "$1 oyun"
+ ],
+ [
+  "^(\\d+) rated games?$",
+  "$1 puanlı oyun"
+ ],
+ [
+  "^(\\d+) reviewed games?$",
+  "$1 incelenmiş oyun"
+ ],
+ [
+  "^(.+) \\((\\d+)\\)$",
+  "$1 ($2)"
+ ],
+ [
+  "^White to move\\. Find the best move\\.$",
+  "Hamle Beyazda. En iyi hamleyi bul."
+ ],
+ [
+  "^Black to move\\. Find the best move\\.$",
+  "Hamle Siyahta. En iyi hamleyi bul."
+ ],
+ [
+  "^(.+) is thinking…$",
+  "$1 düşünüyor…"
+ ],
+ [
+  "^(\\d+) pieces left$",
+  "$1 taş kaldı"
+ ],
+ [
+  "^Solved at this level: (\\d+)\\.$",
+  "Bu seviyede çözülen: $1."
+ ],
+ [
+  "^(\\d+) of (\\d+)$",
+  "$1 / $2"
+ ],
+ [
+  "^Best from White's side: (\\d+)\\. From Black's side: (\\d+)\\.$",
+  "Beyaz tarafında en iyi: $1. Siyah tarafında: $2."
+ ],
+ [
+  "^(.+) vs (.+)\\. Live now\\.$",
+  "$1 - $2. Şu an canlı."
+ ],
+ [
+  "^Joined (.+)\\. (\\d+) games? played\\.$",
+  "Katılma tarihi: $1. Oynanan oyun: $2."
+ ],
+ [
+  "^Score from (\\d+) games?$",
+  "$1 oyundan elde edilen skor"
+ ],
+ [
+  "^Bot ladder: you're #(\\d+) of (\\d+)$",
+  "Bot sıralaması: $2 kişi arasında $1. sıradasın"
+ ],
+ [
+  "^Achievements \\((\\d+)/(\\d+)\\)$",
+  "Başarımlar ($1/$2)"
+ ],
+ [
+  "^(\\d+)% win rate$",
+  "%$1 kazanma oranı"
+ ],
+ [
+  "^Best streak (\\d+)$",
+  "En iyi seri: $1"
+ ],
+ [
+  "^(\\d+) won, (\\d+) drawn, (\\d+) lost\\. Last played (.+)$",
+  "$1 galibiyet, $2 beraberlik, $3 mağlubiyet. Son oyun: $4"
+ ],
+ [
+  "^Depth (\\d+)$",
+  "Derinlik $1"
+ ],
+ [
+  "^3 min (\\d+) · 5 min (\\d+) · Survival (\\d+)$",
+  "3 dk $1 · 5 dk $2 · Hayatta kalma $3"
+ ],
+ [
+  "^Other players will see your name \\((.+)\\), avatar, ratings, your recent online and bot games, and whether you're online\\. There's no email or password: a key saved in this browser is your account, your games and ratings are backed up to it, and you can sign in on other devices from Settings\\.$",
+  "Diğer oyuncular adını ($1), avatarını, puanlarını, son çevrim içi ve bot oyunlarını ve çevrim içi olup olmadığını görür. E-posta ya da şifre yok: Bu tarayıcıda kayıtlı bir anahtar senin hesabındır; oyunların ve puanların ona yedeklenir ve Ayarlar'dan diğer cihazlarında giriş yapabilirsin."
+ ],
+ [
+  "^Looking for an opponent at (.+)$",
+  "$1 için rakip aranıyor"
+ ],
+ [
+  "^Searching… (\\d+:\\d+)$",
+  "Aranıyor… $1"
+ ],
+ [
+  "^(\\d+) min read$",
+  "$1 dk okuma"
+ ]
 ]
