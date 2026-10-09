@@ -1,0 +1,274 @@
+[
+ [
+  "^you're on vacation until (.+)$",
+  "ești în vacanță până la $1"
+ ],
+ [
+  "^they're on vacation until (.+)$",
+  "în vacanță până la $1"
+ ],
+ [
+  "^(1) days left$",
+  "mai e $1 zi"
+ ],
+ [
+  "^(\\d*[2-9]\\d|\\d+00) days left$",
+  "mai sunt $1 de zile"
+ ],
+ [
+  "^(\\d+) days left$",
+  "mai sunt $1 zile"
+ ],
+ [
+  "^(\\d+) h left$",
+  "încă $1 h"
+ ],
+ [
+  "^(\\d+) min left$",
+  "încă $1 min"
+ ],
+ [
+  "^out of time$",
+  "timp expirat"
+ ],
+ [
+  "^(\\d*[2-9]\\d|\\d+00) moves?$",
+  "$1 de mutări"
+ ],
+ [
+  "^(\\d+) moves?$",
+  "$1 mutări"
+ ],
+ [
+  "^last (.+)$",
+  "ultima mutare: $1"
+ ],
+ [
+  "^(\\d*[2-9]\\d|\\d+00) days? per move$",
+  "$1 de zile pe mutare"
+ ],
+ [
+  "^(\\d+) days? per move$",
+  "$1 zile pe mutare"
+ ],
+ [
+  "^(.+), (\\d+ (?:min|h|d) ago|just now)$",
+  "$1, $2"
+ ],
+ [
+  "^(\\d+) min ago$",
+  "acum $1 min"
+ ],
+ [
+  "^(\\d+) h ago$",
+  "acum $1 h"
+ ],
+ [
+  "^(1) d ago$",
+  "acum $1 zi"
+ ],
+ [
+  "^(\\d*[2-9]\\d|\\d+00) d ago$",
+  "acum $1 de zile"
+ ],
+ [
+  "^(\\d+) d ago$",
+  "acum $1 zile"
+ ],
+ [
+  "^Updated (.+)$",
+  "Actualizat $1"
+ ],
+ [
+  "^(\\d*[2-9]\\d|\\d+00) games? in progress$",
+  "$1 de partide în desfășurare"
+ ],
+ [
+  "^(\\d+) games? in progress$",
+  "$1 partide în desfășurare"
+ ],
+ [
+  "^Your move in (\\d*[2-9]\\d|\\d+00) games?$",
+  "E rândul tău în $1 de partide"
+ ],
+ [
+  "^Your move in (\\d+) games?$",
+  "E rândul tău în $1 partide"
+ ],
+ [
+  "^(.+), rated (\\d+)$",
+  "$1, rating $2"
+ ],
+ [
+  "^vs (.+)$",
+  "contra $1"
+ ],
+ [
+  "^(1-0|0-1|½-½|1/2-1/2) (.+)$",
+  "$1 $2"
+ ],
+ [
+  "^([A-E]\\d\\d) · as White$",
+  "$1 · cu Albul"
+ ],
+ [
+  "^([A-E]\\d\\d) · as Black$",
+  "$1 · cu Negrul"
+ ],
+ [
+  "^(Basics|Tactics|Strategy|Endgames) (\\d+)/(\\d+)$",
+  "$1 $2/$3"
+ ],
+ [
+  "^(\\d*[2-9]\\d|\\d+00) steps$",
+  "$1 de pași"
+ ],
+ [
+  "^(\\d+) steps$",
+  "$1 pași"
+ ],
+ [
+  "^(.+), (\\d*[2-9]\\d|\\d+00) videos$",
+  "$1, $2 de videoclipuri"
+ ],
+ [
+  "^(.+), (\\d+) videos$",
+  "$1, $2 videoclipuri"
+ ],
+ [
+  "^(\\d*[2-9]\\d|\\d+00) puzzles?$",
+  "$1 de probleme"
+ ],
+ [
+  "^(\\d+) puzzles?$",
+  "$1 probleme"
+ ],
+ [
+  "^(\\d*[2-9]\\d|\\d+00) games?$",
+  "$1 de partide"
+ ],
+ [
+  "^(\\d+) games?$",
+  "$1 partide"
+ ],
+ [
+  "^(\\d*[2-9]\\d|\\d+00) rated games?$",
+  "$1 de partide cu rating"
+ ],
+ [
+  "^(\\d+) rated games?$",
+  "$1 partide cu rating"
+ ],
+ [
+  "^(\\d*[2-9]\\d|\\d+00) reviewed games?$",
+  "$1 de partide analizate"
+ ],
+ [
+  "^(\\d+) reviewed games?$",
+  "$1 partide analizate"
+ ],
+ [
+  "^(.+) \\((\\d+)\\)$",
+  "$1 ($2)"
+ ],
+ [
+  "^White to move\\. Find the best move\\.$",
+  "Albul la mutare. Găsește cea mai bună mutare."
+ ],
+ [
+  "^Black to move\\. Find the best move\\.$",
+  "Negrul la mutare. Găsește cea mai bună mutare."
+ ],
+ [
+  "^(.+) is thinking…$",
+  "$1 se gândește…"
+ ],
+ [
+  "^(\\d*[2-9]\\d|\\d+00) pieces left$",
+  "$1 de piese rămase"
+ ],
+ [
+  "^(\\d+) pieces left$",
+  "$1 piese rămase"
+ ],
+ [
+  "^Solved at this level: (\\d+)\\.$",
+  "Rezolvate la acest nivel: $1."
+ ],
+ [
+  "^(\\d+) of (\\d+)$",
+  "$1 din $2"
+ ],
+ [
+  "^Best from White's side: (\\d+)\\. From Black's side: (\\d+)\\.$",
+  "Cel mai bun scor cu Albul: $1. Cu Negrul: $2."
+ ],
+ [
+  "^(.+) vs (.+)\\. Live now\\.$",
+  "$1 contra $2. În direct acum."
+ ],
+ [
+  "^Joined (.+)\\. (1) games? played\\.$",
+  "Membru din $1. $2 partidă jucată."
+ ],
+ [
+  "^Joined (.+)\\. (\\d*[2-9]\\d|\\d+00) games? played\\.$",
+  "Membru din $1. $2 de partide jucate."
+ ],
+ [
+  "^Joined (.+)\\. (\\d+) games? played\\.$",
+  "Membru din $1. $2 partide jucate."
+ ],
+ [
+  "^Score from (\\d*[2-9]\\d|\\d+00) games?$",
+  "Scor din $1 de partide"
+ ],
+ [
+  "^Score from (\\d+) games?$",
+  "Scor din $1 partide"
+ ],
+ [
+  "^Bot ladder: you're #(\\d+) of (\\d+)$",
+  "Clasamentul boților: ești pe locul $1 din $2"
+ ],
+ [
+  "^Achievements \\((\\d+)/(\\d+)\\)$",
+  "Realizări ($1/$2)"
+ ],
+ [
+  "^(\\d+)% win rate$",
+  "$1% victorii"
+ ],
+ [
+  "^Best streak (\\d+)$",
+  "Cea mai bună serie: $1"
+ ],
+ [
+  "^(\\d+) won, (\\d+) drawn, (\\d+) lost\\. Last played (.+)$",
+  "Victorii: $1, remize: $2, înfrângeri: $3. Ultima partidă: $4"
+ ],
+ [
+  "^Depth (\\d+)$",
+  "Adâncime $1"
+ ],
+ [
+  "^3 min (\\d+) · 5 min (\\d+) · Survival (\\d+)$",
+  "3 min $1 · 5 min $2 · Supraviețuire $3"
+ ],
+ [
+  "^Other players will see your name \\((.+)\\), avatar, ratings, your recent online and bot games, and whether you're online\\. There's no email or password: a key saved in this browser is your account, your games and ratings are backed up to it, and you can sign in on other devices from Settings\\.$",
+  "Ceilalți jucători îți vor vedea numele ($1), avatarul, ratingurile, partidele recente online și cu boții și dacă ești online. Nu există e-mail sau parolă: o cheie salvată în acest browser este contul tău, partidele și ratingurile tale sunt salvate în el și te poți conecta pe alte dispozitive din Setări."
+ ],
+ [
+  "^Looking for an opponent at (.+)$",
+  "Se caută un adversar la $1"
+ ],
+ [
+  "^Searching… (\\d+:\\d+)$",
+  "Se caută… $1"
+ ],
+ [
+  "^(\\d+) min read$",
+  "$1 min de lectură"
+ ]
+]

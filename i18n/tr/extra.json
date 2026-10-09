@@ -102,5 +102,12 @@
  "History": "Tarih",
  "Couldn't load this article. Check your connection and try again.": "Bu makale yüklenemedi. Bağlantını kontrol edip tekrar dene.",
  "That article doesn't exist.": "Böyle bir makale yok.",
- "Couldn't load the articles right now.": "Makaleler şu anda yüklenemiyor."
+ "Couldn't load the articles right now.": "Makaleler şu anda yüklenemiyor.",
+ "Play a rated game against a random opponent to join this week's league.": "Bu haftanın ligine katılmak için rastgele bir rakibe karşı puanlı bir oyun oyna.",
+ "You'll be grouped with up to 49 players of your tier.": "Kendi kademenden en fazla 49 oyuncuyla aynı gruba gireceksin.",
+ "Play a rated game of this variant against a random opponent to get on this board.": "Bu tabloya girmek için rastgele bir rakibe karşı bu varyantta puanlı bir oyun oyna.",
+ "Play more rated games in this category to get ranked": "Sıralamaya girmek için bu kategoride daha fazla puanlı oyun oyna",
+ "Solve more rated puzzles to get ranked": "Sıralamaya girmek için daha fazla puanlı bulmaca çöz",
+ "Ratings against the bots, which are played on each device.": "Botlara karşı puanlar; bu oyunlar her cihazda ayrı oynanır.",
+ "Players need a few rated games and a visit in the last 30 days to be listed.": "Listede yer almak için oyuncuların birkaç puanlı oyunu olması ve son 30 gün içinde uğramış olması gerekir."
 }

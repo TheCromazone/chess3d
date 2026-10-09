@@ -48,7 +48,7 @@
  "agreement": "Einigung",
  "aborted": "abgebrochen",
  "days in a row": "Tage in Folge",
- "As": "Als",
+ "As": "Farbe",
  "Lessons: tactics": "Lektionen: Taktik",
  "Lessons: strategy": "Lektionen: Strategie",
  "Lessons: endgames": "Lektionen: Endspiele",
@@ -102,5 +102,12 @@
  "History": "Geschichte",
  "Couldn't load this article. Check your connection and try again.": "Dieser Artikel konnte nicht geladen werden. Prüfe deine Verbindung und versuch es noch einmal.",
  "That article doesn't exist.": "Diesen Artikel gibt es nicht.",
- "Couldn't load the articles right now.": "Die Artikel können gerade nicht geladen werden."
+ "Couldn't load the articles right now.": "Die Artikel können gerade nicht geladen werden.",
+ "Play a rated game against a random opponent to join this week's league.": "Spiel eine gewertete Partie gegen einen zufälligen Gegner, um der Liga dieser Woche beizutreten.",
+ "You'll be grouped with up to 49 players of your tier.": "Du kommst in eine Gruppe mit bis zu 49 Spielern deiner Stufe.",
+ "Play a rated game of this variant against a random opponent to get on this board.": "Spiel eine gewertete Partie in dieser Variante gegen einen zufälligen Gegner, um auf diese Liste zu kommen.",
+ "Play more rated games in this category to get ranked": "Spiel mehr gewertete Partien in dieser Kategorie, um in die Rangliste zu kommen",
+ "Solve more rated puzzles to get ranked": "Löse mehr gewertete Aufgaben, um in die Rangliste zu kommen",
+ "Ratings against the bots, which are played on each device.": "Wertungen gegen die Bots, gegen die auf dem jeweiligen Gerät gespielt wird.",
+ "Players need a few rated games and a visit in the last 30 days to be listed.": "Um gelistet zu werden, brauchen Spieler ein paar gewertete Partien und einen Besuch in den letzten 30 Tagen."
 }

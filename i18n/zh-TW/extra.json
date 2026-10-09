@@ -102,5 +102,12 @@
  "History": "歷史",
  "Couldn't load this article. Check your connection and try again.": "無法載入這篇文章。請檢查網路連線後再試一次。",
  "That article doesn't exist.": "找不到這篇文章。",
- "Couldn't load the articles right now.": "目前無法載入文章。"
+ "Couldn't load the articles right now.": "目前無法載入文章。",
+ "Play a rated game against a random opponent to join this week's league.": "與隨機對手下一盤計等級分對局，就能加入本週聯賽。",
+ "You'll be grouped with up to 49 players of your tier.": "你會和最多 49 名同段位的棋手分在同一組。",
+ "Play a rated game of this variant against a random opponent to get on this board.": "與隨機對手下一盤這個變體的計等級分對局，就能登上這個排行榜。",
+ "Play more rated games in this category to get ranked": "在這個類別多下幾盤計等級分對局，就能上榜",
+ "Solve more rated puzzles to get ranked": "多解幾道計等級分謎題，就能上榜",
+ "Ratings against the bots, which are played on each device.": "對戰機器人的等級分，這些對局在每台裝置上進行。",
+ "Players need a few rated games and a visit in the last 30 days to be listed.": "棋手需要有幾盤計等級分對局，並在最近 30 天內造訪過，才會列在榜上。"
 }

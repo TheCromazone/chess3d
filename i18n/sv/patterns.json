@@ -40,10 +40,6 @@
   "$1, $2"
  ],
  [
-  "^Play (.+)$",
-  "Spela upp $1"
- ],
- [
   "^(\\d+) min ago$",
   "för $1 min sedan"
  ],

@@ -102,5 +102,12 @@
  "History": "Histoire",
  "Couldn't load this article. Check your connection and try again.": "Impossible de charger cet article. Vérifiez votre connexion et réessayez.",
  "That article doesn't exist.": "Cet article n'existe pas.",
- "Couldn't load the articles right now.": "Impossible de charger les articles pour l'instant."
+ "Couldn't load the articles right now.": "Impossible de charger les articles pour l'instant.",
+ "Play a rated game against a random opponent to join this week's league.": "Jouez une partie classée contre un adversaire aléatoire pour rejoindre la ligue de cette semaine.",
+ "You'll be grouped with up to 49 players of your tier.": "Vous rejoindrez un groupe d'au plus 49 joueurs de votre niveau.",
+ "Play a rated game of this variant against a random opponent to get on this board.": "Jouez une partie classée de cette variante contre un adversaire aléatoire pour figurer dans ce classement.",
+ "Play more rated games in this category to get ranked": "Jouez plus de parties classées dans cette catégorie pour figurer au classement",
+ "Solve more rated puzzles to get ranked": "Résolvez plus de problèmes classés pour figurer au classement",
+ "Ratings against the bots, which are played on each device.": "Classements contre les bots, dont les parties se jouent sur chaque appareil.",
+ "Players need a few rated games and a visit in the last 30 days to be listed.": "Pour figurer dans la liste, il faut quelques parties classées et une visite au cours des 30 derniers jours."
 }

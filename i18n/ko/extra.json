@@ -102,5 +102,12 @@
  "History": "역사",
  "Couldn't load this article. Check your connection and try again.": "이 아티클을 불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요.",
  "That article doesn't exist.": "존재하지 않는 아티클이에요.",
- "Couldn't load the articles right now.": "지금은 아티클을 불러올 수 없어요."
+ "Couldn't load the articles right now.": "지금은 아티클을 불러올 수 없어요.",
+ "Play a rated game against a random opponent to join this week's league.": "무작위 상대와 레이팅 대국을 두면 이번 주 리그에 참가해요.",
+ "You'll be grouped with up to 49 players of your tier.": "같은 등급의 플레이어 최대 49명과 한 그룹이 돼요.",
+ "Play a rated game of this variant against a random opponent to get on this board.": "무작위 상대와 이 변형으로 레이팅 대국을 두면 이 순위표에 오를 수 있어요.",
+ "Play more rated games in this category to get ranked": "이 카테고리에서 레이팅 대국을 더 두면 순위에 올라요",
+ "Solve more rated puzzles to get ranked": "레이팅 퍼즐을 더 풀면 순위에 올라요",
+ "Ratings against the bots, which are played on each device.": "봇 상대 레이팅이에요. 봇 대국은 각 기기에서 진행돼요.",
+ "Players need a few rated games and a visit in the last 30 days to be listed.": "목록에 오르려면 레이팅 대국 몇 판과 최근 30일 이내 방문이 필요해요."
 }

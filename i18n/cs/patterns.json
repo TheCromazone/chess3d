@@ -1,67 +1,258 @@
 [
- ["^you're on vacation until (.+)$","máš dovolenou do $1"],
- ["^they're on vacation until (.+)$","má dovolenou do $1"],
- ["^([2-4]) days left$","ještě $1 dny"],
- ["^(\\d+) days left$","ještě $1 dní"],
- ["^(\\d+) h left$","ještě $1 h"],
- ["^(\\d+) min left$","ještě $1 min"],
- ["^out of time$","čas vypršel"],
- ["^([2-4]) moves?$","$1 tahy"],
- ["^(\\d+) moves?$","$1 tahů"],
- ["^last (.+)$","poslední tah $1"],
- ["^([2-4]) days? per move$","$1 dny na tah"],
- ["^(\\d+) days? per move$","$1 dní na tah"],
- ["^(.+), (\\d+ (?:min|h|d) ago|just now)$","$1, $2"],
- ["^Play (.+)$","Přehrát: $1"],
- ["^(\\d+) min ago$","před $1 min"],
- ["^(\\d+) h ago$","před $1 h"],
- ["^(1) d ago$","před $1 dnem"],
- ["^(\\d+) d ago$","před $1 dny"],
- ["^Updated (.+)$","Aktualizováno $1"],
- ["^([2-4]) games? in progress$","$1 rozehrané partie"],
- ["^(\\d+) games? in progress$","$1 rozehraných partií"],
- ["^Your move in (\\d+) games?$","Jsi na tahu v $1 partiích"],
- ["^(.+), rated (\\d+)$","$1, rating $2"],
- ["^vs (.+)$","proti $1"],
- ["^(1-0|0-1|½-½|1/2-1/2) (.+)$","$1 $2"],
- ["^([A-E]\\d\\d) · as White$","$1 · za bílé"],
- ["^([A-E]\\d\\d) · as Black$","$1 · za černé"],
- ["^(Basics|Tactics|Strategy|Endgames) (\\d+)/(\\d+)$","$1 $2/$3"],
- ["^([2-4]) steps$","$1 kroky"],
- ["^(\\d+) steps$","$1 kroků"],
- ["^(.+), (1) videos$","$1, $2 video"],
- ["^(.+), ([2-4]) videos$","$1, $2 videa"],
- ["^(.+), (\\d+) videos$","$1, $2 videí"],
- ["^([2-4]) puzzles?$","$1 úlohy"],
- ["^(\\d+) puzzles?$","$1 úloh"],
- ["^([2-4]) games?$","$1 partie"],
- ["^(\\d+) games?$","$1 partií"],
- ["^([2-4]) rated games?$","$1 hodnocené partie"],
- ["^(\\d+) rated games?$","$1 hodnocených partií"],
- ["^([2-4]) reviewed games?$","$1 rozebrané partie"],
- ["^(\\d+) reviewed games?$","$1 rozebraných partií"],
- ["^(.+) \\((\\d+)\\)$","$1 ($2)"],
- ["^White to move\\. Find the best move\\.$","Na tahu bílý. Najdi nejlepší tah."],
- ["^Black to move\\. Find the best move\\.$","Na tahu černý. Najdi nejlepší tah."],
- ["^(.+) is thinking…$","$1 přemýšlí…"],
- ["^(1) pieces left$","Zbývá $1 figura"],
- ["^([2-4]) pieces left$","Zbývají $1 figury"],
- ["^(\\d+) pieces left$","Zbývá $1 figur"],
- ["^Solved at this level: (\\d+)\\.$","Vyřešeno na této úrovni: $1."],
- ["^(\\d+) of (\\d+)$","$1 z $2"],
- ["^Best from White's side: (\\d+)\\. From Black's side: (\\d+)\\.$","Nejlepší výsledek za bílé: $1. Za černé: $2."],
- ["^(.+) vs (.+)\\. Live now\\.$","$1 proti $2. Právě živě."],
- ["^Joined (.+)\\. (\\d+) games? played\\.$","Členem od $1. Odehrané partie: $2."],
- ["^Score from (\\d+) games?$","Skóre z $1 partií"],
- ["^Bot ladder: you're #(\\d+) of (\\d+)$","Žebříček botů: jsi č. $1 z $2"],
- ["^Achievements \\((\\d+)/(\\d+)\\)$","Úspěchy ($1/$2)"],
- ["^(\\d+)% win rate$","$1 % výher"],
- ["^Best streak (\\d+)$","Nejlepší série: $1"],
- ["^(\\d+) won, (\\d+) drawn, (\\d+) lost\\. Last played (.+)$","Výhry: $1, remízy: $2, prohry: $3. Naposledy hráno: $4"],
- ["^Depth (\\d+)$","Hloubka $1"],
- ["^3 min (\\d+) · 5 min (\\d+) · Survival (\\d+)$","3 min $1 · 5 min $2 · Přežití $3"],
- ["^Other players will see your name \\((.+)\\), avatar, ratings, your recent online and bot games, and whether you're online\\. There's no email or password: a key saved in this browser is your account, your games and ratings are backed up to it, and you can sign in on other devices from Settings\\.$","Ostatní hráči uvidí tvé jméno ($1), avatar, ratingy, tvé nedávné online partie a partie proti botům a také to, zda jsi online. Žádný e-mail ani heslo: tvým účtem je klíč uložený v tomto prohlížeči, tvoje partie a ratingy se do něj zálohují a na dalších zařízeních se můžeš přihlásit v Nastavení."],
- ["^Looking for an opponent at (.+)$","Hledám soupeře: $1"],
- ["^Searching… (\\d+:\\d+)$","Hledám… $1"],
- ["^(\\d+) min read$","$1 min čtení"]
+ [
+  "^you're on vacation until (.+)$",
+  "máš dovolenou do $1"
+ ],
+ [
+  "^they're on vacation until (.+)$",
+  "má dovolenou do $1"
+ ],
+ [
+  "^([2-4]) days left$",
+  "ještě $1 dny"
+ ],
+ [
+  "^(\\d+) days left$",
+  "ještě $1 dní"
+ ],
+ [
+  "^(\\d+) h left$",
+  "ještě $1 h"
+ ],
+ [
+  "^(\\d+) min left$",
+  "ještě $1 min"
+ ],
+ [
+  "^out of time$",
+  "čas vypršel"
+ ],
+ [
+  "^([2-4]) moves?$",
+  "$1 tahy"
+ ],
+ [
+  "^(\\d+) moves?$",
+  "$1 tahů"
+ ],
+ [
+  "^last (.+)$",
+  "poslední tah $1"
+ ],
+ [
+  "^([2-4]) days? per move$",
+  "$1 dny na tah"
+ ],
+ [
+  "^(\\d+) days? per move$",
+  "$1 dní na tah"
+ ],
+ [
+  "^(.+), (\\d+ (?:min|h|d) ago|just now)$",
+  "$1, $2"
+ ],
+ [
+  "^(\\d+) min ago$",
+  "před $1 min"
+ ],
+ [
+  "^(\\d+) h ago$",
+  "před $1 h"
+ ],
+ [
+  "^(1) d ago$",
+  "před $1 dnem"
+ ],
+ [
+  "^(\\d+) d ago$",
+  "před $1 dny"
+ ],
+ [
+  "^Updated (.+)$",
+  "Aktualizováno $1"
+ ],
+ [
+  "^([2-4]) games? in progress$",
+  "$1 rozehrané partie"
+ ],
+ [
+  "^(\\d+) games? in progress$",
+  "$1 rozehraných partií"
+ ],
+ [
+  "^Your move in (\\d+) games?$",
+  "Jsi na tahu v $1 partiích"
+ ],
+ [
+  "^(.+), rated (\\d+)$",
+  "$1, rating $2"
+ ],
+ [
+  "^vs (.+)$",
+  "proti $1"
+ ],
+ [
+  "^(1-0|0-1|½-½|1/2-1/2) (.+)$",
+  "$1 $2"
+ ],
+ [
+  "^([A-E]\\d\\d) · as White$",
+  "$1 · za bílé"
+ ],
+ [
+  "^([A-E]\\d\\d) · as Black$",
+  "$1 · za černé"
+ ],
+ [
+  "^(Basics|Tactics|Strategy|Endgames) (\\d+)/(\\d+)$",
+  "$1 $2/$3"
+ ],
+ [
+  "^([2-4]) steps$",
+  "$1 kroky"
+ ],
+ [
+  "^(\\d+) steps$",
+  "$1 kroků"
+ ],
+ [
+  "^(.+), (1) videos$",
+  "$1, $2 video"
+ ],
+ [
+  "^(.+), ([2-4]) videos$",
+  "$1, $2 videa"
+ ],
+ [
+  "^(.+), (\\d+) videos$",
+  "$1, $2 videí"
+ ],
+ [
+  "^([2-4]) puzzles?$",
+  "$1 úlohy"
+ ],
+ [
+  "^(\\d+) puzzles?$",
+  "$1 úloh"
+ ],
+ [
+  "^([2-4]) games?$",
+  "$1 partie"
+ ],
+ [
+  "^(\\d+) games?$",
+  "$1 partií"
+ ],
+ [
+  "^([2-4]) rated games?$",
+  "$1 hodnocené partie"
+ ],
+ [
+  "^(\\d+) rated games?$",
+  "$1 hodnocených partií"
+ ],
+ [
+  "^([2-4]) reviewed games?$",
+  "$1 rozebrané partie"
+ ],
+ [
+  "^(\\d+) reviewed games?$",
+  "$1 rozebraných partií"
+ ],
+ [
+  "^(.+) \\((\\d+)\\)$",
+  "$1 ($2)"
+ ],
+ [
+  "^White to move\\. Find the best move\\.$",
+  "Na tahu bílý. Najdi nejlepší tah."
+ ],
+ [
+  "^Black to move\\. Find the best move\\.$",
+  "Na tahu černý. Najdi nejlepší tah."
+ ],
+ [
+  "^(.+) is thinking…$",
+  "$1 přemýšlí…"
+ ],
+ [
+  "^(1) pieces left$",
+  "Zbývá $1 figura"
+ ],
+ [
+  "^([2-4]) pieces left$",
+  "Zbývají $1 figury"
+ ],
+ [
+  "^(\\d+) pieces left$",
+  "Zbývá $1 figur"
+ ],
+ [
+  "^Solved at this level: (\\d+)\\.$",
+  "Vyřešeno na této úrovni: $1."
+ ],
+ [
+  "^(\\d+) of (\\d+)$",
+  "$1 z $2"
+ ],
+ [
+  "^Best from White's side: (\\d+)\\. From Black's side: (\\d+)\\.$",
+  "Nejlepší výsledek za bílé: $1. Za černé: $2."
+ ],
+ [
+  "^(.+) vs (.+)\\. Live now\\.$",
+  "$1 proti $2. Právě živě."
+ ],
+ [
+  "^Joined (.+)\\. (\\d+) games? played\\.$",
+  "Členem od $1. Odehrané partie: $2."
+ ],
+ [
+  "^Score from (\\d+) games?$",
+  "Skóre z $1 partií"
+ ],
+ [
+  "^Bot ladder: you're #(\\d+) of (\\d+)$",
+  "Žebříček botů: jsi č. $1 z $2"
+ ],
+ [
+  "^Achievements \\((\\d+)/(\\d+)\\)$",
+  "Úspěchy ($1/$2)"
+ ],
+ [
+  "^(\\d+)% win rate$",
+  "$1 % výher"
+ ],
+ [
+  "^Best streak (\\d+)$",
+  "Nejlepší série: $1"
+ ],
+ [
+  "^(\\d+) won, (\\d+) drawn, (\\d+) lost\\. Last played (.+)$",
+  "Výhry: $1, remízy: $2, prohry: $3. Naposledy hráno: $4"
+ ],
+ [
+  "^Depth (\\d+)$",
+  "Hloubka $1"
+ ],
+ [
+  "^3 min (\\d+) · 5 min (\\d+) · Survival (\\d+)$",
+  "3 min $1 · 5 min $2 · Přežití $3"
+ ],
+ [
+  "^Other players will see your name \\((.+)\\), avatar, ratings, your recent online and bot games, and whether you're online\\. There's no email or password: a key saved in this browser is your account, your games and ratings are backed up to it, and you can sign in on other devices from Settings\\.$",
+  "Ostatní hráči uvidí tvé jméno ($1), avatar, ratingy, tvé nedávné online partie a partie proti botům a také to, zda jsi online. Žádný e-mail ani heslo: tvým účtem je klíč uložený v tomto prohlížeči, tvoje partie a ratingy se do něj zálohují a na dalších zařízeních se můžeš přihlásit v Nastavení."
+ ],
+ [
+  "^Looking for an opponent at (.+)$",
+  "Hledám soupeře: $1"
+ ],
+ [
+  "^Searching… (\\d+:\\d+)$",
+  "Hledám… $1"
+ ],
+ [
+  "^(\\d+) min read$",
+  "$1 min čtení"
+ ]
 ]

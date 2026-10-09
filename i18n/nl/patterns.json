@@ -40,10 +40,6 @@
   "$1, $2"
  ],
  [
-  "^Play (.+)$",
-  "$1 afspelen"
- ],
- [
   "^(\\d+) min ago$",
   "$1 min geleden"
  ],

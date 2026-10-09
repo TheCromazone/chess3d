@@ -40,10 +40,6 @@
   "$1, $2"
  ],
  [
-  "^Play (.+)$",
-  "Reproducir $1"
- ],
- [
   "^(\\d+) min ago$",
   "hace $1 min"
  ],

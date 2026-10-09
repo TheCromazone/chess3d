@@ -102,5 +102,12 @@
  "History": "Historie",
  "Couldn't load this article. Check your connection and try again.": "Tento článek se nepodařilo načíst. Zkontroluj připojení a zkus to znovu.",
  "That article doesn't exist.": "Tento článek neexistuje.",
- "Couldn't load the articles right now.": "Články se teď nepodařilo načíst."
+ "Couldn't load the articles right now.": "Články se teď nepodařilo načíst.",
+ "Play a rated game against a random opponent to join this week's league.": "Zahraj si hodnocenou partii proti náhodnému soupeři a zapoj se do ligy tohoto týdne.",
+ "You'll be grouped with up to 49 players of your tier.": "Dostaneš se do skupiny s nejvýše 49 hráči své úrovně.",
+ "Play a rated game of this variant against a random opponent to get on this board.": "Zahraj si hodnocenou partii této varianty proti náhodnému soupeři a dostaň se do této tabulky.",
+ "Play more rated games in this category to get ranked": "Odehraj v této kategorii víc hodnocených partií a dostaň se do žebříčku",
+ "Solve more rated puzzles to get ranked": "Vyřeš víc hodnocených úloh a dostaň se do žebříčku",
+ "Ratings against the bots, which are played on each device.": "Ratingy proti botům, se kterými se hraje v každém zařízení zvlášť.",
+ "Players need a few rated games and a visit in the last 30 days to be listed.": "Do žebříčku se dostanou hráči s několika hodnocenými partiemi a návštěvou v posledních 30 dnech."
 }

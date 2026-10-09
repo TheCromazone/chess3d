@@ -102,5 +102,12 @@
  "History": "歴史",
  "Couldn't load this article. Check your connection and try again.": "この記事を読み込めませんでした。接続を確認して、もう一度お試しください。",
  "That article doesn't exist.": "その記事は見つかりません。",
- "Couldn't load the articles right now.": "今は記事を読み込めません。"
+ "Couldn't load the articles right now.": "今は記事を読み込めません。",
+ "Play a rated game against a random opponent to join this week's league.": "ランダムな相手とレーティング対局をして、今週のリーグに参加しよう。",
+ "You'll be grouped with up to 49 players of your tier.": "同じティアのプレイヤー最大49人とグループになります。",
+ "Play a rated game of this variant against a random opponent to get on this board.": "このバリアントでランダムな相手とレーティング対局をして、このランキングに載ろう。",
+ "Play more rated games in this category to get ranked": "このカテゴリでレーティング対象の対局をもっと指して、ランク入りしよう",
+ "Solve more rated puzzles to get ranked": "レーティング対象のパズルをもっと解いて、ランク入りしよう",
+ "Ratings against the bots, which are played on each device.": "ボット戦のレーティングです。ボット戦は各端末でプレイされます。",
+ "Players need a few rated games and a visit in the last 30 days to be listed.": "ランキングに載るには、レーティング対象の対局が数局と、過去30日以内の訪問が必要です。"
 }

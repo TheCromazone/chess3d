@@ -66,7 +66,8 @@ export class ArticleScreen {
     const i = list.indexOf(a), next = list[(i + 1) % list.length];
     page.replaceChildren(
       h("a.back-link", { href: "#/learn" }, icon("back", 16), "Learn"),
-      h("article.article",
+      // articles are written in English, so they keep its direction inside right-to-left pages
+      h("article.article", { lang: "en", dir: "ltr" },
         h("p.article-topic", a.topic),
         h("h1", { "data-no-i18n": "" }, a.title),
         h("p.article-meta", "Chess 3D", " · ", `${readingMinutes(a)} min read`),

@@ -102,5 +102,12 @@
  "History": "历史",
  "Couldn't load this article. Check your connection and try again.": "无法加载这篇文章。请检查网络连接后重试。",
  "That article doesn't exist.": "没有这篇文章。",
- "Couldn't load the articles right now.": "暂时无法加载文章。"
+ "Couldn't load the articles right now.": "暂时无法加载文章。",
+ "Play a rated game against a random opponent to join this week's league.": "与随机对手下一盘计等级分对局，即可加入本周联赛。",
+ "You'll be grouped with up to 49 players of your tier.": "你会与最多 49 名同段位棋手分在一组。",
+ "Play a rated game of this variant against a random opponent to get on this board.": "与随机对手下一盘此变体的计等级分对局，即可登上此榜。",
+ "Play more rated games in this category to get ranked": "在此类别中多下几盘计等级分对局即可上榜",
+ "Solve more rated puzzles to get ranked": "多解几道计等级分谜题即可上榜",
+ "Ratings against the bots, which are played on each device.": "对战机器人的等级分，这些对局在每台设备上进行。",
+ "Players need a few rated games and a visit in the last 30 days to be listed.": "棋手需有几盘计等级分对局，且最近 30 天内访问过，才会列入榜单。"
 }

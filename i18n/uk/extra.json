@@ -102,5 +102,12 @@
  "History": "Історія",
  "Couldn't load this article. Check your connection and try again.": "Не вдалося завантажити статтю. Перевір з'єднання і спробуй ще раз.",
  "That article doesn't exist.": "Такої статті немає.",
- "Couldn't load the articles right now.": "Зараз не вдається завантажити статті."
+ "Couldn't load the articles right now.": "Зараз не вдається завантажити статті.",
+ "Play a rated game against a random opponent to join this week's league.": "Зіграй рейтингову партію з випадковим суперником, щоб потрапити до ліги цього тижня.",
+ "You'll be grouped with up to 49 players of your tier.": "У групі з тобою буде до 49 гравців твого рівня.",
+ "Play a rated game of this variant against a random opponent to get on this board.": "Зіграй рейтингову партію в цьому варіанті з випадковим суперником, щоб потрапити в цю таблицю.",
+ "Play more rated games in this category to get ranked": "Зіграй більше рейтингових партій у цій категорії, щоб потрапити в таблицю",
+ "Solve more rated puzzles to get ranked": "Розв'яжи більше рейтингових задач, щоб потрапити в таблицю",
+ "Ratings against the bots, which are played on each device.": "Рейтинги проти ботів, з якими грають на кожному пристрої окремо.",
+ "Players need a few rated games and a visit in the last 30 days to be listed.": "До списку потрапляють гравці, які мають кілька рейтингових партій і заходили сюди за останні 30 днів."
 }

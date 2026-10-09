@@ -102,5 +102,12 @@
  "History": "Lịch sử",
  "Couldn't load this article. Check your connection and try again.": "Không tải được bài viết này. Hãy kiểm tra kết nối rồi thử lại.",
  "That article doesn't exist.": "Bài viết này không tồn tại.",
- "Couldn't load the articles right now.": "Hiện không tải được các bài viết."
+ "Couldn't load the articles right now.": "Hiện không tải được các bài viết.",
+ "Play a rated game against a random opponent to join this week's league.": "Chơi một ván tính Elo với đối thủ ngẫu nhiên để tham gia giải hạng tuần này.",
+ "You'll be grouped with up to 49 players of your tier.": "Bạn sẽ được xếp vào nhóm với tối đa 49 người chơi cùng hạng.",
+ "Play a rated game of this variant against a random opponent to get on this board.": "Chơi một ván tính Elo ở biến thể này với đối thủ ngẫu nhiên để có tên trên bảng này.",
+ "Play more rated games in this category to get ranked": "Chơi thêm các ván tính Elo trong hạng mục này để được xếp hạng",
+ "Solve more rated puzzles to get ranked": "Giải thêm câu đố tính Elo để được xếp hạng",
+ "Ratings against the bots, which are played on each device.": "Elo đấu bot, các ván này được chơi trên từng thiết bị.",
+ "Players need a few rated games and a visit in the last 30 days to be listed.": "Người chơi cần có vài ván tính Elo và đã truy cập trong 30 ngày qua để có tên trong danh sách."
 }

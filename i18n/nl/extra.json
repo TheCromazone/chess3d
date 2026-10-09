@@ -102,5 +102,12 @@
  "History": "Geschiedenis",
  "Couldn't load this article. Check your connection and try again.": "Dit artikel kon niet worden geladen. Controleer je verbinding en probeer het opnieuw.",
  "That article doesn't exist.": "Dat artikel bestaat niet.",
- "Couldn't load the articles right now.": "De artikelen kunnen nu niet worden geladen."
+ "Couldn't load the articles right now.": "De artikelen kunnen nu niet worden geladen.",
+ "Play a rated game against a random opponent to join this week's league.": "Speel een partij met rating tegen een willekeurige tegenstander om mee te doen aan de competitie van deze week.",
+ "You'll be grouped with up to 49 players of your tier.": "Je komt in een groep met maximaal 49 spelers van jouw niveau.",
+ "Play a rated game of this variant against a random opponent to get on this board.": "Speel een partij met rating in deze variant tegen een willekeurige tegenstander om op dit bord te komen.",
+ "Play more rated games in this category to get ranked": "Speel meer partijen met rating in deze categorie om op de ranglijst te komen",
+ "Solve more rated puzzles to get ranked": "Los meer puzzels met rating op om op de ranglijst te komen",
+ "Ratings against the bots, which are played on each device.": "Ratings tegen de bots, waartegen op elk apparaat apart wordt gespeeld.",
+ "Players need a few rated games and a visit in the last 30 days to be listed.": "Spelers hebben een paar partijen met rating en een bezoek in de afgelopen 30 dagen nodig om op de lijst te komen."
 }

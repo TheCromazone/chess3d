@@ -102,5 +102,12 @@
  "History": "Historia",
  "Couldn't load this article. Check your connection and try again.": "Artikeln kunde inte läsas in. Kontrollera anslutningen och försök igen.",
  "That article doesn't exist.": "Den artikeln finns inte.",
- "Couldn't load the articles right now.": "Artiklarna kan inte läsas in just nu."
+ "Couldn't load the articles right now.": "Artiklarna kan inte läsas in just nu.",
+ "Play a rated game against a random opponent to join this week's league.": "Spela ett rankat parti mot en slumpmässig motståndare för att gå med i veckans liga.",
+ "You'll be grouped with up to 49 players of your tier.": "Du hamnar i en grupp med upp till 49 spelare på din nivå.",
+ "Play a rated game of this variant against a random opponent to get on this board.": "Spela ett rankat parti i den här varianten mot en slumpmässig motståndare för att komma med på den här listan.",
+ "Play more rated games in this category to get ranked": "Spela fler rankade partier i den här kategorin för att bli rankad",
+ "Solve more rated puzzles to get ranked": "Lös fler rankade pussel för att bli rankad",
+ "Ratings against the bots, which are played on each device.": "Rating mot botarna; de partierna spelas på varje enhet för sig.",
+ "Players need a few rated games and a visit in the last 30 days to be listed.": "Spelare behöver några rankade partier och ett besök de senaste 30 dagarna för att synas på listan."
 }

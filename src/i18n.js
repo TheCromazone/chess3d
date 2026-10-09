@@ -11,19 +11,28 @@ export const LANGUAGES = [
   { code: "es", name: "Español" },
   { code: "fr", name: "Français" },
   { code: "it", name: "Italiano" },
+  { code: "hu", name: "Magyar" },
   { code: "nl", name: "Nederlands" },
   { code: "pl", name: "Polski" },
   { code: "pt", name: "Português" },
+  { code: "ro", name: "Română" },
   { code: "sv", name: "Svenska" },
   { code: "vi", name: "Tiếng Việt" },
   { code: "tr", name: "Türkçe" },
+  { code: "el", name: "Ελληνικά" },
   { code: "ru", name: "Русский" },
   { code: "uk", name: "Українська" },
+  { code: "he", name: "עברית" },
+  { code: "ar", name: "العربية" },
+  { code: "fa", name: "فارسی" },
+  { code: "hi", name: "हिन्दी" },
   { code: "ja", name: "日本語" },
   { code: "ko", name: "한국어" },
   { code: "zh", name: "中文（简体）" },
   { code: "zh-TW", name: "中文（繁體）" },
 ];
+// languages written right to left: the page mirrors, while boards and move notation stay left to right
+const RTL = new Set(["ar", "he", "fa"]);
 const KEY = "chess3d.lang";
 const ATTRS = ["aria-label", "placeholder", "title", "alt"];
 
@@ -100,6 +109,7 @@ function walk(root) {
 export async function startI18n() {
   lang = currentLanguage();
   document.documentElement.lang = lang;
+  document.documentElement.dir = RTL.has(lang) ? "rtl" : "ltr";
   if (lang === "en") return;
   try {
     const res = await fetch(`./i18n/${lang}.json`);

@@ -1,0 +1,202 @@
+[
+ [
+  "^you're on vacation until (.+)$",
+  "szabadságon vagy eddig: $1"
+ ],
+ [
+  "^they're on vacation until (.+)$",
+  "szabadságon eddig: $1"
+ ],
+ [
+  "^(\\d+) days left$",
+  "még $1 nap"
+ ],
+ [
+  "^(\\d+) h left$",
+  "még $1 óra"
+ ],
+ [
+  "^(\\d+) min left$",
+  "még $1 perc"
+ ],
+ [
+  "^out of time$",
+  "lejárt az idő"
+ ],
+ [
+  "^(\\d+) moves?$",
+  "$1 lépés"
+ ],
+ [
+  "^last (.+)$",
+  "utolsó lépés: $1"
+ ],
+ [
+  "^(\\d+) days? per move$",
+  "$1 nap lépésenként"
+ ],
+ [
+  "^(.+), (\\d+ (?:min|h|d) ago|just now)$",
+  "$1, $2"
+ ],
+ [
+  "^(\\d+) min ago$",
+  "$1 perce"
+ ],
+ [
+  "^(\\d+) h ago$",
+  "$1 órája"
+ ],
+ [
+  "^(\\d+) d ago$",
+  "$1 napja"
+ ],
+ [
+  "^Updated (.+)$",
+  "Frissítve: $1"
+ ],
+ [
+  "^(\\d+) games? in progress$",
+  "$1 folyamatban lévő parti"
+ ],
+ [
+  "^Your move in (\\d+) games?$",
+  "$1 partiban te lépsz"
+ ],
+ [
+  "^(.+), rated (\\d+)$",
+  "$1, értékszám: $2"
+ ],
+ [
+  "^vs (.+)$",
+  "$1 ellen"
+ ],
+ [
+  "^(1-0|0-1|½-½|1/2-1/2) (.+)$",
+  "$1 $2"
+ ],
+ [
+  "^([A-E]\\d\\d) · as White$",
+  "$1 · Világossal"
+ ],
+ [
+  "^([A-E]\\d\\d) · as Black$",
+  "$1 · Sötéttel"
+ ],
+ [
+  "^(Basics|Tactics|Strategy|Endgames) (\\d+)/(\\d+)$",
+  "$1 $2/$3"
+ ],
+ [
+  "^(\\d+) steps$",
+  "$1 lépés"
+ ],
+ [
+  "^(.+), (\\d+) videos$",
+  "$1, $2 videó"
+ ],
+ [
+  "^(\\d+) puzzles?$",
+  "$1 feladvány"
+ ],
+ [
+  "^(\\d+) games?$",
+  "$1 parti"
+ ],
+ [
+  "^(\\d+) rated games?$",
+  "$1 értékszámos parti"
+ ],
+ [
+  "^(\\d+) reviewed games?$",
+  "$1 elemzett parti"
+ ],
+ [
+  "^(.+) \\((\\d+)\\)$",
+  "$1 ($2)"
+ ],
+ [
+  "^White to move\\. Find the best move\\.$",
+  "Világos lép. Találd meg a legjobb lépést."
+ ],
+ [
+  "^Black to move\\. Find the best move\\.$",
+  "Sötét lép. Találd meg a legjobb lépést."
+ ],
+ [
+  "^(.+) is thinking…$",
+  "$1 gondolkodik…"
+ ],
+ [
+  "^(\\d+) pieces left$",
+  "$1 figura maradt"
+ ],
+ [
+  "^Solved at this level: (\\d+)\\.$",
+  "Ezen a szinten megoldva: $1."
+ ],
+ [
+  "^(\\d+) of (\\d+)$",
+  "$1 / $2"
+ ],
+ [
+  "^Best from White's side: (\\d+)\\. From Black's side: (\\d+)\\.$",
+  "Legjobb Világossal: $1. Sötéttel: $2."
+ ],
+ [
+  "^(.+) vs (.+)\\. Live now\\.$",
+  "$1 – $2. Most élőben."
+ ],
+ [
+  "^Joined (.+)\\. (\\d+) games? played\\.$",
+  "Csatlakozott: $1. $2 lejátszott parti."
+ ],
+ [
+  "^Score from (\\d+) games?$",
+  "Eredmény $1 partiból"
+ ],
+ [
+  "^Bot ladder: you're #(\\d+) of (\\d+)$",
+  "Bot-ranglista: $1. hely $2 közül"
+ ],
+ [
+  "^Achievements \\((\\d+)/(\\d+)\\)$",
+  "Teljesítmények ($1/$2)"
+ ],
+ [
+  "^(\\d+)% win rate$",
+  "$1% győzelmi arány"
+ ],
+ [
+  "^Best streak (\\d+)$",
+  "Legjobb sorozat: $1"
+ ],
+ [
+  "^(\\d+) won, (\\d+) drawn, (\\d+) lost\\. Last played (.+)$",
+  "$1 győzelem, $2 döntetlen, $3 vereség. Utoljára játszottatok: $4"
+ ],
+ [
+  "^Depth (\\d+)$",
+  "Mélység: $1"
+ ],
+ [
+  "^3 min (\\d+) · 5 min (\\d+) · Survival (\\d+)$",
+  "3 perc $1 · 5 perc $2 · Túlélés $3"
+ ],
+ [
+  "^Other players will see your name \\((.+)\\), avatar, ratings, your recent online and bot games, and whether you're online\\. There's no email or password: a key saved in this browser is your account, your games and ratings are backed up to it, and you can sign in on other devices from Settings\\.$",
+  "A többi játékos látni fogja a nevedet ($1), az avatárodat, az értékszámaidat, a legutóbbi online és bot elleni partijaidat, valamint azt, hogy online vagy-e. Nincs e-mail-cím és jelszó: a böngészőben tárolt kulcs a fiókod, a partijaid és értékszámaid erre mentődnek, és a Beállításokban más eszközökön is bejelentkezhetsz."
+ ],
+ [
+  "^Looking for an opponent at (.+)$",
+  "Ellenfél keresése: $1"
+ ],
+ [
+  "^Searching… (\\d+:\\d+)$",
+  "Keresés… $1"
+ ],
+ [
+  "^(\\d+) min read$",
+  "$1 perc olvasás"
+ ]
+]

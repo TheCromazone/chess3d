@@ -102,5 +102,12 @@
  "History": "История",
  "Couldn't load this article. Check your connection and try again.": "Не удалось загрузить статью. Проверь подключение и попробуй ещё раз.",
  "That article doesn't exist.": "Такой статьи нет.",
- "Couldn't load the articles right now.": "Сейчас не удаётся загрузить статьи."
+ "Couldn't load the articles right now.": "Сейчас не удаётся загрузить статьи.",
+ "Play a rated game against a random opponent to join this week's league.": "Сыграй рейтинговую партию со случайным соперником, чтобы попасть в лигу этой недели.",
+ "You'll be grouped with up to 49 players of your tier.": "В группе с тобой будет до 49 игроков твоего уровня.",
+ "Play a rated game of this variant against a random opponent to get on this board.": "Сыграй рейтинговую партию в этом варианте со случайным соперником, чтобы попасть в эту таблицу.",
+ "Play more rated games in this category to get ranked": "Сыграй больше рейтинговых партий в этой категории, чтобы попасть в таблицу",
+ "Solve more rated puzzles to get ranked": "Реши больше задач на рейтинг, чтобы попасть в таблицу",
+ "Ratings against the bots, which are played on each device.": "Рейтинги против ботов, с которыми играют на каждом устройстве отдельно.",
+ "Players need a few rated games and a visit in the last 30 days to be listed.": "В список попадают игроки, у которых есть несколько рейтинговых партий и которые заходили сюда за последние 30 дней."
 }
