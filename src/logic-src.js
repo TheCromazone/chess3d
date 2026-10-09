@@ -8,8 +8,9 @@ import { FourPlayer, FP_COLORS, fpTextToMove } from "./core/fp.js";
 export const meta = { game: "Chess 3D", minPlayers: 2, maxPlayers: 2 };
 
 const TIME_CONTROLS = { "1+0": [60, 0], "3+2": [180, 2], "5+0": [300, 0], "10+0": [600, 0], "15+10": [900, 10], "inf": null };
-const VERSION = 6;           // v2: chat / takebacks / abort / custom clocks; v3: daily deadlines; v4: crazyhouse, bughouse;
-                             // v5: duck chess, fog of war, giveaway, atomic, horde; v6: 4-player chess
+const VERSION = 7;           // v2: chat / takebacks / abort / custom clocks; v3: daily deadlines; v4: crazyhouse, bughouse;
+                             // v5: duck chess, fog of war, giveaway, atomic, horde; v6: 4-player chess;
+                             // v7: config may swap colours (club matches)
 const ROOM_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const otherColor = (c) => (c === "w" ? "b" : "w");
 
@@ -103,6 +104,7 @@ export function validateAction(state, playerId, action) {
     if (action.variant !== undefined && action.variant !== "standard" && !VARIANTS.includes(action.variant)) return { ok: false, error: "unknown variant" };
     if (action.variant === "bughouse" && !(typeof action.link === "string" && ROOM_RE.test(action.link))) return { ok: false, error: "a bughouse board needs its partner board" };
     if (action.variant === "chess960" && !(Number.isInteger(action.start) && action.start >= 0 && action.start < 960)) return { ok: false, error: "which Chess960 position?" };
+    if (action.swap !== undefined && typeof action.swap !== "boolean") return { ok: false, error: "malformed config" };
     return { ok: true };
   }
   if (state.phase === "config") return { ok: false, error: "waiting for White to choose the time control" };
@@ -197,8 +199,11 @@ export function applyAction(state, playerId, action) {
     const { tc, perMove } = parseTc(action.tc);
     const variant = VARIANTS.includes(action.variant) ? action.variant : null;
     const vx = VX_VARIANTS[variant] ? new VxGame(variant, variant === "chess960" ? { start: action.start } : {}) : null;
+    // swap: the player setting up the game takes Black (club matches assign colours)
+    const seats = action.swap ? { white: state.black, black: state.white } : {};
     return {
       ...state,
+      ...seats,
       phase: "playing",
       tcKey: action.tc,
       variant,

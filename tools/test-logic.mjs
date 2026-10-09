@@ -221,6 +221,14 @@ hill = vplay(hill, [P1, "e2e4"], [P2, "e7e5"], [P1, "e1e2"], [P2, "d7d6"], [P1, 
 r = L.isGameOver(hill);
 ok(r.over && r.winner === P1 && r.reason === "hill", "King of the Hill: the king reaching the centre wins on the server");
 
+// v7: the player setting up a game can take Black
+{
+  const sw = L.applyAction(L.setup([P1, P2]), P1, { t: "config", tc: "3d", swap: true });
+  ok(sw.white === P2 && sw.black === P1 && sw.v >= 7, "config with swap gives the other player White");
+  ok(!L.validateAction(L.setup([P1, P2]), P1, { t: "config", tc: "3d", swap: "yes" }).ok, "swap must be true or false");
+  ok(L.validateAction(sw, P2, { t: "move", from: "e2", to: "e4" }).ok && !L.validateAction(sw, P1, { t: "move", from: "e2", to: "e4" }).ok, "after the swap, the new White moves first");
+}
+
 // v6: 4-Player Chess in a four-seat room
 {
   const [R, B, Y, G] = ["p-red", "p-blue", "p-yellow", "p-green"];

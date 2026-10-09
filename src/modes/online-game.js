@@ -184,7 +184,9 @@ export class OnlineGame extends BaseGame {
         this.sentConfig = true;
         let tc = this.tcKey || new URLSearchParams(location.search).get("tc") || "10+0";
         if (/d$/.test(tc) && (v.v || 1) < 3) tc = "inf";   // a server without daily deadlines
-        this.client.action({ t: "config", tc: this.v2 || SERVER_TCS.includes(tc) ? tc : nearestTc(tc) });
+        // a club match may have given you Black: the room seated you first, so swap
+        const swap = this.cfg.forceColor === "b" && (v.v || 1) >= 7 ? { swap: true } : {};
+        this.client.action({ t: "config", tc: this.v2 || SERVER_TCS.includes(tc) ? tc : nearestTc(tc), ...swap });
       }
       this._setNote(this.myColor === "w" ? "Starting…" : "Waiting for White to start the clock…");
       this.renderStrips();

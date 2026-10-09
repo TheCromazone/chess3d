@@ -11,6 +11,7 @@ import { LearnPage, LessonScreen, DrillScreen, OpeningTrainer } from "./modes/le
 import { WatchPage, ReplayScreen, BotTV } from "./modes/watch.js";
 import { EventScreen, BroadcastGame } from "./modes/events.js";
 import { VisionTrainer, SoloChess } from "./modes/trainers.js";
+import { VoteChess } from "./modes/vote-chess.js";
 import { SwissLobby } from "./screens/swiss.js";
 import { VariantReplay } from "./modes/variant-replay.js";
 import { ArenaScreen } from "./modes/arena.js";
@@ -55,6 +56,7 @@ const routes = [
   { pattern: /^#\/puzzles\/battle$/, nav: "puzzles", make: (app) => new BattleScreen(app) },
   { pattern: /^#\/puzzles\/solo$/, nav: "puzzles", make: (app) => new SoloChess(app) },
   { pattern: /^#\/vision$/, nav: "learn", make: (app) => new VisionTrainer(app) },
+  { pattern: /^#\/vote\/(vc_[a-z0-9]+)$/, nav: "social", make: (app, m) => new VoteChess(app, m[1]) },
   { pattern: /^#\/arena$/, nav: "play", make: (app) => new ArenaScreen(app) },
   { pattern: /^#\/arenas$/, nav: "play", make: (app) => new ArenasScreen(app) },
   { pattern: /^#\/swiss\/(sw-\d+)$/, nav: "play", make: (app, m) => new SwissLobby(app, m[1]) },
@@ -107,6 +109,7 @@ const routes = [
   { pattern: /^#\/social\/blog\/(b_[a-z0-9]+)$/, nav: "social", make: (app, m) => new SocialScreen(app, { tab: "blogs", blog: m[1] }) },
   { pattern: /^#\/social\/chat\/(u_[a-z0-9]+)$/, nav: "social", make: (app, m) => new SocialScreen(app, { tab: "messages", chat: m[1] }) },
   { pattern: /^#\/social\/club\/(c_[a-z0-9]+)$/, nav: "social", make: (app, m) => new SocialScreen(app, { tab: "clubs", club: m[1] }) },
+  { pattern: /^#\/social\/match\/(cm_[a-z0-9]+)$/, nav: "social", make: (app, m) => new SocialScreen(app, { tab: "clubs", match: m[1] }) },
   { pattern: /^#\/social\/add\/([0-9A-Za-z]{8})$/, nav: "social", make: (app, m) => new SocialScreen(app, { tab: "friends", add: m[1] }) },
   { pattern: /^#\/profile$/, nav: "profile", make: (app) => new ProfilePage(app) },
   { pattern: /^#\/insights$/, nav: "profile", make: (app) => new InsightsPage(app) },

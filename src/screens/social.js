@@ -5,6 +5,7 @@ import { openModal, toast, confirmModal, segmented, tcPicker, tcLabel, switchRow
 import { userAvatar, presenceText, notice } from "../ui/people.js";
 import { getProfile } from "../store.js";
 import { OnlineGame } from "../modes/online-game.js";
+import { makePlayerId } from "../net/room.js";
 import { DAILY_PACES } from "../modes/daily.js";
 import { gamePgn } from "./pages.js";
 import { signInModal } from "./account.js";
@@ -177,6 +178,7 @@ export class SocialScreen {
       clubs: () => (this.view.club ? this._club(tok, this.view.club) : this._clubs(tok)), leaderboard: () => this._leaderboard(tok),
       forums: () => (this.view.topic ? this._topic(tok, this.view.topic) : this._forums(tok)),
       blogs: () => (this.view.blog ? this._blogPost(tok, this.view.blog) : this._blogs(tok)), coaches: () => this._coaches(tok) };
+    if (this.view.match) run.clubs = () => this._match(tok, this.view.match);
     (run[this.view.tab] || run.friends)();
   }
 
@@ -593,10 +595,111 @@ export class SocialScreen {
               if (!(await confirmModal({ title: `Leave ${c.name}?`, sub: members.length === 1 ? "You're the last member, so the club and its chat will be deleted." : "You can rejoin with the invite code.", yes: "Leave", danger: true }))) return;
               try { await S.api("POST", "/clubs/leave", { id }); toast(`You left ${c.name}`); this.app.go("#/social/clubs"); } catch (e) { toast(e.message); }
             },
-          }, "Leave club"))));
+          }, "Leave club"))),
+      this._clubMatchesCard(c), this._voteChessCard(c));
     addMsgs(d.messages);
     list.scrollTop = list.scrollHeight;
     this.poll = setInterval(pull, 5000);
+  }
+
+  // ---------- club team matches ----------
+  _clubMatchesCard(c) {
+    const box = h("div.rows", h("p.note", "Loading matches…"));
+    const owner = c.owner === S.myId();
+    const card = h("section.card.club-matches", h("div.section-head", h("h3", "Team matches"),
+      owner ? h("button.btn.small", { onclick: () => this._challengeClub(c) }, icon("plus", 16), "Challenge a club") : null), box);
+    const STATUS = { challenge: "Challenge sent", signup: "Sign-ups open", running: "In play", done: "Finished", cancelled: "Cancelled" };
+    S.api("GET", `/clubs/${c.id}/matches`).then((d) => {
+      box.replaceChildren(...(d.matches.length ? d.matches.map((m) => {
+        const incoming = m.status === "challenge" && m.b_club === c.id;
+        return h("div.row",
+          h("button.row-main", { onclick: () => this.app.go(`#/social/match/${m.id}`) },
+            h("span.rt", h("b", `${m.a_name} vs ${m.b_name}`),
+              h("small", `${incoming ? "Challenge received" : STATUS[m.status] || m.status}, ${m.tc.replace("d", "")} day${m.tc === "1d" ? "" : "s"} per move${m.status === "running" || m.status === "done" ? `, ${m.a_score2 / 2}–${m.b_score2 / 2}` : `, ${m.a_players} + ${m.b_players} signed up`}`))),
+          incoming && owner ? h("div.btn-row",
+            h("button.btn.small.primary", { onclick: async () => { try { await S.api("POST", `/matches/${m.id}/accept`, {}); toast("Accepted: sign-ups are open for a day"); this.app.go(`#/social/match/${m.id}`); } catch (e) { toast(e.message); } } }, "Accept"),
+            h("button.btn.small.ghost", { onclick: async () => { try { await S.api("POST", `/matches/${m.id}/decline`, {}); toast("Declined"); this.render(); } catch (e) { toast(e.message); } } }, "Decline")) : null);
+      }) : [h("p.note", owner ? "No matches yet. Challenge another club to a team match: each member plays an opponent from the other club, one game with each colour." : "No matches yet. The club's owner can challenge other clubs.")]));
+    }).catch((e) => box.replaceChildren(errorLine(e)));
+    return card;
+  }
+
+  _voteChessCard(c) {
+    const box = h("div.rows", h("p.note", "Loading…"));
+    const owner = c.owner === S.myId();
+    const card = h("section.card.club-matches", h("div.section-head", h("h3", "Vote Chess"),
+      owner ? h("button.btn.small", { onclick: () => this._challengeClub(c, "votechess") }, icon("plus", 16), "Challenge a club") : null), box);
+    S.api("GET", `/clubs/${c.id}/votechess`).then((d) => {
+      box.replaceChildren(...(d.games.length ? d.games.map((g) => {
+        const incoming = g.status === "challenge" && g.b_club === c.id;
+        const status = incoming ? "Challenge received" : g.status === "challenge" ? "Challenge sent" : g.status === "done" ? `Finished, ${g.result}` : `Move ${Math.floor(g.ply / 2) + 1}, ${g.ply % 2 === 0 ? "White" : "Black"} to vote`;
+        return h("div.row",
+          h("button.row-main", { onclick: () => this.app.go(`#/vote/${g.id}`) }, h("span.rt", h("b", `${g.a_name} vs ${g.b_name}`), h("small", status))),
+          incoming && owner ? h("div.btn-row",
+            h("button.btn.small.primary", { onclick: async () => { try { await S.api("POST", `/votechess/${g.id}/accept`, {}); this.app.go(`#/vote/${g.id}`); } catch (e) { toast(e.message); } } }, "Accept"),
+            h("button.btn.small.ghost", { onclick: async () => { try { await S.api("POST", `/votechess/${g.id}/decline`, {}); this.render(); } catch (e) { toast(e.message); } } }, "Decline")) : null);
+      }) : [h("p.note", "One game against another club, where every move is the one your members vote for.")]));
+    }).catch((e) => box.replaceChildren(errorLine(e)));
+    return card;
+  }
+
+  async _challengeClub(c, kind = "matches") {
+    let d;
+    try { d = await S.api("GET", "/clubs"); } catch (e) { toast(e.message); return; }
+    const choices = [...d.public, ...d.mine].filter((x, i, all) => x.id !== c.id && all.findIndex((y) => y.id === x.id) === i);
+    if (!choices.length) { toast("There are no other clubs to challenge yet."); return; }
+    let opp = choices[0].id, tc = "3d";
+    const boards = h("input.input", { type: "number", min: "1", max: "50", value: "10", "aria-label": "Most boards" });
+    const go = h("button.btn.primary.block", {
+      onclick: async () => {
+        go.disabled = true;
+        try {
+          const r = await S.api("POST", `/clubs/${c.id}/${kind}`, { opponent: opp, tc, boards: Number(boards.value) });
+          m.close(); toast("Challenge sent");
+          this.app.go(kind === "votechess" ? `#/vote/${r.id}` : `#/social/match/${r.id}`);
+        }
+        catch (e) { toast(e.message); go.disabled = false; }
+      },
+    }, "Send challenge");
+    const m = openModal({
+      title: kind === "votechess" ? "Vote Chess challenge" : "Challenge a club",
+      body: [
+        h("div.field", h("label", "Club"), h("select.input", { onchange: (e) => { opp = e.target.value; }, "aria-label": "Club to challenge" }, ...choices.map((x) => h("option", { value: x.id }, `${x.name} (${x.members} member${x.members === 1 ? "" : "s"})`)))),
+        h("div.field", h("div.lbl", "Time per move"), segmented(["1d", "3d", "7d"].map((v) => ({ value: v, label: `${v.replace("d", "")} day${v === "1d" ? "" : "s"}` })), tc, (v) => { tc = v; })),
+        kind === "votechess" ? null : h("div.field", h("label", "Most boards"), boards),
+        h("p.note", kind === "votechess" ? "One daily game: your club plays White, and each move is the one most of your members vote for." : "If they accept, members of both clubs have a day to sign up. Players are paired top against top by rating, and each pair plays two daily games, one with each colour."),
+        go],
+    });
+  }
+
+  async _match(tok, mid) {
+    let d;
+    try { d = await S.api("GET", `/matches/${mid}`); } catch (e) { this.body.replaceChildren(errorLine(e, () => this.app.go("#/social/clubs"))); return; }
+    if (!this._live(tok)) return;
+    const m = d.match;
+    const OUT = { w: "1–0", b: "0–1", draw: "½–½", "w-forfeit": "1–0 forfeit", "b-forfeit": "0–1 forfeit", "double-forfeit": "0–0" };
+    const act = async (path, body = {}, msg) => { try { await S.api("POST", `/matches/${mid}/${path}`, body); if (msg) toast(msg); this.render(); } catch (e) { toast(e.message); } };
+    const pidFor = () => { const p = getProfile(); return makePlayerId(p.name, p.ratings.rapid.r, S.myCode()); };
+    const side = (s) => d.players.filter((p) => p.side === s);
+    const status = { challenge: "Waiting for the other club to accept", signup: `Sign-ups close ${new Date(m.starts).toLocaleString()}`, running: "In play", done: "Finished", cancelled: "Cancelled: nobody to pair" }[m.status] || m.status;
+    const mine = d.games.filter((g) => g.mine && !g.outcome);
+    const actions = [];
+    if ((m.status === "signup" || m.status === "challenge") && !d.me.joined) actions.push(h("button.btn.primary", { onclick: () => act("join", { pid: pidFor() }, "Signed up") }, "Sign up to play"));
+    if ((m.status === "signup" || m.status === "challenge") && d.me.joined) actions.push(h("button.btn.ghost", { onclick: () => act("leave", {}, "You're off the team sheet") }, "Leave the team sheet"));
+    if (m.status === "signup" && d.me.owner) actions.push(h("button.btn", { onclick: () => act("start", {}, "The match has started") }, "Start now"));
+    this.body.replaceChildren(
+      h("div.club-head", h("a.btn.small.ghost", { href: "#/social/clubs", "aria-label": "Clubs" }, icon("back", 16)),
+        h("div.club-title", h("h2", `${m.a_name} vs ${m.b_name}`), h("p.note", `${status}. ${m.tc.replace("d", "")} day${m.tc === "1d" ? "" : "s"} per move, up to ${m.boards} boards.`))),
+      m.status === "running" || m.status === "done" ? h("div.card.arena-head", h("div", h("div.note", m.a_name), h("div.big-num", String(m.aScore))), h("div", { style: { textAlign: "right" } }, h("div.note", m.b_name), h("div.big-num", String(m.bScore)))) : null,
+      actions.length ? h("div.btn-row", ...actions) : null,
+      mine.length ? h("section.card", h("h3", "Your games"), ...mine.map((g) => h("div.row",
+        h("span.rt", h("b", `Board ${g.board}: ${g.mine.color === "w" ? "White" : "Black"} against ${g.mine.color === "w" ? g.black.name : g.white.name}`), h("small", "Daily game")),
+        h("button.btn.small.primary", { onclick: () => this.app.launch(() => new OnlineGame(this.app, { kind: "daily", room: g.room, tcKey: m.tc, playerId: g.mine.pid, forceColor: g.mine.color }), "#/online") }, "Play")))) : null,
+      d.games.length ? h("section.card", h("h3", "Boards"), ...d.games.map((g) => h("div.row.swiss-game",
+        h("span.rt", h("b", `${g.board}. ${g.white.name} – ${g.black.name}`), h("small", g.outcome ? OUT[g.outcome] || g.outcome : "In play"))))) : null,
+      m.status === "signup" || m.status === "challenge" ? h("div.club-grid",
+        ...["a", "b"].map((sd) => h("section.card", h("h3", `${sd === "a" ? m.a_name : m.b_name} (${side(sd).length})`),
+          ...(side(sd).length ? side(sd).map((p) => h("div.row", userAvatar(p, ".sm"), h("span.rt", h("b", p.name), h("small", `Rapid ${p.rating ?? "?"}`)))) : [h("p.note", "Nobody yet.")])))) : null);
   }
 
   // ---------- forums ----------

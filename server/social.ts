@@ -28,6 +28,8 @@ export interface SocialHooks {
   pushFetch?: (url: string, init: RequestInit) => Promise<Response>;
   // how news/video/streamer feeds are fetched (tests swap it out)
   feedFetch?: (url: string) => Promise<Response>;
+  // Vote Chess: seat a player in a room (action null) or act for them; the room referees as usual
+  roomAct?: (room: string, playerId: string, action: unknown) => Promise<{ ok: boolean; error?: string; status?: string; result?: RoomState["result"] }>;
 }
 
 export interface SocialDB {
@@ -88,6 +90,26 @@ const SCHEMA = [
      room TEXT PRIMARY KEY, sid TEXT NOT NULL, round INTEGER NOT NULL, w_uid TEXT NOT NULL, w_pid TEXT NOT NULL, b_uid TEXT NOT NULL, b_pid TEXT NOT NULL,
      created INTEGER NOT NULL, outcome TEXT, token TEXT)`,
   `CREATE INDEX IF NOT EXISTS social_swiss_games_round ON social_swiss_games (sid, round)`,
+  // club team matches: daily games between two clubs' members, two games per board
+  `CREATE TABLE IF NOT EXISTS social_club_matches (
+     id TEXT PRIMARY KEY, a_club TEXT NOT NULL, b_club TEXT NOT NULL, tc TEXT NOT NULL, boards INTEGER NOT NULL,
+     status TEXT NOT NULL DEFAULT 'challenge', created INTEGER NOT NULL, starts INTEGER NOT NULL DEFAULT 0,
+     a_score2 INTEGER NOT NULL DEFAULT 0, b_score2 INTEGER NOT NULL DEFAULT 0, token TEXT)`,
+  `CREATE INDEX IF NOT EXISTS social_club_matches_a ON social_club_matches (a_club)`,
+  `CREATE INDEX IF NOT EXISTS social_club_matches_b ON social_club_matches (b_club)`,
+  `CREATE TABLE IF NOT EXISTS social_club_match_players (
+     mid TEXT NOT NULL, uid TEXT NOT NULL, side TEXT NOT NULL, pid TEXT NOT NULL, joined INTEGER NOT NULL, PRIMARY KEY (mid, uid))`,
+  `CREATE TABLE IF NOT EXISTS social_club_match_games (
+     room TEXT PRIMARY KEY, mid TEXT NOT NULL, board INTEGER NOT NULL, w_uid TEXT NOT NULL, w_pid TEXT NOT NULL,
+     b_uid TEXT NOT NULL, b_pid TEXT NOT NULL, w_side TEXT NOT NULL, created INTEGER NOT NULL, outcome TEXT, token TEXT)`,
+  `CREATE INDEX IF NOT EXISTS social_club_match_games_mid ON social_club_match_games (mid)`,
+  // Vote Chess: two clubs play one daily game, each move chosen by its members' votes
+  `CREATE TABLE IF NOT EXISTS social_vote_games (
+     id TEXT PRIMARY KEY, a_club TEXT NOT NULL, b_club TEXT NOT NULL, room TEXT NOT NULL DEFAULT '', a_pid TEXT NOT NULL DEFAULT '',
+     b_pid TEXT NOT NULL DEFAULT '', tc TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'challenge', created INTEGER NOT NULL,
+     deadline INTEGER NOT NULL DEFAULT 0, ply INTEGER NOT NULL DEFAULT 0, result TEXT, token TEXT)`,
+  `CREATE TABLE IF NOT EXISTS social_vote_votes (
+     game TEXT NOT NULL, ply INTEGER NOT NULL, uid TEXT NOT NULL, move TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY (game, ply, uid))`,
   `CREATE TABLE IF NOT EXISTS social_battles (
      id TEXT PRIMARY KEY, seed INTEGER NOT NULL, created INTEGER NOT NULL, starts INTEGER NOT NULL DEFAULT 0,
      a_uid TEXT NOT NULL, a_score INTEGER NOT NULL DEFAULT 0, a_strikes INTEGER NOT NULL DEFAULT 0, a_done INTEGER NOT NULL DEFAULT 0, a_seen INTEGER NOT NULL DEFAULT 0,
@@ -273,6 +295,10 @@ export function swissPairings(players: SwissEntrant[]): { pairs: [string, string
   }
   return { pairs, bye };
 }
+
+// club matches: sign-ups close a day after the challenge is accepted (or when an owner starts it)
+const MATCH_SIGNUP_MS = 24 * 60 * 60_000;
+const MATCH_TCS = ["1d", "2d", "3d", "5d", "7d"];
 
 const CATS = ["bullet", "blitz", "rapid", "puzzle", "bots"] as const;
 type Cat = (typeof CATS)[number];
@@ -837,6 +863,9 @@ export class Social {
       return { ok: true };
     }
     const seg0 = seg[0] ?? "", seg1 = seg[1] ?? "", seg2 = seg[2] ?? "";
+    // club team matches (before the club routes, which would take /clubs/:id/matches)
+    if (seg0 === "matches" || (seg0 === "clubs" && seg2 === "matches")) return this.clubMatches(request, me, seg, now);
+    if (seg0 === "votechess" || (seg0 === "clubs" && seg2 === "votechess")) return this.voteChess(request, me, seg, now);
     if (seg0 === "clubs" && seg1 && !["create", "join", "leave"].includes(seg1)) {
       const id = seg1;
       const memberQ = this.q("SELECT 1 AS x FROM social_club_members WHERE club = ? AND member = ?", id, me.id);
@@ -1008,6 +1037,7 @@ export class Social {
         this.q("DELETE FROM social_club_bans WHERE member = ?", me.id),
         this.q("DELETE FROM social_arena_players WHERE uid = ?", me.id),
         this.q("UPDATE social_swiss_players SET withdrawn = 1 WHERE uid = ?", me.id),
+        this.q("DELETE FROM social_club_match_players WHERE uid = ? AND mid IN (SELECT id FROM social_club_matches WHERE status IN ('challenge', 'signup'))", me.id),
         this.q("DELETE FROM social_games WHERE uid = ?", me.id),
         this.q("DELETE FROM social_keys WHERE uid = ?", me.id),
         this.q("DELETE FROM social_links WHERE uid = ?", me.id),
@@ -1180,6 +1210,279 @@ export class Social {
       return { outcome: final?.outcome ?? outcome, you: game.a_uid === me.id ? "a" : "b" };
     }
     throw new HttpError(404, "not found");
+  }
+
+  // ---- club team matches ----
+  // POST /clubs/:id/matches {opponent, tc, boards}: a club's owner challenges another club
+  // GET /clubs/:id/matches: the club's matches
+  // POST /matches/:mid/accept | decline (the challenged owner) | join {pid} | leave | start (either owner)
+  // GET /matches/:mid: sign-ups, boards and results; also moves the match along
+  private async clubMatches(request: Request, me: UserRow, seg: string[], now: number): Promise<unknown> {
+    const method = request.method;
+    const memberOf = async (club: string) => !!(await this.q("SELECT 1 AS x FROM social_club_members WHERE club = ? AND member = ?", club, me.id).first());
+    const ownerOf = async (club: string) => !!(await this.q("SELECT 1 AS x FROM social_clubs WHERE id = ? AND owner = ?", club, me.id).first());
+    if (seg[0] === "clubs") {
+      const club = str(seg[1], 32);
+      if (method === "POST") {
+        const b = await body(request);
+        if (!(await ownerOf(club))) throw new HttpError(403, "only the club's owner can challenge another club");
+        const opponent = str(b["opponent"], 32);
+        if (opponent === club) throw new HttpError(400, "a club can't play itself");
+        if (!(await this.q("SELECT 1 AS x FROM social_clubs WHERE id = ?", opponent).first())) throw new HttpError(404, "no such club");
+        const tc = MATCH_TCS.includes(String(b["tc"])) ? String(b["tc"]) : "3d";
+        const boards = Math.max(1, Math.min(50, Math.round(Number(b["boards"]) || 10)));
+        await this.rateLimit("SELECT COUNT(*) AS n FROM social_club_matches WHERE a_club = ? AND status IN ('challenge', 'signup')", [club], 5, "open challenges");
+        const id = "cm_" + randomString(10).toLowerCase();
+        await this.q("INSERT INTO social_club_matches (id, a_club, b_club, tc, boards, created) VALUES (?, ?, ?, ?, ?, ?)", id, club, opponent, tc, boards, now).run();
+        return { id };
+      }
+      if (!(await memberOf(club))) throw new HttpError(403, "join the club first");
+      const r = await this.q(`SELECT m.*, a.name AS a_name, b.name AS b_name,
+          (SELECT COUNT(*) FROM social_club_match_players p WHERE p.mid = m.id AND p.side = 'a') AS a_players,
+          (SELECT COUNT(*) FROM social_club_match_players p WHERE p.mid = m.id AND p.side = 'b') AS b_players
+          FROM social_club_matches m LEFT JOIN social_clubs a ON a.id = m.a_club LEFT JOIN social_clubs b ON b.id = m.b_club
+          WHERE (m.a_club = ? OR m.b_club = ?) AND m.status <> 'declined' ORDER BY m.created DESC LIMIT 20`, club, club).all();
+      return { matches: r.results };
+    }
+    const mid = str(seg[1], 32);
+    type M = { id: string; a_club: string; b_club: string; tc: string; boards: number; status: string; created: number; starts: number };
+    const m = await this.q("SELECT * FROM social_club_matches WHERE id = ?", mid).first<M>();
+    if (!m) throw new HttpError(404, "no such match");
+    const action = seg[2] ?? "";
+    const side = (await memberOf(m.a_club)) ? "a" : (await memberOf(m.b_club)) ? "b" : null;
+    if (method === "POST" && (action === "accept" || action === "decline")) {
+      if (m.status !== "challenge") throw new HttpError(409, "this challenge has been answered");
+      if (!(await ownerOf(m.b_club))) throw new HttpError(403, "only the challenged club's owner can answer");
+      if (action === "accept") await this.q("UPDATE social_club_matches SET status = 'signup', starts = ? WHERE id = ? AND status = 'challenge'", now + MATCH_SIGNUP_MS, mid).run();
+      else await this.q("UPDATE social_club_matches SET status = 'declined' WHERE id = ?", mid).run();
+    } else if (method === "POST" && action === "join") {
+      if (m.status !== "signup" && m.status !== "challenge") throw new HttpError(409, "sign-ups are closed");
+      if (!side) throw new HttpError(403, "only members of the two clubs can play");
+      const b = await body(request);
+      const pid = str(b["pid"], 64);
+      if (!PID_RE.test(pid)) throw new HttpError(400, "bad player id");
+      await this.q("INSERT OR REPLACE INTO social_club_match_players (mid, uid, side, pid, joined) VALUES (?, ?, ?, ?, ?)", mid, me.id, side, pid, now).run();
+    } else if (method === "POST" && action === "leave") {
+      if (m.status !== "signup" && m.status !== "challenge") throw new HttpError(409, "the match has started");
+      await this.q("DELETE FROM social_club_match_players WHERE mid = ? AND uid = ?", mid, me.id).run();
+    } else if (method === "POST" && action === "start") {
+      if (m.status !== "signup") throw new HttpError(409, "the match can't start now");
+      if (!(await ownerOf(m.a_club)) && !(await ownerOf(m.b_club))) throw new HttpError(403, "only the clubs' owners can start the match");
+      await this.matchStart(m, now);
+    } else if (!(method === "GET" && seg.length === 2)) throw new HttpError(404, "not found");
+    if (!side && !(method === "POST")) throw new HttpError(403, "only members of the two clubs can see this match");
+    await this.matchTick(mid, now);
+    return this.matchView(mid, me);
+  }
+
+  // pair the boards: each club's players by rapid rating, top against top; two games per board
+  private async matchStart(m: { id: string; tc: string; boards: number }, now: number) {
+    const token = randomString(12);
+    await this.q("UPDATE social_club_matches SET status = 'running', starts = ?, token = ? WHERE id = ? AND status = 'signup'", now, token, m.id).run();
+    const mine = await this.q("SELECT token FROM social_club_matches WHERE id = ?", m.id).first<{ token: string }>();
+    if (!mine || mine.token !== token) return;
+    const players = (await this.q(`SELECT p.uid, p.side, p.pid, u.r_rapid AS rating FROM social_club_match_players p
+        JOIN social_users u ON u.id = p.uid WHERE p.mid = ? ORDER BY u.r_rapid DESC, p.joined`, m.id).all<{ uid: string; side: string; pid: string; rating: number }>()).results;
+    const a = players.filter((p) => p.side === "a"), b = players.filter((p) => p.side === "b");
+    const n = Math.min(m.boards, a.length, b.length);
+    if (!n) { await this.q("UPDATE social_club_matches SET status = 'cancelled' WHERE id = ?", m.id).run(); return; }
+    const stmts = [];
+    for (let i = 0; i < n; i++) {
+      const pa = a[i]!, pb = b[i]!;
+      for (const [w, bl, wSide] of [[pa, pb, "a"], [pb, pa, "b"]] as const) {
+        const room = "cm" + randomString(10).toLowerCase();
+        stmts.push(this.q("INSERT INTO social_club_match_games (room, mid, board, w_uid, w_pid, b_uid, b_pid, w_side, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          room, m.id, i + 1, w.uid, w.pid, bl.uid, bl.pid, wSide, now));
+      }
+    }
+    await this.many(...stmts);
+  }
+
+  // start when sign-ups close; score games as they finish (from the rooms); end when all are done
+  private async matchTick(mid: string, now: number) {
+    const m = await this.q("SELECT * FROM social_club_matches WHERE id = ?", mid).first<{ id: string; tc: string; boards: number; status: string; starts: number }>();
+    if (!m) return;
+    if (m.status === "signup" && now >= m.starts) { await this.matchStart(m, now); return; }
+    if (m.status !== "running") return;
+    const days = Number(m.tc.replace("d", "")) || 3;
+    const open = (await this.q("SELECT * FROM social_club_match_games WHERE mid = ? AND outcome IS NULL", mid).all<{ room: string; w_pid: string; b_pid: string; w_side: string; created: number }>()).results;
+    for (const g of open.slice(0, 8)) {
+      let outcome: string | null = null;
+      const st = this.hooks.roomState ? await this.hooks.roomState(g.room) : null;
+      if (st && st.status === "over" && st.result) {
+        const r = st.result;
+        outcome = r.reason === "aborted" ? "draw" : r.draw ? "draw" : r.winner === g.w_pid ? "w" : r.winner === g.b_pid ? "b" : "draw";
+      } else if ((!st || st.status === "waiting") && now - g.created > days * 86_400_000) {
+        // nobody (or only one player) came within a move's allowance
+        const seated = st ? st.seats : [];
+        outcome = seated.includes(g.w_pid) ? "w-forfeit" : seated.includes(g.b_pid) ? "b-forfeit" : "double-forfeit";
+      }
+      if (!outcome) continue;
+      const token = randomString(12);
+      const wPts = outcome.startsWith("w") ? 2 : outcome === "draw" ? 1 : 0, bPts = outcome.startsWith("b") ? 2 : outcome === "draw" ? 1 : 0;
+      const aPts = g.w_side === "a" ? wPts : bPts, bClubPts = g.w_side === "a" ? bPts : wPts;
+      await this.many(
+        this.q("UPDATE social_club_match_games SET outcome = ?, token = ? WHERE room = ? AND outcome IS NULL", outcome, token, g.room),
+        this.q("UPDATE social_club_matches SET a_score2 = a_score2 + ?, b_score2 = b_score2 + ? WHERE id = ? AND EXISTS (SELECT 1 FROM social_club_match_games WHERE room = ? AND token = ?)", aPts, bClubPts, mid, g.room, token));
+    }
+    const left = await this.q("SELECT COUNT(*) AS n FROM social_club_match_games WHERE mid = ? AND outcome IS NULL", mid).first<{ n: number }>();
+    if (left && left.n === 0) await this.q("UPDATE social_club_matches SET status = 'done' WHERE id = ? AND status = 'running'", mid).run();
+  }
+
+  private async matchView(mid: string, me: UserRow) {
+    const [mr, players, games] = await this.many(
+      this.q(`SELECT m.*, a.name AS a_name, b.name AS b_name, a.owner AS a_owner, b.owner AS b_owner FROM social_club_matches m
+          LEFT JOIN social_clubs a ON a.id = m.a_club LEFT JOIN social_clubs b ON b.id = m.b_club WHERE m.id = ?`, mid),
+      this.q(`SELECT p.uid, p.side, p.pid, u.name, u.avatar, u.r_rapid AS rating FROM social_club_match_players p
+          LEFT JOIN social_users u ON u.id = p.uid WHERE p.mid = ? ORDER BY u.r_rapid DESC`, mid),
+      this.q(`SELECT g.room, g.board, g.w_uid, g.b_uid, g.w_pid, g.b_pid, g.w_side, g.outcome, w.name AS w_name, b.name AS b_name FROM social_club_match_games g
+          LEFT JOIN social_users w ON w.id = g.w_uid LEFT JOIN social_users b ON b.id = g.b_uid WHERE g.mid = ? ORDER BY g.board, g.w_side`, mid));
+    const m = mr?.[0] as Record<string, unknown> | undefined;
+    if (!m) throw new HttpError(404, "no such match");
+    const plist = ((players ?? []) as Record<string, unknown>[]).map((p) => {
+      let avatar: unknown = null;
+      try { avatar = p["avatar"] ? JSON.parse(String(p["avatar"])) : null; } catch { avatar = null; }
+      return { uid: p["uid"], side: p["side"], name: p["name"] ?? "Deleted player", avatar, rating: p["rating"] };
+    });
+    const glist = ((games ?? []) as Record<string, unknown>[]).map((g) => ({
+      room: g["room"], board: g["board"], wSide: g["w_side"], outcome: g["outcome"] ?? null,
+      white: { uid: g["w_uid"], name: g["w_name"] ?? "Deleted player" }, black: { uid: g["b_uid"], name: g["b_name"] ?? "Deleted player" },
+      mine: g["w_uid"] === me.id ? { color: "w", pid: g["w_pid"] } : g["b_uid"] === me.id ? { color: "b", pid: g["b_pid"] } : null,
+    }));
+    const { token: _t, a_owner, b_owner, ...match } = m;
+    void _t;
+    return {
+      match: { ...match, aScore: Number(m["a_score2"]) / 2, bScore: Number(m["b_score2"]) / 2 },
+      players: plist, games: glist, me: { joined: plist.some((p) => p.uid === me.id), owner: a_owner === me.id ? "a" : b_owner === me.id ? "b" : null },
+    };
+  }
+
+  // ---- Vote Chess ----
+  // POST /clubs/:id/votechess {opponent, tc}: an owner challenges; GET /clubs/:id/votechess: the club's games
+  // POST /votechess/:vid/accept | decline (the challenged owner); GET /votechess/:vid: the game and the vote
+  // POST /votechess/:vid/vote {move}: a member of the side to move votes ("e2e4", "e7e8q")
+  // POST /votechess/:vid/play: that side's owner plays the leading move now (otherwise it's played at the deadline)
+  private async voteChess(request: Request, me: UserRow, seg: string[], now: number): Promise<unknown> {
+    const method = request.method;
+    const memberOf = async (club: string) => !!(await this.q("SELECT 1 AS x FROM social_club_members WHERE club = ? AND member = ?", club, me.id).first());
+    const ownerOf = async (club: string) => !!(await this.q("SELECT 1 AS x FROM social_clubs WHERE id = ? AND owner = ?", club, me.id).first());
+    if (seg[0] === "clubs") {
+      const club = str(seg[1], 32);
+      if (method === "POST") {
+        const b = await body(request);
+        if (!(await ownerOf(club))) throw new HttpError(403, "only the club's owner can challenge another club");
+        const opponent = str(b["opponent"], 32);
+        if (opponent === club || !(await this.q("SELECT 1 AS x FROM social_clubs WHERE id = ?", opponent).first())) throw new HttpError(404, "no such club");
+        const tc = MATCH_TCS.includes(String(b["tc"])) ? String(b["tc"]) : "1d";
+        await this.rateLimit("SELECT COUNT(*) AS n FROM social_vote_games WHERE a_club = ? AND status IN ('challenge', 'running')", [club], 3, "Vote Chess games");
+        const id = "vc_" + randomString(10).toLowerCase();
+        await this.q("INSERT INTO social_vote_games (id, a_club, b_club, tc, created) VALUES (?, ?, ?, ?, ?)", id, club, opponent, tc, now).run();
+        return { id };
+      }
+      if (!(await memberOf(club))) throw new HttpError(403, "join the club first");
+      const r = await this.q(`SELECT v.id, v.a_club, v.b_club, v.tc, v.status, v.ply, v.deadline, v.result, a.name AS a_name, b.name AS b_name
+          FROM social_vote_games v LEFT JOIN social_clubs a ON a.id = v.a_club LEFT JOIN social_clubs b ON b.id = v.b_club
+          WHERE (v.a_club = ? OR v.b_club = ?) AND v.status <> 'declined' ORDER BY v.created DESC LIMIT 20`, club, club).all();
+      return { games: r.results };
+    }
+    const vid = str(seg[1], 32);
+    type V = { id: string; a_club: string; b_club: string; room: string; a_pid: string; b_pid: string; tc: string; status: string; deadline: number; ply: number };
+    const g = await this.q("SELECT * FROM social_vote_games WHERE id = ?", vid).first<V>();
+    if (!g) throw new HttpError(404, "no such game");
+    const side = (await memberOf(g.a_club)) ? "a" : (await memberOf(g.b_club)) ? "b" : null;
+    if (!side) throw new HttpError(403, "only members of the two clubs can take part");
+    const action = seg[2] ?? "";
+    const toMove = g.ply % 2 === 0 ? "a" : "b";
+    if (method === "POST" && (action === "accept" || action === "decline")) {
+      if (g.status !== "challenge") throw new HttpError(409, "this challenge has been answered");
+      if (!(await ownerOf(g.b_club))) throw new HttpError(403, "only the challenged club's owner can answer");
+      if (action === "decline") await this.q("UPDATE social_vote_games SET status = 'declined' WHERE id = ?", vid).run();
+      else await this.voteStart(g, now);
+    } else if (method === "POST" && action === "vote") {
+      if (g.status !== "running") throw new HttpError(409, "the game isn't in play");
+      if (side !== toMove) throw new HttpError(409, "it's the other club's move");
+      const b = await body(request);
+      const move = str(b["move"], 5);
+      if (!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)) throw new HttpError(400, "bad move");
+      await this.q("INSERT OR REPLACE INTO social_vote_votes (game, ply, uid, move, created) VALUES (?, ?, ?, ?, ?)", vid, g.ply, me.id, move, now).run();
+    } else if (method === "POST" && action === "play") {
+      if (g.status !== "running") throw new HttpError(409, "the game isn't in play");
+      if (!(await ownerOf(toMove === "a" ? g.a_club : g.b_club))) throw new HttpError(403, "only the owner of the club to move can play the move early");
+      await this.votePlay(g, now, true);
+    } else if (!(method === "GET" && seg.length === 2)) throw new HttpError(404, "not found");
+    // the move is due: play the most popular legal one
+    const cur = await this.q("SELECT * FROM social_vote_games WHERE id = ?", vid).first<V>();
+    if (cur && cur.status === "running" && now >= cur.deadline) await this.votePlay(cur, now, false);
+    return this.voteView(vid, me, side);
+  }
+
+  // the clubs' seats in a fresh room: each plays as "<club name>"
+  private async voteStart(g: { id: string; a_club: string; b_club: string; tc: string }, now: number) {
+    if (!this.hooks.roomAct) throw new HttpError(503, "games can't be started right now");
+    const token = randomString(12);
+    await this.q("UPDATE social_vote_games SET status = 'starting', token = ? WHERE id = ? AND status = 'challenge'", token, g.id).run();
+    const mine = await this.q("SELECT token FROM social_vote_games WHERE id = ?", g.id).first<{ token: string }>();
+    if (!mine || mine.token !== token) return;
+    const names = await this.many(this.q("SELECT name FROM social_clubs WHERE id = ?", g.a_club), this.q("SELECT name FROM social_clubs WHERE id = ?", g.b_club));
+    const slug = (r: Record<string, unknown>[] | undefined) => (String(r?.[0]?.["name"] ?? "Club").replace(/[^A-Za-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 16) || "Club");
+    const room = "vc" + randomString(10).toLowerCase();
+    const aPid = `p-vc${randomString(6).toLowerCase()}.${slug(names[0])}.1500`, bPid = `p-vc${randomString(6).toLowerCase()}.${slug(names[1])}.1500`;
+    await this.hooks.roomAct(room, aPid, null);
+    await this.hooks.roomAct(room, bPid, null);
+    const cfg = await this.hooks.roomAct(room, aPid, { t: "config", tc: g.tc });
+    if (!cfg.ok) { await this.q("UPDATE social_vote_games SET status = 'challenge' WHERE id = ?", g.id).run(); throw new HttpError(503, "couldn't set up the game"); }
+    const days = Number(g.tc.replace("d", "")) || 1;
+    await this.q("UPDATE social_vote_games SET status = 'running', room = ?, a_pid = ?, b_pid = ?, deadline = ?, ply = 0 WHERE id = ?", room, aPid, bPid, now + days * 86_400_000, g.id).run();
+  }
+
+  // play the side's most voted legal move (ties: the earliest vote); no legal vote at the deadline loses on time
+  private async votePlay(g: { id: string; room: string; a_pid: string; b_pid: string; tc: string; ply: number }, now: number, early: boolean) {
+    if (!this.hooks.roomAct) return;
+    const token = randomString(12);
+    // claim this ply: parking the ply number makes the claim atomic (a second request matches nothing)
+    const LOCK = 1_000_000;
+    await this.q("UPDATE social_vote_games SET token = ?, ply = ply + ? WHERE id = ? AND ply = ? AND status = 'running'", token, LOCK, g.id, g.ply).run();
+    const claim = await this.q("SELECT token, ply FROM social_vote_games WHERE id = ?", g.id).first<{ token: string; ply: number }>();
+    if (!claim || claim.token !== token || claim.ply !== g.ply + LOCK) return;
+    const pid = g.ply % 2 === 0 ? g.a_pid : g.b_pid;
+    const votes = (await this.q(`SELECT move, COUNT(*) AS n, MIN(created) AS first FROM social_vote_votes WHERE game = ? AND ply = ?
+        GROUP BY move ORDER BY n DESC, first ASC`, g.id, g.ply).all<{ move: string; n: number }>()).results;
+    let played: { ok: boolean; status?: string; result?: RoomState["result"] } | null = null;
+    for (const v of votes) {
+      const r = await this.hooks.roomAct(g.room, pid, { t: "move", from: v.move.slice(0, 2), to: v.move.slice(2, 4), promotion: v.move[4] || undefined });
+      if (r.ok) { played = r; break; }
+    }
+    if (!played) {
+      if (early) { await this.q("UPDATE social_vote_games SET token = NULL, ply = ? WHERE id = ?", g.ply, g.id).run(); throw new HttpError(409, "there's no legal move with votes yet"); }
+      await this.hooks.roomAct(g.room, pid, { t: "resign" });
+      await this.q("UPDATE social_vote_games SET status = 'done', ply = ?, result = ? WHERE id = ?", g.ply, g.ply % 2 === 0 ? "0-1" : "1-0", g.id).run();
+      return;
+    }
+    const days = Number(g.tc.replace("d", "")) || 1;
+    if (played.status === "over") {
+      const r = played.result;
+      const res = !r || r.draw ? "1/2-1/2" : r.winner === g.a_pid ? "1-0" : "0-1";
+      await this.q("UPDATE social_vote_games SET status = 'done', ply = ?, result = ? WHERE id = ?", g.ply + 1, res, g.id).run();
+    } else await this.q("UPDATE social_vote_games SET ply = ?, deadline = ? WHERE id = ?", g.ply + 1, now + days * 86_400_000, g.id).run();
+  }
+
+  private async voteView(vid: string, me: UserRow, side: string) {
+    const [gr, tally, mine] = await this.many(
+      this.q(`SELECT v.id, v.a_club, v.b_club, v.room, v.tc, v.status, v.ply, v.deadline, v.result, a.name AS a_name, b.name AS b_name, a.owner AS a_owner, b.owner AS b_owner
+          FROM social_vote_games v LEFT JOIN social_clubs a ON a.id = v.a_club LEFT JOIN social_clubs b ON b.id = v.b_club WHERE v.id = ?`, vid),
+      this.q(`SELECT move, COUNT(*) AS n FROM social_vote_votes WHERE game = ? AND ply = (SELECT ply FROM social_vote_games WHERE id = ?)
+          GROUP BY move ORDER BY n DESC, MIN(created) ASC`, vid, vid),
+      this.q("SELECT move FROM social_vote_votes WHERE game = ? AND uid = ? AND ply = (SELECT ply FROM social_vote_games WHERE id = ?)", vid, me.id, vid));
+    const g = gr?.[0] as Record<string, unknown> | undefined;
+    if (!g) throw new HttpError(404, "no such game");
+    const toMove = Number(g["ply"]) % 2 === 0 ? "a" : "b";
+    const { a_owner, b_owner, ...game } = g;
+    return {
+      game, side, toMove, colour: side === "a" ? "w" : "b",
+      // only your own club's votes are shown while it's your move
+      tally: side === toMove ? (tally ?? []) : [], myVote: mine?.[0]?.["move"] ?? null,
+      owner: (side === "a" ? a_owner : b_owner) === me.id,
+    };
   }
 
   // ---- Swiss tournaments ----

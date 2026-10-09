@@ -9,6 +9,9 @@ const out = await build({ entryPoints: [new URL("../server/social.ts", import.me
 const dir = mkdtempSync(join(tmpdir(), "social-"));
 writeFileSync(join(dir, "social.mjs"), out.outputFiles[0].text);
 const { Social, swissPairings } = await import(join(dir, "social.mjs"));
+// Vote Chess plays moves into rooms: the tests referee them with the real rules (dist/logic.js)
+const L = await import(new URL("../dist/logic.js", import.meta.url).href);
+const actRooms = new Map();
 
 function d1(db) {
   return {
@@ -43,6 +46,21 @@ const pending = [];
 let feedCalls = 0;
 const api = new Social(d1(new DatabaseSync(":memory:")), () => clock, {
   roomState: async (room) => rooms.get(room) ?? null,
+  roomAct: async (room, pid, action) => {
+    const r = actRooms.get(room) || { seats: [], status: "waiting", state: null, result: null };
+    actRooms.set(room, r);
+    if (!r.seats.includes(pid) && r.seats.length < 2) r.seats.push(pid);
+    if (r.status === "waiting" && r.seats.length >= 2) { r.state = L.setup(r.seats); r.status = "playing"; }
+    if (action == null) return { ok: true, status: r.status };
+    if (r.status !== "playing") return { ok: false, error: "game is not in progress" };
+    const v = L.validateAction(r.state, pid, action);
+    if (!v.ok) return { ok: false, error: v.error };
+    r.state = L.applyAction(r.state, pid, action);
+    const end = L.isGameOver(r.state);
+    if (end.over) { r.status = "over"; r.result = end; }
+    rooms.set(room, { status: r.status, seats: r.seats, result: r.result });
+    return { ok: true, status: r.status, result: r.result };
+  },
   waitUntil: (p) => pending.push(p),
   pushFetch: async (url, init) => { pushes.push({ url, init }); return new Response(null, { status: pushStatus }); },
   feedFetch: async (url) => {
@@ -323,6 +341,78 @@ await call("POST", "/delete", { secret: rep3.secret });
   ok(v.tournament.status === "done" && v.standings[0].score >= v.standings[2].score, "with nobody left to pair, the tournament ends with final standings");
   ok(typeof v.standings[0].buchholz === "number", "standings carry a Buchholz tie-break");
   clock = saved;
+}
+
+// club team matches
+{
+  const ca = (await call("POST", "/clubs/create", { secret: ann.secret, body: { name: "Rooks United" } })).data;
+  const cb = (await call("POST", "/clubs/create", { secret: cid.secret, body: { name: "Knights FC" } })).data;
+  await call("POST", "/clubs/join", { secret: dee.secret, body: { code: ca.code } });
+  ok((await call("POST", `/clubs/${ca.id}/matches`, { secret: dee.secret, body: { opponent: cb.id } })).status === 403, "only a club's owner can challenge");
+  const ch = (await call("POST", `/clubs/${ca.id}/matches`, { secret: ann.secret, body: { opponent: cb.id, tc: "1d", boards: 5 } })).data;
+  ok(ch.id && ch.id.startsWith("cm_"), "a club challenges another club");
+  ok((await call("GET", `/clubs/${cb.id}/matches`, { secret: cid.secret })).data.matches.some((m) => m.id === ch.id && m.status === "challenge"), "the challenged club sees it");
+  ok((await call("POST", `/matches/${ch.id}/accept`, { secret: ann.secret })).status === 403, "only the challenged owner answers");
+  await call("POST", `/matches/${ch.id}/accept`, { secret: cid.secret });
+  const mp = (u) => `p-cm${u.name.toLowerCase()}.${u.name}.1500`;
+  for (const u of [ann, dee, cid]) await call("POST", `/matches/${ch.id}/join`, { secret: u.secret, body: { pid: mp(u) } });
+  let mv = (await call("GET", `/matches/${ch.id}`, { secret: dee.secret })).data;
+  ok(mv.match.status === "signup" && mv.players.length === 3 && mv.me.joined, "members of both clubs sign up");
+  const outsider = (await call("POST", "/register", { body: { name: "Out" }, ip: "7.7.7.7" })).data;
+  ok((await call("GET", `/matches/${ch.id}`, { secret: outsider.secret })).status === 403, "outsiders can't see the match");
+  ok((await call("POST", `/matches/${ch.id}/join`, { secret: outsider.secret, body: { pid: "p-out.Out.1500" } })).status === 403, "or play in it");
+  await call("POST", "/delete", { secret: outsider.secret });
+  await call("POST", `/matches/${ch.id}/start`, { secret: cid.secret });
+  mv = (await call("GET", `/matches/${ch.id}`, { secret: ann.secret })).data;
+  ok(mv.match.status === "running" && mv.games.length === 2 && mv.games.every((g) => g.board === 1), "the match starts: one board (2 against 1), two games");
+  // Rooks United's board-one player is whoever is rated higher of Ann and Dee
+  const gA = mv.games.find((g) => g.wSide === "a"), gB = mv.games.find((g) => g.wSide === "b");
+  const top = [ann, dee].find((u) => u.id === gA.white.uid);
+  const tv = (await call("GET", `/matches/${ch.id}`, { secret: top.secret })).data;
+  const mineG = tv.games.filter((g) => g.mine);
+  ok(mineG.length === 2 && mineG.some((g) => g.mine.color === "w") && mineG.some((g) => g.mine.color === "b") && mineG[0].mine.pid === mp(top), "the board-one player plays both colours, and sees their player id");
+  rooms.set(gA.room, { status: "over", seats: [mp(top), mp(cid)], result: { winner: mp(top), reason: "resignation" } });
+  rooms.set(gB.room, { status: "over", seats: [mp(cid), mp(top)], result: { draw: true, reason: "agreement" } });
+  mv = (await call("GET", `/matches/${ch.id}`, { secret: cid.secret })).data;
+  ok(mv.match.status === "done" && mv.match.aScore === 1.5 && mv.match.bScore === 0.5, "results come from the rooms: Rooks United 1.5, Knights FC 0.5");
+}
+
+// Vote Chess
+{
+  const va = (await call("POST", "/clubs/create", { secret: ann.secret, body: { name: "Vote Rooks" } })).data;
+  const vb = (await call("POST", "/clubs/create", { secret: cid.secret, body: { name: "Vote Knights" } })).data;
+  await call("POST", "/clubs/join", { secret: dee.secret, body: { code: va.code } });
+  const vg = (await call("POST", `/clubs/${va.id}/votechess`, { secret: ann.secret, body: { opponent: vb.id, tc: "1d" } })).data;
+  ok(vg.id && vg.id.startsWith("vc_"), "a club challenges another to Vote Chess");
+  await call("POST", `/votechess/${vg.id}/accept`, { secret: cid.secret });
+  let vv = (await call("GET", `/votechess/${vg.id}`, { secret: dee.secret })).data;
+  const room = vv.game.room;
+  ok(vv.game.status === "running" && vv.toMove === "a" && vv.colour === "w" && actRooms.get(room)?.status === "playing", "accepted: the clubs are seated in a room, White to vote");
+  ok((await call("POST", `/votechess/${vg.id}/vote`, { secret: cid.secret, body: { move: "e7e5" } })).status === 409, "the other club can't vote out of turn");
+  await call("POST", `/votechess/${vg.id}/vote`, { secret: dee.secret, body: { move: "e2e4" } });
+  clock += 1000;
+  await call("POST", `/votechess/${vg.id}/vote`, { secret: ann.secret, body: { move: "d2d4" } });
+  vv = (await call("GET", `/votechess/${vg.id}`, { secret: ann.secret })).data;
+  ok(vv.tally.length === 2 && vv.myVote === "d2d4", "votes are tallied, and you see your own");
+  ok((await call("GET", `/votechess/${vg.id}`, { secret: cid.secret })).data.tally.length === 0, "the other club doesn't see your votes");
+  ok((await call("POST", `/votechess/${vg.id}/play`, { secret: dee.secret })).status === 403, "only the owner can play the move early");
+  await call("POST", `/votechess/${vg.id}/play`, { secret: ann.secret });
+  ok(actRooms.get(room).state.moves[0].to === "e4", "a tie goes to the earlier vote: 1.e4 is played");
+  await call("POST", `/votechess/${vg.id}/vote`, { secret: cid.secret, body: { move: "e7e5" } });
+  clock += 86_400_000 + 1000;
+  vv = (await call("GET", `/votechess/${vg.id}`, { secret: cid.secret })).data;
+  ok(vv.game.ply === 2 && actRooms.get(room).state.moves[1].to === "e5", "at the deadline the leading move is played (1...e5)");
+  await call("POST", `/votechess/${vg.id}/vote`, { secret: dee.secret, body: { move: "e2e4" } });
+  clock += 1000;
+  await call("POST", `/votechess/${vg.id}/vote`, { secret: ann.secret, body: { move: "g1f3" } });
+  await call("POST", `/votechess/${vg.id}/play`, { secret: ann.secret });
+  ok(actRooms.get(room).state.moves[2].to === "f3", "an illegal vote is skipped for the next one (2.Nf3)");
+  clock += 86_400_000 + 1000;
+  vv = (await call("GET", `/votechess/${vg.id}`, { secret: ann.secret })).data;
+  ok(vv.game.status === "done" && vv.game.result === "1-0" && actRooms.get(room).status === "over", "a side with no votes at the deadline loses");
+  const outsider = (await call("POST", "/register", { body: { name: "Out2" }, ip: "8.8.8.8" })).data;
+  ok((await call("GET", `/votechess/${vg.id}`, { secret: outsider.secret })).status === 403, "outsiders can't see or vote");
+  await call("POST", "/delete", { secret: outsider.secret });
 }
 
 // variant ratings and leaderboards
