@@ -1,6 +1,6 @@
 // First visit: pick a name and say how well you play, which seeds your ratings and suggests a bot
 // (chess.com asks the same question when you sign up).
-import { h } from "../ui/dom.js";
+import { h, icon } from "../ui/dom.js";
 import { openModal } from "../ui/components.js";
 import { getProfile, updateProfile } from "../store.js";
 import { BOTS } from "../bots.js";
@@ -16,11 +16,29 @@ export function maybeWelcome(app) {
   const p = getProfile();
   if (p.onboarded || p.stats.games > 0) return;
   let level = LEVELS[1];
-  const name = h("input.input", { value: p.name, maxlength: "16", "aria-label": "Display name" });
-  const list = h("div.rows", ...LEVELS.map(l => {
-    const b = h(`button.row${l === level ? ".on" : ""}`, { onclick: () => { level = l; list.querySelectorAll(".row").forEach(x => x.style.borderColor = ""); b.style.borderColor = "var(--accent)"; } },
-      h("span.rt", h("b", l.label), h("small", l.sub)));
-    if (l === level) b.style.borderColor = "var(--accent)";
+  const name = h("input.input", { id: "welcome-name", value: p.name, maxlength: "16", "aria-label": "Display name" });
+  function selectLevel(l) {
+    level = l;
+    list.querySelectorAll("[role=radio]").forEach((button, i) => {
+      const selected = LEVELS[i] === l;
+      button.setAttribute("aria-checked", String(selected));
+      button.tabIndex = selected ? 0 : -1;
+    });
+  }
+  const list = h("div.rows.welcome-levels", { role: "radiogroup", "aria-label": "How well do you play?" }, ...LEVELS.map((l, i) => {
+    const b = h("button.row", {
+      type: "button", role: "radio", "aria-checked": String(l === level), tabindex: l === level ? "0" : "-1",
+      onclick: () => selectLevel(l),
+      onkeydown: e => {
+        const direction = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+        if (!direction && e.key !== "Home" && e.key !== "End") return;
+        e.preventDefault();
+        const next = e.key === "Home" ? 0 : e.key === "End" ? LEVELS.length - 1 : (i + direction + LEVELS.length) % LEVELS.length;
+        selectLevel(LEVELS[next]);
+        list.children[next].focus();
+      },
+    }, h("span.rt", h("b", l.label), h("small", l.sub)),
+    h("span.welcome-check", { "aria-hidden": "true" }, icon("check", 16)));
     return b;
   }));
   const m = openModal({
@@ -28,7 +46,7 @@ export function maybeWelcome(app) {
     sub: "Two quick questions so we can match you with the right bots and puzzles.",
     onClose: () => updateProfile(pr => { pr.onboarded = true; }),
     body: [
-      h("div.field", h("label", "Your name"), name),
+      h("div.field", h("label", { for: "welcome-name" }, "Your name"), name),
       h("div.field", h("div.lbl", "How well do you play?"), list),
       h("button.btn.primary.big.block", {
         onclick: () => {
@@ -46,6 +64,7 @@ export function maybeWelcome(app) {
       }, "Let's play"),
     ],
   });
+  m.el.classList.add("welcome-modal");
 }
 
 // the bot closest to a rating, for "suggested opponent" copy

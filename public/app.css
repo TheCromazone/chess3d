@@ -352,6 +352,19 @@ textarea.input { min-height: 110px; resize: vertical; font-family: ui-monospace,
 .modal-head h2 { font-family: var(--display); font-size: 34px; font-weight: 700; line-height: 1.05; }
 .modal-head p { color: var(--ink-2); margin-top: 4px; }
 .modal-head .x { position: absolute; right: 10px; top: 10px; padding: 6px; color: var(--ink-3); border-radius: 8px; }
+.welcome-modal .modal-head { text-align: left; padding-right: 64px; }
+.welcome-modal .modal-head h2 { font-size: 32px; text-wrap: balance; }
+.welcome-modal .modal-head p { font-size: 14px; line-height: 1.5; margin-top: 8px; }
+.welcome-modal .modal-head .x { width: 44px; height: 44px; display: grid; place-items: center; }
+.welcome-modal .modal-body { gap: 16px; }
+.welcome-levels { gap: 8px; }
+.welcome-levels .row { padding: 12px 14px; min-height: 66px; transition: border-color .16s, background .16s; }
+.welcome-levels .row .rt small { white-space: normal; line-height: 1.4; margin-top: 3px; font-size: 13px; }
+.welcome-check { flex: none; width: 22px; height: 22px; border: 1px solid var(--line-2); border-radius: 50%; display: grid; place-items: center; }
+.welcome-check .ic { opacity: 0; }
+.welcome-levels [aria-checked="true"] { border-color: var(--accent); background: var(--panel-3); }
+.welcome-levels [aria-checked="true"] .welcome-check { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.welcome-levels [aria-checked="true"] .welcome-check .ic { opacity: 1; }
 .modal-body { padding: 12px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
 .vs { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 6px 0; }
 .vs .side { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 110px; }
