@@ -26,3 +26,7 @@ Engine lighting derived from formula: warm key directional light (#fff1e0) with 
 
 ## Interface (chess.com parity)
 Clocks top/bottom, captured trays + material score, SAN move list, buttons: new game, flip board, resign, offer draw, undo (local), sound/music toggles. Promotion picker modal. Game-over modal with reason + rematch. Menu: mode select → options → play. Invite-link banner in online waiting phase.
+
+### First-visit setup
+
+Keep the welcome sheet in the tournament-hall palette and serif display face. Reserve a separate 44px close target beside its heading. Experience choices use one radio group with an explicit checked marker, a warm selected surface and the existing emerald accent; descriptions wrap rather than ellipsize. Arrow keys move through the choices, Home/End choose the first/last, and only the selected choice is in the tab sequence. These controls seed the existing ratings and suggested modes; they do not change chess rules or bot strength.
